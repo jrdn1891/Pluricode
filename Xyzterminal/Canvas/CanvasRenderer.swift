@@ -1,0 +1,169 @@
+import MetalKit
+import simd
+
+final class CanvasRenderer: NSObject, MTKViewDelegate {
+    let device: MTLDevice
+    let commandQueue: MTLCommandQueue
+    let nodePipeline: MTLRenderPipelineState
+    let edgePipeline: MTLRenderPipelineState
+    let document: CanvasDocument
+    var terminalManager: TerminalManager?
+
+    init(device: MTLDevice, document: CanvasDocument) {
+        self.device = device
+        self.commandQueue = device.makeCommandQueue()!
+        self.document = document
+
+        let library = device.makeDefaultLibrary()!
+
+        let nodeDesc = MTLRenderPipelineDescriptor()
+        nodeDesc.vertexFunction = library.makeFunction(name: "vertex_node")
+        nodeDesc.fragmentFunction = library.makeFunction(name: "fragment_node")
+        nodeDesc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        nodeDesc.colorAttachments[0].isBlendingEnabled = true
+        nodeDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        nodeDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        nodeDesc.colorAttachments[0].sourceAlphaBlendFactor = .one
+        nodeDesc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        self.nodePipeline = try! device.makeRenderPipelineState(descriptor: nodeDesc)
+
+        let edgeVertexDesc = MTLVertexDescriptor()
+        edgeVertexDesc.attributes[0].format = .float2
+        edgeVertexDesc.attributes[0].offset = 0
+        edgeVertexDesc.attributes[0].bufferIndex = 0
+        edgeVertexDesc.attributes[1].format = .float4
+        edgeVertexDesc.attributes[1].offset = MemoryLayout<SIMD2<Float>>.stride
+        edgeVertexDesc.attributes[1].bufferIndex = 0
+        edgeVertexDesc.layouts[0].stride = MemoryLayout<EdgeVertex>.stride
+
+        let edgeDesc = MTLRenderPipelineDescriptor()
+        edgeDesc.vertexFunction = library.makeFunction(name: "vertex_edge")
+        edgeDesc.fragmentFunction = library.makeFunction(name: "fragment_edge")
+        edgeDesc.vertexDescriptor = edgeVertexDesc
+        edgeDesc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        edgeDesc.colorAttachments[0].isBlendingEnabled = true
+        edgeDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        edgeDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        edgeDesc.colorAttachments[0].sourceAlphaBlendFactor = .one
+        edgeDesc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        self.edgePipeline = try! device.makeRenderPipelineState(descriptor: edgeDesc)
+
+        super.init()
+    }
+
+    func draw(in view: MTKView) {
+        terminalManager?.sync(containerView: view)
+
+        guard let drawable = view.currentDrawable,
+              let passDescriptor = view.currentRenderPassDescriptor else { return }
+
+        let viewportPoints = SIMD2<Float>(Float(view.bounds.width), Float(view.bounds.height))
+        var uniforms = Uniforms(
+            viewProjection: document.camera.viewProjectionMatrix(viewportSize: viewportPoints),
+            viewportSize: viewportPoints,
+            zoom: document.camera.zoom,
+            contentsScale: Float(view.window?.backingScaleFactor ?? 2.0)
+        )
+
+        let commandBuffer = commandQueue.makeCommandBuffer()!
+        let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor)!
+        encoder.setCullMode(.none)
+
+        drawEdges(encoder: encoder, uniforms: &uniforms)
+        drawNodes(encoder: encoder, uniforms: &uniforms)
+
+        encoder.endEncoding()
+        commandBuffer.present(drawable)
+        commandBuffer.commit()
+    }
+
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+
+    private func drawEdges(encoder: MTLRenderCommandEncoder, uniforms: inout Uniforms) {
+        var allVertices: [EdgeVertex] = []
+
+        for edge in document.edges.values {
+            guard let source = document.nodes[edge.sourceID],
+                  let target = document.nodes[edge.targetID] else { continue }
+            let color = colorForEdgeType(edge.edgeType)
+            allVertices.append(contentsOf: EdgeTessellator.tessellate(from: source, to: target, color: color))
+        }
+
+        if let drag = document.edgeDrag {
+            let dummyTarget = CanvasNode(
+                id: UUID(),
+                position: drag.currentPoint - SIMD2<Float>(1, 1),
+                size: SIMD2<Float>(2, 2),
+                kind: .taskCard(TaskCardData())
+            )
+            if let source = document.nodes[drag.sourceNodeID] {
+                let color = SIMD4<Float>(0.5, 0.5, 0.6, 0.5)
+                allVertices.append(contentsOf: EdgeTessellator.tessellate(from: source, to: dummyTarget, color: color))
+            }
+        }
+
+        guard !allVertices.isEmpty else { return }
+
+        guard let buffer = device.makeBuffer(
+            bytes: allVertices,
+            length: MemoryLayout<EdgeVertex>.stride * allVertices.count,
+            options: .storageModeShared
+        ) else { return }
+
+        encoder.setRenderPipelineState(edgePipeline)
+        encoder.setVertexBuffer(buffer, offset: 0, index: 0)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: allVertices.count)
+    }
+
+    private func drawNodes(encoder: MTLRenderCommandEncoder, uniforms: inout Uniforms) {
+        var instances = document.nodes.values.map { node -> NodeInstance in
+            let isSelected = document.selectedNodeIDs.contains(node.id)
+            let color: SIMD4<Float> = switch node.kind {
+            case .terminal: SIMD4<Float>(0.14, 0.14, 0.18, 1.0)
+            case .taskCard: SIMD4<Float>(0.20, 0.20, 0.25, 1.0)
+            }
+            return NodeInstance(
+                position: node.position,
+                size: node.size,
+                color: color,
+                cornerRadius: 8,
+                selected: isSelected ? 1 : 0
+            )
+        }
+
+        if let rect = document.selectionRect {
+            instances.append(NodeInstance(
+                position: SIMD2<Float>(
+                    min(rect.origin.x, rect.origin.x + rect.size.x),
+                    min(rect.origin.y, rect.origin.y + rect.size.y)
+                ),
+                size: SIMD2<Float>(abs(rect.size.x), abs(rect.size.y)),
+                color: SIMD4<Float>(0.3, 0.5, 1.0, 0.12),
+                cornerRadius: 2,
+                selected: 0
+            ))
+        }
+
+        guard !instances.isEmpty else { return }
+        guard let buffer = device.makeBuffer(
+            bytes: instances,
+            length: MemoryLayout<NodeInstance>.stride * instances.count,
+            options: .storageModeShared
+        ) else { return }
+
+        encoder.setRenderPipelineState(nodePipeline)
+        encoder.setVertexBuffer(buffer, offset: 0, index: 0)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
+    }
+
+    private func colorForEdgeType(_ type: EdgeType) -> SIMD4<Float> {
+        switch type {
+        case .handsOffTo: return SIMD4<Float>(0.4, 0.7, 0.4, 0.8)
+        case .reviews: return SIMD4<Float>(0.7, 0.5, 0.2, 0.8)
+        case .assignedTo: return SIMD4<Float>(0.35, 0.55, 1.0, 0.8)
+        case .blocks, .blockedBy: return SIMD4<Float>(0.7, 0.3, 0.3, 0.8)
+        }
+    }
+}
