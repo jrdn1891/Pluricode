@@ -202,6 +202,13 @@ final class CanvasInputHandler {
         guard let session = terminalManager?.sessions[terminalID],
               let process = session.terminalView.process else { return }
 
+        let existingEdgeIDs = document.edges.values
+            .filter { $0.sourceID == taskID && $0.edgeType == .assignedTo }
+            .map(\.id)
+        for edgeID in existingEdgeIDs {
+            document.edges.removeValue(forKey: edgeID)
+        }
+
         document.addEdge(from: taskID, to: terminalID, type: .assignedTo)
 
         var updatedTask = taskData
