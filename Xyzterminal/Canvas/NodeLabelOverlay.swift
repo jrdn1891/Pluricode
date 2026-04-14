@@ -32,17 +32,17 @@ struct NodeLabelOverlay: View {
                         .frame(width: 8, height: 8)
                     Text(data.title)
                         .font(.system(size: max(10, 13 * CGFloat(document.camera.zoom)), weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
                     Spacer()
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: max(8, 10 * CGFloat(document.camera.zoom))))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(.secondary)
                 }
                 if !data.body.isEmpty && height > 50 {
                     Text(data.body)
                         .font(.system(size: max(9, 11 * CGFloat(document.camera.zoom))))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
             }
@@ -57,7 +57,7 @@ struct NodeLabelOverlay: View {
                         .foregroundStyle(.green.opacity(0.7))
                     Text(data.role?.rawValue.capitalized ?? "Terminal")
                         .font(.system(size: max(10, 13 * CGFloat(document.camera.zoom)), weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                     if let branch = data.branchName {
                         Text(branch)
                             .font(.system(size: max(8, 10 * CGFloat(document.camera.zoom)), design: .monospaced))

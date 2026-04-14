@@ -22,8 +22,9 @@ final class InlineEditor: NSObject, NSTextFieldDelegate {
         tf.font = .systemFont(ofSize: 14, weight: .semibold)
         tf.isBezeled = false
         tf.drawsBackground = true
-        tf.backgroundColor = NSColor(red: 0.18, green: 0.18, blue: 0.22, alpha: 1)
-        tf.textColor = .white
+        let theme = Theme(from: containerView.effectiveAppearance)
+        tf.backgroundColor = theme.inlineEditorBackground
+        tf.textColor = theme.inlineEditorTextColor
         tf.focusRingType = .exterior
         tf.alignment = .left
         tf.cell?.isScrollable = true

@@ -27,7 +27,7 @@ struct TaskCardEditor: View {
             TextField("Title", text: $title)
                 .textFieldStyle(.plain)
                 .font(.title2.bold())
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
 
             Picker("Status", selection: $status) {
                 ForEach(TaskCardData.Status.allCases, id: \.self) { s in
@@ -43,7 +43,7 @@ struct TaskCardEditor: View {
             TextEditor(text: $content)
                 .font(.body)
                 .scrollContentBackground(.hidden)
-                .background(Color.white.opacity(0.05))
+                .background(Color(nsColor: .controlBackgroundColor))
                 .cornerRadius(6)
                 .frame(minHeight: 150)
 
@@ -58,8 +58,7 @@ struct TaskCardEditor: View {
         }
         .padding(20)
         .frame(width: 450, height: 360)
-        .background(Color(nsColor: NSColor(red: 0.15, green: 0.15, blue: 0.18, alpha: 1)))
-        .preferredColorScheme(.dark)
+        .background(Color(nsColor: .windowBackgroundColor))
         .onDisappear { save() }
     }
 

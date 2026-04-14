@@ -12,9 +12,12 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
         self.terminalView = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 270))
         super.init()
         terminalView.processDelegate = self
-        terminalView.nativeBackgroundColor = NSColor(red: 0.10, green: 0.10, blue: 0.13, alpha: 1.0)
-        terminalView.nativeForegroundColor = NSColor.white
         terminalView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+    }
+
+    func updateColors(theme: Theme) {
+        terminalView.nativeBackgroundColor = theme.terminalBackground
+        terminalView.nativeForegroundColor = theme.terminalForeground
     }
 
     func start(in directory: String? = nil) {
