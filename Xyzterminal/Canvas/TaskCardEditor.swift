@@ -32,12 +32,20 @@ struct TaskCardEditor: View {
                 .font(.title2.bold())
                 .foregroundStyle(.white)
 
-            Picker("Status", selection: $status) {
-                ForEach(TaskCardData.Status.allCases, id: \.self) { s in
-                    Text(s.rawValue).tag(s)
+            HStack {
+                Picker("Status", selection: $status) {
+                    ForEach(TaskCardData.Status.allCases, id: \.self) { s in
+                        Text(s.rawValue).tag(s)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if let elapsed = taskDuration {
+                    Text(elapsed)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
                 }
             }
-            .pickerStyle(.segmented)
 
             Text("Description")
                 .font(.subheadline.bold())
@@ -79,9 +87,27 @@ struct TaskCardEditor: View {
         .onDisappear { save() }
     }
 
+    private var taskDuration: String? {
+        guard let node = document.nodes[nodeID],
+              case .taskCard(let data) = node.kind,
+              let started = data.startedAt else { return nil }
+        let end = data.completedAt ?? Date()
+        let seconds = Int(end.timeIntervalSince(started))
+        let m = seconds / 60
+        let s = seconds % 60
+        return String(format: "%d:%02d", m, s)
+    }
+
     private func save() {
-        guard document.nodes[nodeID] != nil else { return }
-        let data = TaskCardData(title: title, body: content, result: result, status: status)
+        guard let node = document.nodes[nodeID],
+              case .taskCard(var data) = node.kind else { return }
+        let oldStatus = data.status
+        data.title = title
+        data.body = content
+        data.result = result
+        if status != oldStatus {
+            data.transition(to: status)
+        }
         document.nodes[nodeID]?.kind = .taskCard(data)
         document.scheduleSave()
     }

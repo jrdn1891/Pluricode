@@ -47,7 +47,7 @@ enum MCPToolHandlers {
 
         if let statusStr = args["status"],
            let status = TaskCardData.Status(rawValue: statusStr) {
-            data.status = status
+            data.transition(to: status)
         }
         if let result = args["result"] {
             data.result = result

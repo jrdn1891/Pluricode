@@ -53,6 +53,24 @@ struct TaskCardData: Codable {
     var body: String = ""
     var result: String = ""
     var status: Status = .draft
+    var createdAt: Date = Date()
+    var startedAt: Date?
+    var completedAt: Date?
+
+    mutating func transition(to newStatus: Status) {
+        status = newStatus
+        switch newStatus {
+        case .inProgress:
+            startedAt = Date()
+            completedAt = nil
+        case .done, .failed:
+            completedAt = Date()
+            if startedAt == nil { startedAt = Date() }
+        case .draft, .ready:
+            startedAt = nil
+            completedAt = nil
+        }
+    }
 }
 
 extension SIMD2: Encodable where Scalar: Encodable {

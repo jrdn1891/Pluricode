@@ -204,7 +204,7 @@ final class CanvasInputHandler {
         document.addEdge(from: taskID, to: terminalID, type: .assignedTo)
 
         var updatedTask = taskData
-        updatedTask.status = .inProgress
+        updatedTask.transition(to: .inProgress)
         document.nodes[taskID]?.kind = .taskCard(updatedTask)
 
         let prompt = buildAssignmentPrompt(taskData: taskData, taskID: taskID, terminalID: terminalID)
