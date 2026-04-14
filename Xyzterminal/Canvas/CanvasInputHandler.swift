@@ -230,14 +230,34 @@ final class CanvasInputHandler {
             lines.append("")
         }
 
+        lines.append("## Context")
+        if let projectPath = document.projectPath?.path {
+            lines.append("Project: \(projectPath)")
+        }
         if let termNode = document.nodes[terminalID],
            case .terminal(let termData) = termNode.kind {
+            if let role = termData.role {
+                lines.append("Role: \(role.rawValue)")
+            }
             if let branch = termData.branchName {
                 lines.append("Branch: `\(branch)`")
             }
             if let path = termData.worktreePath {
                 lines.append("Worktree: \(path)")
             }
+        }
+
+        let blockerTitles = document.edges.values
+            .filter { $0.targetID == taskID && $0.edgeType == .blocks }
+            .compactMap { edge -> String? in
+                guard let node = document.nodes[edge.sourceID],
+                      case .taskCard(let d) = node.kind else { return nil }
+                return "- \(d.title) (\(d.status.rawValue))"
+            }
+        if !blockerTitles.isEmpty {
+            lines.append("")
+            lines.append("Dependencies:")
+            lines.append(contentsOf: blockerTitles)
         }
 
         lines.append("")
