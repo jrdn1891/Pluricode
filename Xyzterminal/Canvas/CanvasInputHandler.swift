@@ -207,11 +207,39 @@ final class CanvasInputHandler {
         updatedTask.status = .inProgress
         document.nodes[taskID]?.kind = .taskCard(updatedTask)
 
-        let prompt = "# Task: \(taskData.title)\n\n\(taskData.body)\n\n"
+        let prompt = buildAssignmentPrompt(taskData: taskData, taskID: taskID, terminalID: terminalID)
         let bytes = Array(prompt.utf8)
         process.send(data: bytes[...])
 
         document.scheduleSave()
+    }
+
+    private func buildAssignmentPrompt(taskData: TaskCardData, taskID: UUID, terminalID: UUID) -> String {
+        var lines = ["# Task: \(taskData.title)", ""]
+
+        if !taskData.body.isEmpty {
+            lines.append(taskData.body)
+            lines.append("")
+        }
+
+        if let termNode = document.nodes[terminalID],
+           case .terminal(let termData) = termNode.kind {
+            if let branch = termData.branchName {
+                lines.append("Branch: `\(branch)`")
+            }
+            if let path = termData.worktreePath {
+                lines.append("Worktree: \(path)")
+            }
+        }
+
+        lines.append("")
+        lines.append("When finished, report completion via the `xyzterminal` MCP tool `update_task`:")
+        lines.append("- task_id: \(taskID.uuidString)")
+        lines.append("- status: \"done\" or \"failed\"")
+        lines.append("- result: a brief summary of what you did")
+        lines.append("")
+
+        return lines.joined(separator: "\n")
     }
 
     func handleKeyDown(_ event: NSEvent) {
