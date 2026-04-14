@@ -340,6 +340,8 @@ final class CanvasInputHandler {
             document.showTerminalConfig = true
         case "d":
             duplicateSelected()
+        case "m":
+            document.minimapCollapsed.toggle()
         default:
             break
         }

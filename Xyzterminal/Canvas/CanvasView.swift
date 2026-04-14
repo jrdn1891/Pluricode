@@ -97,6 +97,7 @@ struct CanvasContainerView: View {
         ZStack {
             CanvasMetalView(document: document)
             NodeLabelOverlay(document: document)
+            MinimapToggleButton(document: document)
         }
         .ignoresSafeArea()
         .toolbar {

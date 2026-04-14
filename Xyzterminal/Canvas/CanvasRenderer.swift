@@ -175,6 +175,8 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
     }
 
     private func drawMinimap(encoder: MTLRenderCommandEncoder, viewportPoints: SIMD2<Float>, contentsScale: Float) {
+        guard !document.minimapCollapsed else { return }
+
         let nodes = Array(document.nodes.values)
         guard !nodes.isEmpty else { return }
 
@@ -231,9 +233,15 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         let vpTopLeft = SIMD2<Float>(cam.offset.x - vpCanvasW * 0.5, cam.offset.y - vpCanvasH * 0.5)
         let vpRel = (vpTopLeft - minP) * mapScale
         let vpSz = SIMD2<Float>(vpCanvasW, vpCanvasH) * mapScale
+
+        let clampedX = max(mapX, min(mapX + vpRel.x, mapX + mapW - 4))
+        let clampedY = max(mapY, min(mapY + vpRel.y, mapY + mapH - 4))
+        let clampedW = min(max(4, vpSz.x), mapX + mapW - clampedX)
+        let clampedH = min(max(4, vpSz.y), mapY + mapH - clampedY)
+
         instances.append(NodeInstance(
-            position: SIMD2<Float>(mapX + vpRel.x, mapY + vpRel.y),
-            size: SIMD2<Float>(max(4, vpSz.x), max(4, vpSz.y)),
+            position: SIMD2<Float>(clampedX, clampedY),
+            size: SIMD2<Float>(clampedW, clampedH),
             color: theme.minimapViewportFrame,
             cornerRadius: 2,
             selected: 0
