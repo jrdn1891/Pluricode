@@ -34,6 +34,10 @@ struct NodeLabelOverlay: View {
                         .font(.system(size: max(10, 13 * CGFloat(document.camera.zoom)), weight: .semibold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
+                    Spacer()
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: max(8, 10 * CGFloat(document.camera.zoom))))
+                        .foregroundStyle(.white.opacity(0.35))
                 }
                 if !data.body.isEmpty && height > 50 {
                     Text(data.body)

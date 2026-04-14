@@ -27,6 +27,7 @@ struct TaskCardEditor: View {
             TextField("Title", text: $title)
                 .textFieldStyle(.plain)
                 .font(.title2.bold())
+                .foregroundStyle(.white)
 
             Picker("Status", selection: $status) {
                 ForEach(TaskCardData.Status.allCases, id: \.self) { s in
@@ -35,10 +36,16 @@ struct TaskCardEditor: View {
             }
             .pickerStyle(.segmented)
 
+            Text("Description")
+                .font(.subheadline.bold())
+                .foregroundStyle(.secondary)
+
             TextEditor(text: $content)
                 .font(.body)
                 .scrollContentBackground(.hidden)
-                .frame(minHeight: 120)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(6)
+                .frame(minHeight: 150)
 
             HStack {
                 Spacer()
@@ -50,11 +57,14 @@ struct TaskCardEditor: View {
             }
         }
         .padding(20)
-        .frame(width: 400, height: 300)
+        .frame(width: 450, height: 360)
+        .background(Color(nsColor: NSColor(red: 0.15, green: 0.15, blue: 0.18, alpha: 1)))
+        .preferredColorScheme(.dark)
         .onDisappear { save() }
     }
 
     private func save() {
+        guard document.nodes[nodeID] != nil else { return }
         let data = TaskCardData(title: title, body: content, status: status)
         document.nodes[nodeID]?.kind = .taskCard(data)
         document.scheduleSave()

@@ -6,6 +6,7 @@ final class CanvasInputHandler {
     weak var view: NSView?
 
     var terminalManager: TerminalManager?
+    let inlineEditor = InlineEditor()
 
     private enum DragState {
         case none
@@ -58,11 +59,24 @@ final class CanvasInputHandler {
         let canvasPoint = document.camera.screenToCanvas(screenPoint, viewportSize: viewportSize)
         let optionHeld = NSEvent.modifierFlags.contains(.option)
 
+        if inlineEditor.isEditing {
+            inlineEditor.cancel()
+        }
+
         if event.clickCount == 2 {
             if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes),
-               case .taskCard = document.nodes[hitID]?.kind {
-                document.editingNodeID = hitID
+               let node = document.nodes[hitID],
+               case .taskCard(let data) = node.kind {
+                startInlineEdit(nodeID: hitID, node: node, data: data)
             }
+            return
+        }
+
+        if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes),
+           let node = document.nodes[hitID],
+           case .taskCard = node.kind,
+           isExpandHit(canvasPoint: canvasPoint, node: node) {
+            document.editingNodeID = hitID
             return
         }
 
@@ -226,6 +240,44 @@ final class CanvasInputHandler {
         guard let edge = document.edges[edgeID],
               let sessions = terminalManager?.sessions else { return }
         WiringAction.send(edge: edge, document: document, sessions: sessions)
+    }
+
+    private func startInlineEdit(nodeID: UUID, node: CanvasNode, data: TaskCardData) {
+        guard let view else { return }
+        let titlePos = node.position + SIMD2<Float>(28, 4)
+        let titleSize = SIMD2<Float>(node.size.x - 56, 24)
+
+        let screenTL = document.camera.canvasToScreen(titlePos, viewportSize: viewportSize)
+        let screenBR = document.camera.canvasToScreen(titlePos + titleSize, viewportSize: viewportSize)
+
+        let frame = NSRect(
+            x: screenTL.x,
+            y: screenBR.y,
+            width: screenBR.x - screenTL.x,
+            height: screenTL.y - screenBR.y
+        )
+
+        guard frame.width > 40 else { return }
+
+        inlineEditor.startEditing(nodeID: nodeID, text: data.title, frame: frame, in: view) { [weak self] newTitle in
+            guard var node = self?.document.nodes[nodeID],
+                  case .taskCard(var d) = node.kind else { return }
+            d.title = newTitle
+            node.kind = .taskCard(d)
+            self?.document.nodes[nodeID] = node
+            self?.document.scheduleSave()
+        }
+    }
+
+    private func isExpandHit(canvasPoint: SIMD2<Float>, node: CanvasNode) -> Bool {
+        let expandOrigin = SIMD2<Float>(
+            node.position.x + node.size.x - 28,
+            node.position.y + 4
+        )
+        return canvasPoint.x >= expandOrigin.x
+            && canvasPoint.x <= expandOrigin.x + 24
+            && canvasPoint.y >= expandOrigin.y
+            && canvasPoint.y <= expandOrigin.y + 24
     }
 
     private func duplicateSelected() {
