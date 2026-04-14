@@ -45,8 +45,18 @@ final class TerminalManager {
 
             if let wm = worktreeManager {
                 let shortID = id.uuidString.prefix(8).lowercased()
-                let baseBranch = wm.defaultBranch()
-                if let path = try? wm.createWorktree(name: String(shortID), baseBranch: baseBranch) {
+
+                let path: URL?
+                if let node = document.nodes[id],
+                   case .terminal(let data) = node.kind,
+                   let saved = data.worktreePath,
+                   FileManager.default.fileExists(atPath: saved) {
+                    path = URL(fileURLWithPath: saved)
+                } else {
+                    path = try? wm.createWorktree(name: String(shortID), baseBranch: wm.defaultBranch())
+                }
+
+                if let path {
                     session.worktreePath = path.path
                     let branch = wm.currentBranch(at: path) ?? "xyz-\(shortID)"
                     session.start(in: path.path)
