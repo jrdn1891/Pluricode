@@ -348,6 +348,11 @@ final class CanvasInputHandler {
             triggerEdgeSend(edgeID)
             return
         }
+        if event.modifierFlags.contains(.command),
+           event.charactersIgnoringModifiers == "v" {
+            handlePaste()
+            return
+        }
         guard let chars = event.charactersIgnoringModifiers else { return }
         switch chars {
         case "t":
@@ -518,6 +523,26 @@ final class CanvasInputHandler {
                 kind: kind
             )
             document.nodes[newNode.id] = newNode
+        }
+        document.scheduleSave()
+    }
+
+    private func handlePaste() {
+        guard let text = NSPasteboard.general.string(forType: .string),
+              !text.isEmpty else { return }
+        let lines = text.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard !lines.isEmpty else { return }
+
+        let basePosition = document.camera.offset - SIMD2<Float>(125, Float(lines.count) * 55)
+        for (i, line) in lines.enumerated() {
+            let position = basePosition + SIMD2<Float>(0, Float(i) * 110)
+            let node = CanvasNode(
+                id: UUID(),
+                position: position,
+                size: SIMD2<Float>(250, 100),
+                kind: .taskCard(TaskCardData(title: line.trimmingCharacters(in: .whitespaces)))
+            )
+            document.nodes[node.id] = node
         }
         document.scheduleSave()
     }
