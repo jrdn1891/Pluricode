@@ -26,6 +26,7 @@ struct NodeLabelOverlay: View {
         switch node.kind {
         case .taskCard(let data):
             let blocked = !document.unresolvedBlockers(for: node.id).isEmpty
+            let isEditing = node.id == document.inlineEditingNodeID
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Circle()
@@ -36,9 +37,9 @@ struct NodeLabelOverlay: View {
                             .font(.system(size: max(8, 10 * CGFloat(document.camera.zoom))))
                             .foregroundStyle(.red.opacity(0.7))
                     }
-                    Text(data.title)
+                    Text(data.title.isEmpty ? "Untitled" : data.title)
                         .font(.system(size: max(10, 13 * CGFloat(document.camera.zoom)), weight: .semibold))
-                        .foregroundStyle(.primary.opacity(blocked ? 0.5 : 1))
+                        .foregroundStyle(.primary.opacity(isEditing ? 0 : (data.title.isEmpty ? 0.4 : (blocked ? 0.5 : 1))))
                         .lineLimit(1)
                     Spacer()
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
