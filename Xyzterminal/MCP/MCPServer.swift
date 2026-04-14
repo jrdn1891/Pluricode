@@ -6,6 +6,7 @@ final class MCPServer {
     weak var terminalManager: TerminalManager?
     private var listener: NWListener?
     private var connections: [NWConnection] = []
+    private var buffers: [ObjectIdentifier: Data] = [:]
     private(set) var port: UInt16 = 0
     var onPortReady: (() -> Void)?
 
@@ -39,35 +40,49 @@ final class MCPServer {
         listener?.cancel()
         connections.forEach { $0.cancel() }
         connections.removeAll()
+        buffers.removeAll()
     }
 
     private func handleConnection(_ connection: NWConnection) {
         connections.append(connection)
         connection.start(queue: .main)
-        readLine(from: connection)
+        receiveData(from: connection)
     }
 
-    private func readLine(from connection: NWConnection) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
-            guard let self, let data, !data.isEmpty else {
-                if isComplete { self?.removeConnection(connection) }
-                return
-            }
+    private func receiveData(from connection: NWConnection) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, _ in
+            guard let self else { return }
 
-            if let request = String(data: data, encoding: .utf8) {
-                for line in request.components(separatedBy: "\n") where !line.isEmpty {
-                    let response = MCPToolHandlers.handle(line, document: self.document, sessions: self.terminalManager?.sessions ?? [:])
-                    let responseData = Data((response + "\n").utf8)
-                    connection.send(content: responseData, completion: .contentProcessed { _ in })
+            if let data, !data.isEmpty {
+                let key = ObjectIdentifier(connection)
+                var buffer = self.buffers[key] ?? Data()
+                buffer.append(data)
+
+                while let newlineIndex = buffer.firstIndex(of: UInt8(ascii: "\n")) {
+                    let lineData = buffer[buffer.startIndex..<newlineIndex]
+                    buffer = Data(buffer[buffer.index(after: newlineIndex)...])
+
+                    if let line = String(data: lineData, encoding: .utf8), !line.isEmpty {
+                        let response = MCPToolHandlers.handle(line, document: self.document, sessions: self.terminalManager?.sessions ?? [:])
+                        let responseData = Data((response + "\n").utf8)
+                        connection.send(content: responseData, completion: .contentProcessed { _ in })
+                    }
                 }
+
+                self.buffers[key] = buffer
             }
 
-            self.readLine(from: connection)
+            if isComplete {
+                self.removeConnection(connection)
+            } else {
+                self.receiveData(from: connection)
+            }
         }
     }
 
     private func removeConnection(_ connection: NWConnection) {
         connection.cancel()
+        buffers.removeValue(forKey: ObjectIdentifier(connection))
         connections.removeAll { $0 === connection }
     }
 }

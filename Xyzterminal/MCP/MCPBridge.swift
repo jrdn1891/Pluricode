@@ -148,15 +148,25 @@ enum MCPBridge {
             return errorContent("Failed to send request to app")
         }
 
-        var buffer = [UInt8](repeating: 0, count: 65536)
-        let n = read(socketFD, &buffer, buffer.count)
-        guard n > 0, let responseStr = String(bytes: buffer[..<Int(n)], encoding: .utf8) else {
-            return errorContent("No response from app")
+        var accumulated = Data()
+        var readBuf = [UInt8](repeating: 0, count: 65536)
+        while true {
+            let n = read(socketFD, &readBuf, readBuf.count)
+            guard n > 0 else {
+                return errorContent("No response from app")
+            }
+            accumulated.append(contentsOf: readBuf[..<Int(n)])
+            if accumulated.contains(UInt8(ascii: "\n")) { break }
         }
 
+        guard let responseStr = String(data: accumulated, encoding: .utf8) else {
+            return errorContent("Invalid response encoding")
+        }
+
+        let firstLine = responseStr.components(separatedBy: "\n").first(where: { !$0.isEmpty }) ?? ""
         return [
             "content": [
-                ["type": "text", "text": responseStr.trimmingCharacters(in: .whitespacesAndNewlines)]
+                ["type": "text", "text": firstLine]
             ]
         ]
     }
