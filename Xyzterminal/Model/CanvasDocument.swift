@@ -8,12 +8,14 @@ final class CanvasDocument {
     var edges: [UUID: Edge] = [:]
     var camera = Camera()
     var selectedNodeIDs: Set<UUID> = []
+    var selectedEdgeID: UUID?
     var snapToGrid = false
     var selectionRect: SelectionRect?
     var edgeDrag: EdgeDrag?
     var editingNodeID: UUID?
     var projectPath: URL?
     var showTerminalConfig = false
+    var mcpServer: MCPServer?
 
     private var saveTask: Task<Void, Never>?
 
@@ -38,6 +40,10 @@ final class CanvasDocument {
     }
 
     func deleteSelected() {
+        if let edgeID = selectedEdgeID {
+            edges.removeValue(forKey: edgeID)
+            selectedEdgeID = nil
+        }
         for id in selectedNodeIDs {
             nodes.removeValue(forKey: id)
             edges = edges.filter { $0.value.sourceID != id && $0.value.targetID != id }
@@ -61,6 +67,14 @@ struct Edge: Identifiable, Codable {
     var sourceID: UUID
     var targetID: UUID
     var edgeType: EdgeType
+    var payloadLog: [EdgePayload] = []
+}
+
+struct EdgePayload: Codable, Identifiable {
+    let id: UUID
+    var timestamp: Date
+    var summary: String
+    var branchRef: String?
 }
 
 enum EdgeType: String, Codable {

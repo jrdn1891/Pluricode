@@ -54,18 +54,30 @@
 - "Save as default" persists config to UserDefaults for future terminals
 - `RoleInjector` writes role-specific CLAUDE.md into worktree (architect/coder/reviewer/tester)
 
-## Remaining Phases
+## Phase 7: MCP Bridge Server ✅
+- Same app binary doubles as MCP bridge via `--mcp-bridge` flag (no separate target)
+- `main.swift` entry point checks flag before SwiftUI lifecycle
+- Bridge implements JSON-RPC 2.0 over stdio (MCP protocol)
+- App runs TCP listener on random localhost port (MCPServer via Network framework)
+- Bridge connects to app via localhost TCP, forwards tool calls
+- Tools: `update_task`, `create_task`, `list_tasks`
+- `.mcp.json` auto-written into each worktree pointing to the bridge
 
-### Phase 7: MCP Bridge Server
-- Per-terminal MCP server (separate executable)
-- Agents can call update_task, create_task, request_review, get_task, list_tasks
-- Bidirectional agent-to-app communication via Unix domain socket
+## Phase 8: Terminal-to-Terminal Wiring ✅
+- Click edges to select them (highlighted in bright blue)
+- Edge action toolbar appears when edge is selected (Send button + payload count)
+- Enter key on selected edge triggers send
+- Delete key removes selected edges
+- `handsOffTo`: gathers git diff --stat from source worktree, sends handoff prompt to target terminal
+- `reviews`: gathers diff, sends code review request prompt to target terminal
+- Each send logged as EdgePayload with timestamp and branch ref (persisted)
 
-### Phase 8: Terminal-to-Terminal Wiring
-- hands_off_to: source output context injected into target
-- reviews: target receives source diff for code review
-- Manual trigger via "send" button on edge
-- Edge payload log
+### Known issue
+- SwiftUI overlay views on macOS Tahoe create opaque layers covering Metal content
+- Workaround: edge actions moved to toolbar instead of canvas overlay
+- NodeLabelOverlay works in ZStack but EdgeActionOverlay does not
+
+## Remaining
 
 ### Phase 9: Minimap, Drag-to-Assign, Polish
 - Minimap overlay

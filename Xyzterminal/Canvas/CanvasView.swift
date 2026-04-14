@@ -9,6 +9,7 @@ final class CanvasMTKView: MTKView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
+        window?.appearance = NSAppearance(named: .darkAqua)
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -70,6 +71,7 @@ struct CanvasMetalView: NSViewRepresentable {
         context.coordinator.terminalManager = terminalManager
 
         let inputHandler = CanvasInputHandler(document: document, view: view)
+        inputHandler.terminalManager = terminalManager
         view.inputHandler = inputHandler
         context.coordinator.inputHandler = inputHandler
 
@@ -88,6 +90,13 @@ struct CanvasContainerView: View {
             NodeLabelOverlay(document: document)
         }
         .ignoresSafeArea()
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                if document.selectedEdgeID != nil {
+                    EdgeActionToolbar(document: document)
+                }
+            }
+        }
         .sheet(item: Binding(
             get: { document.editingNodeID.map { EditingNode(id: $0) } },
             set: { document.editingNodeID = $0?.id }

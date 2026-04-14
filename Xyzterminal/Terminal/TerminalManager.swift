@@ -59,6 +59,9 @@ final class TerminalManager {
                     let agent = AgentDefinition.builtins.first { $0.name == data.agentName } ?? .claudeCode
                     RoleInjector.inject(role: role, method: agent.roleInjection, worktreePath: path)
                 }
+                if let path = session.worktreePath {
+                    writeMCPConfig(to: path, nodeID: id)
+                }
                 if let script = data.startupScript, !script.isEmpty {
                     let bytes = Array("\(script)\n".utf8)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -105,5 +108,21 @@ final class TerminalManager {
                 session.terminalView.frame = frame
             }
         }
+    }
+
+    private func writeMCPConfig(to worktreePath: String, nodeID: UUID) {
+        guard let port = document.mcpServer?.port, port > 0 else { return }
+        let appPath = Bundle.main.executablePath ?? ProcessInfo.processInfo.arguments[0]
+        let config: [String: Any] = [
+            "mcpServers": [
+                "xyzterminal": [
+                    "command": appPath,
+                    "args": ["--mcp-bridge", "--port", "\(port)", "--node-id", nodeID.uuidString]
+                ]
+            ]
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: config, options: .prettyPrinted) else { return }
+        let configPath = URL(fileURLWithPath: worktreePath).appendingPathComponent(".mcp.json")
+        try? data.write(to: configPath, options: .atomic)
     }
 }

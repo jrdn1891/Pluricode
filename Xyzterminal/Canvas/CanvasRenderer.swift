@@ -85,7 +85,10 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         for edge in document.edges.values {
             guard let source = document.nodes[edge.sourceID],
                   let target = document.nodes[edge.targetID] else { continue }
-            let color = colorForEdgeType(edge.edgeType)
+            var color = colorForEdgeType(edge.edgeType)
+            if document.selectedEdgeID == edge.id {
+                color = SIMD4<Float>(0.5, 0.8, 1.0, 1.0)
+            }
             allVertices.append(contentsOf: EdgeTessellator.tessellate(from: source, to: target, color: color))
         }
 

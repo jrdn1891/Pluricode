@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 
-@main
 struct XyzterminalApp: App {
     @State private var document = CanvasDocument()
     @State private var hasProject = false
@@ -48,6 +47,11 @@ struct XyzterminalApp: App {
         document.projectPath = url
         Persistence.lastProjectPath = url
         Persistence.load(into: document)
+
+        let server = MCPServer(document: document)
+        server.start()
+        document.mcpServer = server
+
         hasProject = true
     }
 }

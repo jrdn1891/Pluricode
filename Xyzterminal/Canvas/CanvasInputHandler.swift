@@ -5,6 +5,8 @@ final class CanvasInputHandler {
     let document: CanvasDocument
     weak var view: NSView?
 
+    var terminalManager: TerminalManager?
+
     private enum DragState {
         case none
         case movingNodes(startPositions: [UUID: SIMD2<Float>], startMouse: SIMD2<Float>)
@@ -65,6 +67,7 @@ final class CanvasInputHandler {
         }
 
         if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes) {
+            document.selectedEdgeID = nil
             if optionHeld {
                 dragState = .creatingEdge(sourceID: hitID)
                 document.edgeDrag = EdgeDrag(sourceNodeID: hitID, currentPoint: canvasPoint)
@@ -89,7 +92,12 @@ final class CanvasInputHandler {
                 }
             }
             dragState = .movingNodes(startPositions: startPositions, startMouse: canvasPoint)
+        } else if let edgeID = HitTesting.edgeAt(canvasPoint, in: document.edges, nodes: document.nodes, threshold: 12 / document.camera.zoom) {
+            document.selectedNodeIDs.removeAll()
+            document.selectedEdgeID = edgeID
+            dragState = .none
         } else {
+            document.selectedEdgeID = nil
             if !NSEvent.modifierFlags.contains(.shift) {
                 document.selectedNodeIDs.removeAll()
             }
@@ -157,6 +165,10 @@ final class CanvasInputHandler {
             document.deleteSelected()
             return
         }
+        if event.keyCode == 36, let edgeID = document.selectedEdgeID {
+            triggerEdgeSend(edgeID)
+            return
+        }
         guard let chars = event.charactersIgnoringModifiers else { return }
         switch chars {
         case "t":
@@ -166,6 +178,12 @@ final class CanvasInputHandler {
         default:
             break
         }
+    }
+
+    func triggerEdgeSend(_ edgeID: UUID) {
+        guard let edge = document.edges[edgeID],
+              let sessions = terminalManager?.sessions else { return }
+        WiringAction.send(edge: edge, document: document, sessions: sessions)
     }
 
     private func inferEdgeType(sourceID: UUID, targetID: UUID) -> EdgeType {
