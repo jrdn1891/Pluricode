@@ -42,8 +42,9 @@ enum WorkflowEngine {
         }
         if let termNode = document.nodes[terminalID],
            case .terminal(let termData) = termNode.kind {
-            if let role = termData.role {
-                lines.append("Role: \(role.rawValue)")
+            if let profileID = termData.profileID,
+               let profile = document.agentProfiles[profileID] {
+                lines.append("Role: \(profile.name)")
             }
             if let branch = termData.branchName {
                 lines.append("Branch: `\(branch)`")

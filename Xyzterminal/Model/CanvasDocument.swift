@@ -6,6 +6,7 @@ import simd
 final class CanvasDocument {
     var nodes: [UUID: CanvasNode] = [:]
     var edges: [UUID: Edge] = [:]
+    var agentProfiles: [UUID: AgentProfile] = Dictionary(uniqueKeysWithValues: AgentProfile.defaults.map { ($0.id, $0) })
     var camera = Camera()
     var selectedNodeIDs: Set<UUID> = []
     var selectedEdgeID: UUID?

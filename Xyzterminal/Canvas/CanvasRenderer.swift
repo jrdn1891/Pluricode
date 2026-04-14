@@ -127,7 +127,12 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         var instances = document.nodes.values.map { node -> NodeInstance in
             let isSelected = document.selectedNodeIDs.contains(node.id)
             let color: SIMD4<Float> = switch node.kind {
-            case .terminal: theme.terminalNodeColor
+            case .terminal(let data):
+                if let pid = data.profileID, let profile = document.agentProfiles[pid] {
+                    SIMD4(profile.color.x * 0.25, profile.color.y * 0.25, profile.color.z * 0.25, 1.0)
+                } else {
+                    theme.terminalNodeColor
+                }
             case .taskCard: theme.taskCardNodeColor
             }
             return NodeInstance(

@@ -129,7 +129,7 @@ struct CanvasContainerView: View {
             get: { document.showTerminalConfig },
             set: { document.showTerminalConfig = $0 }
         )) {
-            TerminalConfigSheet { data in
+            TerminalConfigSheet(document: document) { data in
                 document.addNode(kind: .terminal(data))
             }
         }

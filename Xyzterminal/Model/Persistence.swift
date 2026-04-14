@@ -5,6 +5,7 @@ struct CanvasSnapshot: Codable {
     var edges: [Edge]
     var cameraOffset: SIMD2<Float>
     var cameraZoom: Float
+    var agentProfiles: [AgentProfile]?
 }
 
 enum Persistence {
@@ -20,7 +21,8 @@ enum Persistence {
             nodes: Array(document.nodes.values),
             edges: Array(document.edges.values),
             cameraOffset: document.camera.offset,
-            cameraZoom: document.camera.zoom
+            cameraZoom: document.camera.zoom,
+            agentProfiles: Array(document.agentProfiles.values)
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -44,6 +46,9 @@ enum Persistence {
             document.edges = Dictionary(uniqueKeysWithValues: snapshot.edges.map { ($0.id, $0) })
             document.camera.offset = snapshot.cameraOffset
             document.camera.zoom = snapshot.cameraZoom
+            if let profiles = snapshot.agentProfiles, !profiles.isEmpty {
+                document.agentProfiles = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+            }
         } catch {
             NSLog("Xyzterminal: failed to load canvas: %@", error.localizedDescription)
         }

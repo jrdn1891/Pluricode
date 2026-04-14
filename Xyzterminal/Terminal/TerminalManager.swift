@@ -105,9 +105,11 @@ final class TerminalManager {
             let mcpDir = session.worktreePath ?? document.projectPath?.path
 
             if let node = document.nodes[id], case .terminal(let data) = node.kind {
-                if let role = data.role, let path = session.worktreePath {
-                    let agent = AgentDefinition.builtins.first { $0.name == data.agentName } ?? .claudeCode
-                    RoleInjector.inject(role: role, method: agent.roleInjection, worktreePath: path)
+                if let profileID = data.profileID,
+                   let profile = document.agentProfiles[profileID],
+                   let path = session.worktreePath {
+                    let agent = AgentDefinition.builtins.first { $0.name == profile.agentDefinition } ?? .claudeCode
+                    ProfileInjector.inject(profile: profile, method: agent.roleInjection, worktreePath: path)
                 }
                 if let path = mcpDir {
                     writeMCPConfig(to: path, nodeID: id)

@@ -21,6 +21,11 @@ struct NodeLabelOverlay: View {
         .allowsHitTesting(false)
     }
 
+    private func profileName(for data: TerminalNodeData) -> String {
+        guard let id = data.profileID, let profile = document.agentProfiles[id] else { return "Terminal" }
+        return profile.name
+    }
+
     @ViewBuilder
     private func nodeLabelView(node: CanvasNode, width: CGFloat, height: CGFloat) -> some View {
         switch node.kind {
@@ -73,7 +78,7 @@ struct NodeLabelOverlay: View {
                     Image(systemName: "terminal")
                         .font(.system(size: max(9, 11 * zoom)))
                         .foregroundStyle(.green.opacity(0.7))
-                    Text(data.role?.rawValue.capitalized ?? "Terminal")
+                    Text(profileName(for: data))
                         .font(.system(size: max(10, 13 * zoom), weight: .semibold))
                         .foregroundStyle(.primary)
                     if let branch = data.branchName {

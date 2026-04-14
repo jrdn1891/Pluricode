@@ -58,9 +58,8 @@ struct TerminalNodeData: Codable {
             }
         }
     }
-    enum Role: String, Codable, CaseIterable { case architect, coder, reviewer, tester }
     var status: Status = .idle
-    var role: Role?
+    var profileID: UUID?
     var worktreePath: String?
     var branchName: String?
     var agentName: String = "Claude Code"
