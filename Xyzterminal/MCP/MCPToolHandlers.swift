@@ -25,6 +25,8 @@ enum MCPToolHandlers {
             result = updateTask(request.args, document: document)
         case "create_task":
             result = createTask(request.args, document: document, nearNodeID: request.nodeID)
+        case "get_task":
+            result = getTask(request.args, document: document)
         case "list_tasks":
             result = listTasks(document: document)
         default:
@@ -80,6 +82,30 @@ enum MCPToolHandlers {
         document.scheduleSave()
 
         return Response(success: true, data: ["task_id": node.id.uuidString])
+    }
+
+    private static func getTask(_ args: [String: String], document: CanvasDocument) -> Response {
+        guard let taskIDStr = args["task_id"],
+              let taskID = UUID(uuidString: taskIDStr) else {
+            return Response(success: false, error: "missing or invalid task_id")
+        }
+
+        guard let node = document.nodes[taskID],
+              case .taskCard(let data) = node.kind else {
+            return Response(success: false, error: "task not found")
+        }
+
+        var entry: [String: String] = [
+            "id": taskID.uuidString,
+            "title": data.title,
+            "status": data.status.rawValue,
+            "body": data.body
+        ]
+        if !data.result.isEmpty { entry["result"] = data.result }
+        if let started = data.startedAt { entry["started_at"] = started.ISO8601Format() }
+        if let completed = data.completedAt { entry["completed_at"] = completed.ISO8601Format() }
+
+        return Response(success: true, data: entry)
     }
 
     private static func listTasks(document: CanvasDocument) -> Response {

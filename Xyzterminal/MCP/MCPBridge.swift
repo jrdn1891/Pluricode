@@ -84,6 +84,14 @@ enum MCPBridge {
                     required: ["title"]
                 ),
                 toolDef(
+                    name: "get_task",
+                    description: "Get details of a specific task card by ID",
+                    properties: [
+                        "task_id": ["type": "string", "description": "UUID of the task card"]
+                    ],
+                    required: ["task_id"]
+                ),
+                toolDef(
                     name: "list_tasks",
                     description: "List all task cards on the Xyzterminal canvas",
                     properties: [:],
