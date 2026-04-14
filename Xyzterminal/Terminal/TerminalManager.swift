@@ -92,10 +92,7 @@ final class TerminalManager {
                     writeMCPConfig(to: path, nodeID: id)
                 }
                 if let script = data.startupScript, !script.isEmpty {
-                    let bytes = Array("\(script)\n".utf8)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        session.terminalView.process?.send(data: bytes[...])
-                    }
+                    session.scheduleStartupScript(script)
                 }
             }
 

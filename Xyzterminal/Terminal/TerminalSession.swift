@@ -7,6 +7,8 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
     var worktreePath: String?
     var onProcessTerminated: ((Int32?) -> Void)?
     private var lastAppliedZoom: Float = 1.0
+    private var pendingScript: String?
+    private var fallbackTimer: DispatchWorkItem?
 
     static let baseFontSize: CGFloat = 13
 
@@ -16,6 +18,24 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
         super.init()
         terminalView.processDelegate = self
         terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize, weight: .regular)
+    }
+
+    func scheduleStartupScript(_ script: String) {
+        pendingScript = script
+        let timer = DispatchWorkItem { [weak self] in
+            self?.deliverPendingScript()
+        }
+        fallbackTimer = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0, execute: timer)
+    }
+
+    private func deliverPendingScript() {
+        guard let script = pendingScript else { return }
+        pendingScript = nil
+        fallbackTimer?.cancel()
+        fallbackTimer = nil
+        let bytes = Array("\(script)\n".utf8)
+        terminalView.process?.send(data: bytes[...])
     }
 
     func applyZoom(_ zoom: Float) {
@@ -49,9 +69,16 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
 
     func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
 
-    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+        if pendingScript != nil {
+            deliverPendingScript()
+        }
+    }
 
     func processTerminated(source: TerminalView, exitCode: Int32?) {
+        pendingScript = nil
+        fallbackTimer?.cancel()
+        fallbackTimer = nil
         onProcessTerminated?(exitCode)
     }
 }
