@@ -2,52 +2,36 @@ import SwiftUI
 import AppKit
 
 struct XyzterminalApp: App {
-    @State private var document = CanvasDocument()
-    @State private var hasProject = false
+    @State private var repoStore = RepoStore()
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if hasProject {
-                    CanvasContainerView(document: document)
-                        .toolbar {
-                            ToolbarItemGroup {
-                                Button(action: { document.addNode(kind: .taskCard(TaskCardData())) }) {
-                                    Label("Task Card", systemImage: "square.text.square")
-                                }
-                                Button(action: { document.showTerminalConfig = true }) {
-                                    Label("Terminal", systemImage: "terminal")
-                                }
-                                Divider()
-                                Toggle(isOn: Binding(
-                                    get: { document.snapToGrid },
-                                    set: { document.snapToGrid = $0 }
-                                )) {
-                                    Label("Snap", systemImage: "grid")
-                                }
-                                Divider()
-                                Picker("Appearance", selection: $appearanceModeRaw) {
-                                    ForEach(AppearanceMode.allCases, id: \.rawValue) { mode in
-                                        Label(mode.rawValue.capitalized, systemImage: mode.icon)
-                                            .tag(mode.rawValue)
-                                    }
-                                }
-                                .pickerStyle(.menu)
-                            }
-                        }
+            NavigationSplitView {
+                RepoSidebarView(repoStore: repoStore)
+                    .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
+            } detail: {
+                if let repo = repoStore.selectedRepo {
+                    CanvasHostView(repoEntry: repo)
+                        .id(repo.id)
                 } else {
-                    ProjectPickerView(onPick: { url in
-                        openProject(url)
-                    })
+                    EmptyCanvasView(repoStore: repoStore)
+                }
+            }
+            .toolbar {
+                ToolbarItemGroup {
+                    Picker("Appearance", selection: $appearanceModeRaw) {
+                        ForEach(AppearanceMode.allCases, id: \.rawValue) { mode in
+                            Label(mode.rawValue.capitalized, systemImage: mode.icon)
+                                .tag(mode.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
                 }
             }
             .onAppear {
                 (AppearanceMode(rawValue: appearanceModeRaw) ?? .system).apply()
-                if let last = Persistence.lastProjectPath,
-                   FileManager.default.fileExists(atPath: last.path) {
-                    openProject(last)
-                }
+                migrateLastProjectPath()
             }
             .onChange(of: appearanceModeRaw) { _, newValue in
                 (AppearanceMode(rawValue: newValue) ?? .system).apply()
@@ -56,39 +40,71 @@ struct XyzterminalApp: App {
         .defaultSize(width: 1200, height: 800)
     }
 
+    private func migrateLastProjectPath() {
+        guard repoStore.repos.isEmpty,
+              let last = Persistence.lastProjectPath,
+              FileManager.default.fileExists(atPath: last.path) else { return }
+        repoStore.addRepo(last)
+        UserDefaults.standard.removeObject(forKey: "lastProjectPath")
+    }
+}
+
+struct CanvasHostView: View {
+    let repoEntry: RepoEntry
+    @State private var document = CanvasDocument()
+
+    var body: some View {
+        CanvasContainerView(document: document)
+            .toolbar {
+                ToolbarItemGroup {
+                    Button(action: { document.addNode(kind: .taskCard(TaskCardData())) }) {
+                        Label("Task Card", systemImage: "square.text.square")
+                    }
+                    Button(action: { document.showTerminalConfig = true }) {
+                        Label("Terminal", systemImage: "terminal")
+                    }
+                    Divider()
+                    Toggle(isOn: Binding(
+                        get: { document.snapToGrid },
+                        set: { document.snapToGrid = $0 }
+                    )) {
+                        Label("Snap", systemImage: "grid")
+                    }
+                }
+            }
+            .onAppear { openProject(repoEntry.path) }
+    }
+
     private func openProject(_ url: URL) {
         document.projectPath = url
-        Persistence.lastProjectPath = url
         Persistence.load(into: document)
 
         let server = MCPServer(document: document)
         server.start()
         document.mcpServer = server
-
-        hasProject = true
     }
 }
 
-struct ProjectPickerView: View {
-    let onPick: (URL) -> Void
+struct EmptyCanvasView: View {
+    let repoStore: RepoStore
 
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "folder.badge.gearshape")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
-            Text("Open a project directory")
+            Text("No repository selected")
                 .font(.title2)
-            Text("Choose a git repository to use as your workspace")
+            Text("Add a git repository from the sidebar")
                 .foregroundStyle(.secondary)
-            Button("Choose Folder...") {
+            Button("Add Repository...") {
                 let panel = NSOpenPanel()
                 panel.canChooseDirectories = true
                 panel.canChooseFiles = false
                 panel.allowsMultipleSelection = false
                 panel.message = "Select a git repository"
                 if panel.runModal() == .OK, let url = panel.url {
-                    onPick(url)
+                    repoStore.addRepo(url)
                 }
             }
             .controlSize(.large)

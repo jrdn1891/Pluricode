@@ -12,6 +12,8 @@ final class MCPServer {
         self.document = document
     }
 
+    deinit { stop() }
+
     func start() {
         do {
             listener = try NWListener(using: .tcp, on: .any)

@@ -16,6 +16,12 @@ final class TerminalManager {
         }
     }
 
+    deinit {
+        for session in sessions.values {
+            session.terminalView.removeFromSuperview()
+        }
+    }
+
     func sync(containerView: NSView) {
         let theme = Theme(from: NSApp.effectiveAppearance)
         if lastIsDark != theme.isDark {

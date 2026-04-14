@@ -20,6 +20,12 @@ final class CanvasDocument {
 
     private var saveTask: Task<Void, Never>?
 
+    deinit {
+        saveTask?.cancel()
+        Persistence.save(self)
+        mcpServer?.stop()
+    }
+
     func addNode(kind: NodeKind) {
         let defaultSize: SIMD2<Float> = switch kind {
         case .terminal: SIMD2<Float>(400, 300)
