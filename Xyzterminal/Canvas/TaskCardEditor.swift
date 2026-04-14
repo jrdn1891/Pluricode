@@ -5,6 +5,7 @@ struct TaskCardEditor: View {
     let nodeID: UUID
     @State private var title: String
     @State private var content: String
+    @State private var result: String
     @State private var status: TaskCardData.Status
     @Environment(\.dismiss) private var dismiss
 
@@ -14,10 +15,12 @@ struct TaskCardEditor: View {
         if let node = document.nodes[nodeID], case .taskCard(let data) = node.kind {
             _title = State(initialValue: data.title)
             _content = State(initialValue: data.body)
+            _result = State(initialValue: data.result)
             _status = State(initialValue: data.status)
         } else {
             _title = State(initialValue: "")
             _content = State(initialValue: "")
+            _result = State(initialValue: "")
             _status = State(initialValue: .draft)
         }
     }
@@ -45,7 +48,20 @@ struct TaskCardEditor: View {
                 .scrollContentBackground(.hidden)
                 .background(Color.white.opacity(0.05))
                 .cornerRadius(6)
-                .frame(minHeight: 150)
+                .frame(minHeight: 100)
+
+            if !result.isEmpty || status == .done || status == .failed {
+                Text("Result")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.secondary)
+
+                TextEditor(text: $result)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(6)
+                    .frame(minHeight: 60)
+            }
 
             HStack {
                 Spacer()
@@ -57,7 +73,7 @@ struct TaskCardEditor: View {
             }
         }
         .padding(20)
-        .frame(width: 450, height: 360)
+        .frame(width: 450, height: result.isEmpty && status != .done && status != .failed ? 360 : 480)
         .background(Color(nsColor: NSColor(red: 0.15, green: 0.15, blue: 0.18, alpha: 1)))
         .preferredColorScheme(.dark)
         .onDisappear { save() }
@@ -65,7 +81,7 @@ struct TaskCardEditor: View {
 
     private func save() {
         guard document.nodes[nodeID] != nil else { return }
-        let data = TaskCardData(title: title, body: content, status: status)
+        let data = TaskCardData(title: title, body: content, result: result, status: status)
         document.nodes[nodeID]?.kind = .taskCard(data)
         document.scheduleSave()
     }

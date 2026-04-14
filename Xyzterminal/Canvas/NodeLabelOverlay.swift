@@ -39,11 +39,16 @@ struct NodeLabelOverlay: View {
                         .font(.system(size: max(8, 10 * CGFloat(document.camera.zoom))))
                         .foregroundStyle(.white.opacity(0.35))
                 }
-                if !data.body.isEmpty && height > 50 {
-                    Text(data.body)
-                        .font(.system(size: max(9, 11 * CGFloat(document.camera.zoom))))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .lineLimit(3)
+                if height > 50 {
+                    let subtitle = (data.status == .done || data.status == .failed) && !data.result.isEmpty
+                        ? data.result
+                        : data.body
+                    if !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: max(9, 11 * CGFloat(document.camera.zoom))))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .lineLimit(3)
+                    }
                 }
             }
             .padding(8)

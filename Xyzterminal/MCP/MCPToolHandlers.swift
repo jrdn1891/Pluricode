@@ -49,8 +49,8 @@ enum MCPToolHandlers {
            let status = TaskCardData.Status(rawValue: statusStr) {
             data.status = status
         }
-        if let summary = args["summary"] {
-            data.body = summary
+        if let result = args["result"] {
+            data.result = result
         }
         node.kind = .taskCard(data)
         document.nodes[taskID] = node
@@ -86,11 +86,15 @@ enum MCPToolHandlers {
         var tasks: [[String: String]] = []
         for (id, node) in document.nodes {
             if case .taskCard(let data) = node.kind {
-                tasks.append([
+                var entry: [String: String] = [
                     "id": id.uuidString,
                     "title": data.title,
                     "status": data.status.rawValue
-                ])
+                ]
+                if !data.result.isEmpty {
+                    entry["result"] = data.result
+                }
+                tasks.append(entry)
             }
         }
         guard let jsonData = try? JSONEncoder().encode(tasks),

@@ -51,6 +51,7 @@ struct TaskCardData: Codable {
     enum Status: String, Codable, CaseIterable { case draft, ready, inProgress, done, failed }
     var title: String = "New Task"
     var body: String = ""
+    var result: String = ""
     var status: Status = .draft
 }
 
