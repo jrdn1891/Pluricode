@@ -3,7 +3,6 @@ import SwiftUI
 struct WorktreePanel: View {
     let document: CanvasDocument
     @State private var entries: [WorktreeEntry] = []
-    @State private var refreshID = UUID()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,27 +33,29 @@ struct WorktreePanel: View {
         }
         .frame(width: 260)
         .onAppear(perform: refresh)
-        .id(refreshID)
     }
 
     private func refresh() {
-        var result: [WorktreeEntry] = []
-        for (id, node) in document.nodes {
-            guard case .terminal(let data) = node.kind,
-                  let path = data.worktreePath else { continue }
-            let url = URL(fileURLWithPath: path)
-            let wm = document.projectPath.flatMap { WorktreeManager(repoRoot: $0) }
-            let uncommitted = wm?.uncommittedCount(at: url) ?? 0
-            result.append(WorktreeEntry(
-                nodeID: id,
-                branch: data.branchName ?? "unknown",
-                path: path,
-                status: data.status,
-                uncommittedCount: uncommitted
-            ))
+        let nodes = document.nodes
+        let wm = document.mcpServer?.terminalManager?.worktreeManager
+
+        Task.detached {
+            var result: [WorktreeEntry] = []
+            for (id, node) in nodes {
+                guard case .terminal(let data) = node.kind,
+                      let path = data.worktreePath else { continue }
+                let uncommitted = wm?.uncommittedCount(at: URL(fileURLWithPath: path)) ?? 0
+                result.append(WorktreeEntry(
+                    nodeID: id,
+                    branch: data.branchName ?? "unknown",
+                    path: path,
+                    status: data.status,
+                    uncommittedCount: uncommitted
+                ))
+            }
+            let sorted = result.sorted { $0.branch < $1.branch }
+            await MainActor.run { entries = sorted }
         }
-        entries = result.sorted { $0.branch < $1.branch }
-        refreshID = UUID()
     }
 }
 
@@ -74,7 +75,7 @@ struct WorktreeRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Circle()
-                    .fill(statusColor)
+                    .fill(entry.status.color)
                     .frame(width: 8, height: 8)
                 Text(entry.branch)
                     .font(.system(.body, design: .monospaced))
@@ -99,16 +100,6 @@ struct WorktreeRow: View {
             .font(.caption)
         }
         .padding(.vertical, 4)
-    }
-
-    private var statusColor: Color {
-        switch entry.status {
-        case .idle: .gray
-        case .working: .blue
-        case .waiting: .yellow
-        case .done: .green
-        case .error: .red
-        }
     }
 
     private func openIn(editor: String, path: String) {

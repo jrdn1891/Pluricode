@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import simd
 
 struct CanvasNode: Identifiable, Codable {
@@ -11,6 +12,13 @@ struct CanvasNode: Identifiable, Codable {
 enum NodeKind: Codable {
     case terminal(TerminalNodeData)
     case taskCard(TaskCardData)
+
+    var defaultSize: SIMD2<Float> {
+        switch self {
+        case .terminal: SIMD2<Float>(400, 300)
+        case .taskCard: SIMD2<Float>(250, 100)
+        }
+    }
 
     private enum CodingKeys: String, CodingKey { case type, data }
 
@@ -37,7 +45,19 @@ enum NodeKind: Codable {
 }
 
 struct TerminalNodeData: Codable {
-    enum Status: String, Codable { case idle, working, waiting, done, error }
+    enum Status: String, Codable {
+        case idle, working, waiting, done, error
+
+        var color: Color {
+            switch self {
+            case .idle: .gray
+            case .working: .orange
+            case .waiting: .yellow
+            case .done: .green
+            case .error: .red
+            }
+        }
+    }
     enum Role: String, Codable, CaseIterable { case architect, coder, reviewer, tester }
     var status: Status = .idle
     var role: Role?
@@ -48,7 +68,9 @@ struct TerminalNodeData: Codable {
 }
 
 struct TaskCardData: Codable {
-    enum Status: String, Codable, CaseIterable { case draft, ready, inProgress, done, failed }
+    enum Status: String, Codable, CaseIterable {
+        case draft, ready, inProgress, done, failed
+    }
     var title: String = "New Task"
     var body: String = ""
     var result: String = ""

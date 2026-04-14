@@ -9,6 +9,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
     private var lastAppliedZoom: Float = 1.0
     private var pendingScript: String?
     private var fallbackTimer: DispatchWorkItem?
+    private var lastSavedBufferSize: Int = 0
 
     static let baseFontSize: CGFloat = 13
 
@@ -40,6 +41,8 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
 
     func saveScrollback(to dir: URL) {
         let data = terminalView.getTerminal().getBufferAsData()
+        guard data.count != lastSavedBufferSize else { return }
+        lastSavedBufferSize = data.count
         let file = dir.appendingPathComponent("\(nodeID.uuidString).txt")
         try? data.write(to: file, options: .atomic)
     }

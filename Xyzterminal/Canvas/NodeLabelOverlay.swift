@@ -10,8 +10,8 @@ struct NodeLabelOverlay: View {
             if zoom > 0.25 {
                 ForEach(Array(document.groups.values), id: \.id) { group in
                     if let bounds = document.groupBounds(for: group) {
-                        let padding: CGFloat = 20
-                        let topLeft = document.camera.canvasToSwiftUI(bounds.min - SIMD2<Float>(Float(padding), Float(padding)), viewportSize: vp)
+                        let p = NodeGroup.padding
+                        let topLeft = document.camera.canvasToSwiftUI(bounds.min - SIMD2<Float>(p, p), viewportSize: vp)
                         Text(group.name)
                             .font(.system(size: max(9, 11 * zoom), weight: .medium))
                             .foregroundStyle(.secondary)
@@ -94,21 +94,11 @@ struct NodeLabelOverlay: View {
                     Spacer()
                     Text(data.status.rawValue)
                         .font(.system(size: max(8, 10 * zoom)))
-                        .foregroundStyle(terminalStatusColor(data.status))
+                        .foregroundStyle(data.status.color)
                 }
             }
             .padding(8)
             .frame(width: width, height: height, alignment: .topLeading)
-        }
-    }
-
-    private func terminalStatusColor(_ status: TerminalNodeData.Status) -> Color {
-        switch status {
-        case .idle: .gray
-        case .working: .orange
-        case .waiting: .yellow
-        case .done: .green
-        case .error: .red
         }
     }
 }

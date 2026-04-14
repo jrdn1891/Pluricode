@@ -6,13 +6,9 @@ enum WiringAction {
               let targetSession = sessions[edge.targetID],
               targetSession.terminalView.process != nil else { return }
 
-        let worktreePath = {
-            if case .terminal(let data) = sourceNode.kind { return data.worktreePath }
-            return nil
-        }()
-        let branchName = {
-            if case .terminal(let data) = sourceNode.kind { return data.branchName }
-            return nil
+        let (worktreePath, branchName): (String?, String?) = {
+            if case .terminal(let data) = sourceNode.kind { return (data.worktreePath, data.branchName) }
+            return (nil, nil)
         }()
         let edgeType = edge.edgeType
         let edgeID = edge.id

@@ -85,15 +85,15 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     private func drawGroups(encoder: MTLRenderCommandEncoder, uniforms: inout Uniforms) {
-        let padding: Float = 20
+        let p = NodeGroup.padding
         var instances: [NodeInstance] = []
 
         for group in document.groups.values {
             guard let bounds = document.groupBounds(for: group) else { continue }
             instances.append(NodeInstance(
-                position: bounds.min - SIMD2<Float>(padding, padding),
-                size: (bounds.max - bounds.min) + SIMD2<Float>(padding * 2, padding * 2),
-                color: group.color,
+                position: bounds.min - SIMD2<Float>(p, p),
+                size: (bounds.max - bounds.min) + SIMD2<Float>(p * 2, p * 2),
+                color: NodeGroup.color,
                 cornerRadius: 12,
                 selected: 0
             ))
@@ -207,14 +207,8 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         guard !document.minimapCollapsed else { return }
 
         let nodes = Array(document.nodes.values)
-        guard !nodes.isEmpty else { return }
-
-        var minP = SIMD2<Float>(Float.greatestFiniteMagnitude, Float.greatestFiniteMagnitude)
-        var maxP = SIMD2<Float>(-Float.greatestFiniteMagnitude, -Float.greatestFiniteMagnitude)
-        for node in nodes {
-            minP = simd_min(minP, node.position)
-            maxP = simd_max(maxP, node.position + node.size)
-        }
+        guard let rawBounds = CanvasDocument.nodeBounds(nodes) else { return }
+        var (minP, maxP) = rawBounds
 
         let padding: Float = 200
         minP -= SIMD2<Float>(padding, padding)

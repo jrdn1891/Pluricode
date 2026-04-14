@@ -14,7 +14,6 @@ final class CanvasDocument {
     var selectionRect: SelectionRect?
     var edgeDrag: EdgeDrag?
     var editingNodeID: UUID?
-    var editingGroupID: UUID?
     var projectPath: URL?
     var showTerminalConfig = false
     var minimapCollapsed = false
@@ -34,13 +33,10 @@ final class CanvasDocument {
 
     @discardableResult
     func addNode(kind: NodeKind) -> UUID {
-        let defaultSize: SIMD2<Float> = switch kind {
-        case .terminal: SIMD2<Float>(400, 300)
-        case .taskCard: SIMD2<Float>(250, 100)
-        }
+        let size = kind.defaultSize
         let jitter = SIMD2<Float>(Float.random(in: -30...30), Float.random(in: -30...30))
-        let position = camera.offset - defaultSize * 0.5 + jitter
-        let node = CanvasNode(id: UUID(), position: position, size: defaultSize, kind: kind)
+        let position = camera.offset - size * 0.5 + jitter
+        let node = CanvasNode(id: UUID(), position: position, size: size, kind: kind)
         nodes[node.id] = node
         scheduleSave()
         return node.id
@@ -80,16 +76,19 @@ final class CanvasDocument {
         scheduleSave()
     }
 
-    func groupBounds(for group: NodeGroup) -> (min: SIMD2<Float>, max: SIMD2<Float>)? {
-        let memberNodes = group.nodeIDs.compactMap { nodes[$0] }
-        guard !memberNodes.isEmpty else { return nil }
+    static func nodeBounds(_ nodes: some Collection<CanvasNode>) -> (min: SIMD2<Float>, max: SIMD2<Float>)? {
+        guard !nodes.isEmpty else { return nil }
         var minP = SIMD2<Float>(Float.greatestFiniteMagnitude, Float.greatestFiniteMagnitude)
         var maxP = SIMD2<Float>(-Float.greatestFiniteMagnitude, -Float.greatestFiniteMagnitude)
-        for node in memberNodes {
+        for node in nodes {
             minP = simd_min(minP, node.position)
             maxP = simd_max(maxP, node.position + node.size)
         }
         return (minP, maxP)
+    }
+
+    func groupBounds(for group: NodeGroup) -> (min: SIMD2<Float>, max: SIMD2<Float>)? {
+        Self.nodeBounds(group.nodeIDs.compactMap { nodes[$0] })
     }
 
     func deleteSelected() {
@@ -171,8 +170,10 @@ struct EditingNode: Identifiable {
 }
 
 struct NodeGroup: Identifiable, Codable {
+    static let color = SIMD4<Float>(0.4, 0.5, 0.7, 0.15)
+    static let padding: Float = 20
+
     let id: UUID
     var name: String
     var nodeIDs: Set<UUID>
-    var color: SIMD4<Float> = SIMD4<Float>(0.4, 0.5, 0.7, 0.15)
 }

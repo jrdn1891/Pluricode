@@ -533,13 +533,14 @@ final class CanvasInputHandler {
         let lines = text.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
         guard !lines.isEmpty else { return }
 
-        let basePosition = document.camera.offset - SIMD2<Float>(125, Float(lines.count) * 55)
+        let size = NodeKind.taskCard(TaskCardData()).defaultSize
+        let basePosition = document.camera.offset - SIMD2<Float>(size.x * 0.5, Float(lines.count) * (size.y + 10) * 0.5)
         for (i, line) in lines.enumerated() {
-            let position = basePosition + SIMD2<Float>(0, Float(i) * 110)
+            let position = basePosition + SIMD2<Float>(0, Float(i) * (size.y + 10))
             let node = CanvasNode(
                 id: UUID(),
                 position: position,
-                size: SIMD2<Float>(250, 100),
+                size: size,
                 kind: .taskCard(TaskCardData(title: line.trimmingCharacters(in: .whitespaces)))
             )
             document.nodes[node.id] = node

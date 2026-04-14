@@ -7,13 +7,12 @@ final class TerminalManager {
     private static let titleBarHeight: Float = 30
     private var lastIsDark: Bool?
     private var pendingMCPConfigs: [(path: String, nodeID: UUID)] = []
-
-    var scrollbackDir: URL? {
+    private(set) lazy var scrollbackDir: URL? = {
         guard let projectPath = document.projectPath else { return nil }
         let dir = projectPath.appendingPathComponent(".xyzterminal/scrollback", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
-    }
+    }()
 
     init(document: CanvasDocument) {
         self.document = document

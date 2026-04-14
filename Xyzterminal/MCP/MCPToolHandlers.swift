@@ -77,7 +77,7 @@ enum MCPToolHandlers {
         let node = CanvasNode(
             id: UUID(),
             position: position,
-            size: SIMD2<Float>(250, 100),
+            size: NodeKind.taskCard(taskData).defaultSize,
             kind: .taskCard(taskData)
         )
         document.nodes[node.id] = node
