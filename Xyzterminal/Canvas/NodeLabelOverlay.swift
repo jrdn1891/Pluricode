@@ -101,8 +101,14 @@ struct NodeLabelOverlay: View {
 
         case .section(let data):
             let zoom = CGFloat(document.camera.zoom)
+            let tasks = document.tasksInSection(node.id)
+            let taskCount = tasks.count
+            let isAssigned = document.edges.values.contains { $0.sourceID == node.id && $0.edgeType == .assignedTo }
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 6) {
+                    Image(systemName: data.isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: max(8, 10 * zoom)))
+                        .foregroundStyle(.secondary)
                     Image(systemName: "rectangle.3.group")
                         .font(.system(size: max(9, 11 * zoom)))
                         .foregroundStyle(.purple.opacity(0.7))
@@ -110,28 +116,56 @@ struct NodeLabelOverlay: View {
                         .font(.system(size: max(10, 13 * zoom), weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
+                    if isAssigned && taskCount > 0 {
+                        let done = tasks.filter { $0.data.status == .done }.count
+                        Text("\(done)/\(taskCount)")
+                            .font(.system(size: max(8, 10 * zoom), weight: .medium))
+                            .foregroundStyle(done == taskCount ? .green : .orange)
+                    } else if data.isCollapsed && taskCount > 0 {
+                        Text("\(taskCount)")
+                            .font(.system(size: max(8, 10 * zoom)))
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
-                    Text(data.viewType.rawValue.capitalized)
+                    if !data.isCollapsed {
+                        Text(data.viewType.rawValue.capitalized)
+                            .font(.system(size: max(8, 10 * zoom)))
+                            .foregroundStyle(.secondary)
+                    }
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: max(8, 10 * zoom)))
                         .foregroundStyle(.secondary)
                 }
                 .frame(height: 40 * zoom)
 
-                if data.viewType == .kanban, width > 200 {
-                    HStack(spacing: 0) {
-                        ForEach(TaskCardData.Status.allCases, id: \.self) { status in
-                            Text(columnLabel(status))
-                                .font(.system(size: max(7, 9 * zoom)))
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity)
+                if !data.isCollapsed {
+                    if data.viewType == .kanban, width > 200 {
+                        HStack(spacing: 0) {
+                            ForEach(TaskCardData.Status.allCases, id: \.self) { status in
+                                let count = tasks.filter { $0.data.status == status }.count
+                                Text(count > 0 ? "\(columnLabel(status)) \(count)" : columnLabel(status))
+                                    .font(.system(size: max(7, 9 * zoom)))
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity)
+                            }
                         }
+                        .frame(height: 28 * zoom)
                     }
-                    .frame(height: 28 * zoom)
+
+                    if taskCount == 0 {
+                        Spacer()
+                        Text("Drag tasks here")
+                            .font(.system(size: max(10, 13 * zoom)))
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity)
+                        Spacer()
+                    } else {
+                        Spacer()
+                    }
                 }
-                Spacer()
             }
             .padding(.horizontal, 8)
-            .frame(width: width, height: height, alignment: .topLeading)
+            .frame(width: width, height: data.isCollapsed ? 40 * zoom : height, alignment: .topLeading)
         }
     }
 

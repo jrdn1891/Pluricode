@@ -123,7 +123,16 @@ struct CanvasContainerView: View {
             get: { document.editingNodeID.map { EditingNode(id: $0) } },
             set: { document.editingNodeID = $0?.id }
         )) { item in
-            TaskCardEditor(document: document, nodeID: item.id)
+            if let node = document.nodes[item.id] {
+                switch node.kind {
+                case .taskCard:
+                    TaskCardEditor(document: document, nodeID: item.id)
+                case .section:
+                    SectionEditor(document: document, nodeID: item.id)
+                case .terminal:
+                    EmptyView()
+                }
+            }
         }
         .sheet(isPresented: Binding(
             get: { document.showTerminalConfig },

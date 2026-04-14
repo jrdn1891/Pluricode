@@ -137,19 +137,36 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         for node in document.nodes.values {
             guard case .section(let sectionData) = node.kind else { continue }
             let isSelected = document.selectedNodeIDs.contains(node.id)
-            let isHighlighted = document.highlightedSectionID == node.id
+            let isHighlighted = document.highlightedSectionID == node.id && document.highlightedColumnIndex == nil
+            let renderSize = sectionData.isCollapsed
+                ? SIMD2<Float>(node.size.x, SectionLayout.headerHeight)
+                : node.size
             instances.append(NodeInstance(
                 position: node.position,
-                size: node.size,
+                size: renderSize,
                 color: isHighlighted ? theme.sectionHighlightColor : theme.sectionNodeColor,
                 cornerRadius: 12,
                 selected: isSelected ? 1 : 0
             ))
 
-            if sectionData.viewType == .kanban {
+            if sectionData.viewType == .kanban && !sectionData.isCollapsed {
                 let statuses = TaskCardData.Status.allCases
                 let numCols = Float(statuses.count)
                 let colW = (node.size.x - SectionLayout.padding * 2 - SectionLayout.colGap * (numCols - 1)) / numCols
+
+                if document.highlightedSectionID == node.id,
+                   let colIdx = document.highlightedColumnIndex,
+                   colIdx >= 0 && colIdx < statuses.count {
+                    let colX = node.position.x + SectionLayout.padding + (colW + SectionLayout.colGap) * Float(colIdx)
+                    instances.append(NodeInstance(
+                        position: SIMD2<Float>(colX, node.position.y + SectionLayout.headerHeight),
+                        size: SIMD2<Float>(colW, node.size.y - SectionLayout.headerHeight),
+                        color: theme.sectionHighlightColor,
+                        cornerRadius: 4,
+                        selected: 0
+                    ))
+                }
+
                 for i in 1..<statuses.count {
                     let x = node.position.x + SectionLayout.padding + (colW + SectionLayout.colGap) * Float(i) - SectionLayout.colGap * 0.5
                     instances.append(NodeInstance(

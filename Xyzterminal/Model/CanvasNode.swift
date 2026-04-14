@@ -133,6 +133,7 @@ struct SectionData: Codable {
     enum ViewType: String, Codable, CaseIterable { case list, kanban }
     var title: String = "Untitled"
     var viewType: ViewType = .list
+    var isCollapsed: Bool = false
 }
 
 extension SIMD2: Encodable where Scalar: Encodable {

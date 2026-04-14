@@ -86,12 +86,25 @@ final class CanvasInputHandler {
         }
 
         if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes, layouts: layouts),
-           let node = document.nodes[hitID],
-           case .taskCard = node.kind {
+           let node = document.nodes[hitID] {
             let entry = layouts[hitID]
-            if isExpandHit(canvasPoint: canvasPoint, position: entry?.position ?? node.position, size: entry?.size ?? node.size) {
-                document.editingNodeID = hitID
+            let pos = entry?.position ?? node.position
+            let sz = entry?.size ?? node.size
+
+            if case .section = node.kind,
+               isCollapseChevronHit(canvasPoint: canvasPoint, position: pos) {
+                toggleCollapse(sectionID: hitID)
                 return
+            }
+
+            switch node.kind {
+            case .taskCard, .section:
+                if isExpandHit(canvasPoint: canvasPoint, position: pos, size: sz) {
+                    document.editingNodeID = hitID
+                    return
+                }
+            case .terminal:
+                break
             }
         }
 
@@ -171,9 +184,19 @@ final class CanvasInputHandler {
                let draggedID = document.selectedNodeIDs.first,
                let draggedNode = document.nodes[draggedID],
                case .taskCard = draggedNode.kind {
-                document.highlightedSectionID = findSectionUnder(canvasPoint, excluding: draggedID)
+                let sectionID = findSectionUnder(canvasPoint, excluding: draggedID)
+                document.highlightedSectionID = sectionID
+                if let sectionID,
+                   let section = document.nodes[sectionID],
+                   case .section(let sData) = section.kind,
+                   sData.viewType == .kanban {
+                    document.highlightedColumnIndex = kanbanColumnIndex(at: canvasPoint, section: section)
+                } else {
+                    document.highlightedColumnIndex = nil
+                }
             } else {
                 document.highlightedSectionID = nil
+                document.highlightedColumnIndex = nil
             }
         case .resizingNode(let nodeID, let corner, let startSize, let startPosition, let startMouse):
             let delta = canvasPoint - startMouse
@@ -268,6 +291,7 @@ final class CanvasInputHandler {
             }
 
             document.highlightedSectionID = nil
+            document.highlightedColumnIndex = nil
             document.scheduleSave()
         }
 
@@ -331,8 +355,6 @@ final class CanvasInputHandler {
             document.showTerminalConfig = true
         case "s":
             document.addNode(kind: .section(SectionData()))
-        case "v":
-            toggleSectionViewType()
         case "d":
             duplicateSelected()
         case "m":
@@ -605,25 +627,33 @@ final class CanvasInputHandler {
         return nil
     }
 
-    private func kanbanColumnStatus(at point: SIMD2<Float>, section: CanvasNode) -> TaskCardData.Status? {
+    private func kanbanColumnIndex(at point: SIMD2<Float>, section: CanvasNode) -> Int? {
         let statuses = TaskCardData.Status.allCases
         let numCols = Float(statuses.count)
         let colW = (section.size.x - SectionLayout.padding * 2 - SectionLayout.colGap * (numCols - 1)) / numCols
         let relX = point.x - section.position.x - SectionLayout.padding
         guard relX >= 0 else { return nil }
-        let colIndex = Int(relX / (colW + SectionLayout.colGap))
-        guard colIndex >= 0 && colIndex < statuses.count else { return nil }
-        return statuses[colIndex]
+        let idx = Int(relX / (colW + SectionLayout.colGap))
+        guard idx >= 0 && idx < statuses.count else { return nil }
+        return idx
     }
 
-    private func toggleSectionViewType() {
-        for id in document.selectedNodeIDs {
-            guard var node = document.nodes[id],
-                  case .section(var data) = node.kind else { continue }
-            data.viewType = data.viewType == .list ? .kanban : .list
-            node.kind = .section(data)
-            document.nodes[id] = node
-        }
+    private func kanbanColumnStatus(at point: SIMD2<Float>, section: CanvasNode) -> TaskCardData.Status? {
+        guard let idx = kanbanColumnIndex(at: point, section: section) else { return nil }
+        return TaskCardData.Status.allCases[idx]
+    }
+
+    private func isCollapseChevronHit(canvasPoint: SIMD2<Float>, position: SIMD2<Float>) -> Bool {
+        canvasPoint.x >= position.x + 4
+            && canvasPoint.x <= position.x + 24
+            && canvasPoint.y >= position.y + 4
+            && canvasPoint.y <= position.y + 36
+    }
+
+    private func toggleCollapse(sectionID: UUID) {
+        guard case .section(var data) = document.nodes[sectionID]?.kind else { return }
+        data.isCollapsed.toggle()
+        document.nodes[sectionID]?.kind = .section(data)
         document.scheduleSave()
     }
 }
