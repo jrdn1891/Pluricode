@@ -6,7 +6,6 @@ final class CanvasInputHandler {
     weak var view: NSView?
 
     var terminalManager: TerminalManager?
-    let inlineEditor = InlineEditor()
 
     private enum DragState {
         case none
@@ -17,10 +16,16 @@ final class CanvasInputHandler {
     }
 
     private var dragState: DragState = .none
+    private var editingTextField: NSTextField?
+    private var editingDelegate: EditingDelegate?
+    private var statusMenuHandler: StatusMenuHandler?
 
     init(document: CanvasDocument, view: NSView) {
         self.document = document
         self.view = view
+        document.onStartInlineEdit = { [weak self] nodeID in
+            self?.beginInlineEdit(nodeID: nodeID)
+        }
     }
 
     private var viewportSize: CGSize {
@@ -60,15 +65,14 @@ final class CanvasInputHandler {
         let canvasPoint = document.camera.screenToCanvas(screenPoint, viewportSize: viewportSize)
         let optionHeld = NSEvent.modifierFlags.contains(.option)
 
-        if inlineEditor.isEditing {
-            inlineEditor.cancel()
+        if editingTextField != nil {
+            endInlineEdit(commit: true)
         }
 
         if event.clickCount == 2 {
             if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes),
-               let node = document.nodes[hitID],
-               case .taskCard(let data) = node.kind {
-                startInlineEdit(nodeID: hitID, node: node, data: data)
+               case .taskCard = document.nodes[hitID]?.kind {
+                beginInlineEdit(nodeID: hitID)
             }
             return
         }
@@ -84,6 +88,14 @@ final class CanvasInputHandler {
         if let (hitID, corner) = HitTesting.resizeHandleAt(canvasPoint, in: document.nodes, selectedIDs: document.selectedNodeIDs),
            let node = document.nodes[hitID] {
             dragState = .resizingNode(nodeID: hitID, corner: corner, startSize: node.size, startPosition: node.position, startMouse: canvasPoint)
+            return
+        }
+
+        if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes),
+           let node = document.nodes[hitID],
+           case .taskCard = node.kind,
+           isStatusPillHit(canvasPoint: canvasPoint, node: node) {
+            showStatusMenu(nodeID: hitID, at: screenPoint)
             return
         }
 
@@ -324,6 +336,7 @@ final class CanvasInputHandler {
     }
 
     func handleKeyDown(_ event: NSEvent) {
+        if editingTextField != nil { return }
         if event.keyCode == 51 || event.keyCode == 117 {
             document.deleteSelected()
             return
@@ -335,7 +348,8 @@ final class CanvasInputHandler {
         guard let chars = event.charactersIgnoringModifiers else { return }
         switch chars {
         case "t":
-            document.addNode(kind: .taskCard(TaskCardData()))
+            let id = document.addNode(kind: .taskCard(TaskCardData(title: "")))
+            beginInlineEdit(nodeID: id)
         case "e":
             document.showTerminalConfig = true
         case "d":
@@ -353,31 +367,68 @@ final class CanvasInputHandler {
         WiringAction.send(edge: edge, document: document, sessions: sessions)
     }
 
-    private func startInlineEdit(nodeID: UUID, node: CanvasNode, data: TaskCardData) {
-        guard let view else { return }
-        let titlePos = node.position + SIMD2<Float>(28, 4)
-        let titleSize = SIMD2<Float>(node.size.x - 56, 24)
+    // MARK: - Inline editing
 
-        let screenTL = document.camera.canvasToScreen(titlePos, viewportSize: viewportSize)
-        let screenBR = document.camera.canvasToScreen(titlePos + titleSize, viewportSize: viewportSize)
+    private func beginInlineEdit(nodeID: UUID) {
+        guard let view,
+              let node = document.nodes[nodeID],
+              case .taskCard(let data) = node.kind else { return }
+
+        endInlineEdit(commit: false)
+
+        let zoom = CGFloat(document.camera.zoom)
+        let screenTL = document.camera.canvasToScreen(node.position, viewportSize: viewportSize)
+        let cardW = CGFloat(node.size.x) * zoom
+        let fontSize = max(10, 13 * zoom)
+        let tfHeight = ceil(fontSize * 1.6)
 
         let frame = NSRect(
-            x: screenTL.x,
-            y: screenBR.y,
-            width: screenBR.x - screenTL.x,
-            height: screenTL.y - screenBR.y
+            x: screenTL.x + 8,
+            y: screenTL.y - 8 - tfHeight,
+            width: cardW - 38,
+            height: tfHeight
         )
-
         guard frame.width > 40 else { return }
 
-        inlineEditor.startEditing(nodeID: nodeID, text: data.title, frame: frame, in: view) { [weak self] newTitle in
-            guard var node = self?.document.nodes[nodeID],
-                  case .taskCard(var d) = node.kind else { return }
-            d.title = newTitle
-            node.kind = .taskCard(d)
-            self?.document.nodes[nodeID] = node
-            self?.document.scheduleSave()
+        let delegate = EditingDelegate()
+        delegate.onCommit = { [weak self] in self?.endInlineEdit(commit: true) }
+        delegate.onCancel = { [weak self] in self?.endInlineEdit(commit: false) }
+
+        let tf = NSTextField(frame: frame)
+        tf.stringValue = data.title
+        tf.font = .systemFont(ofSize: fontSize, weight: .semibold)
+        tf.isBezeled = false
+        tf.drawsBackground = false
+        tf.focusRingType = .none
+        tf.textColor = .labelColor
+        tf.cell?.isScrollable = true
+        tf.cell?.wraps = false
+        tf.delegate = delegate
+
+        view.addSubview(tf)
+        view.window?.makeFirstResponder(tf)
+        tf.selectText(nil)
+
+        editingTextField = tf
+        editingDelegate = delegate
+        document.inlineEditingNodeID = nodeID
+    }
+
+    private func endInlineEdit(commit: Bool) {
+        guard let nodeID = document.inlineEditingNodeID else { return }
+        document.inlineEditingNodeID = nil
+
+        if commit, let text = editingTextField?.stringValue {
+            if case .taskCard(var d) = document.nodes[nodeID]?.kind {
+                d.title = text
+                document.nodes[nodeID]?.kind = .taskCard(d)
+                document.scheduleSave()
+            }
         }
+
+        editingTextField?.removeFromSuperview()
+        editingTextField = nil
+        editingDelegate = nil
     }
 
     func handleMouseMoved(_ event: NSEvent) {
@@ -398,6 +449,37 @@ final class CanvasInputHandler {
         case .terminal: SIMD2<Float>(200, 120)
         case .taskCard: SIMD2<Float>(120, 50)
         }
+    }
+
+    private func isStatusPillHit(canvasPoint: SIMD2<Float>, node: CanvasNode) -> Bool {
+        let zoom = document.camera.zoom
+        let pillOrigin = node.position + SIMD2<Float>(8 / zoom, 26 / zoom)
+        let pillSize = SIMD2<Float>(80 / zoom, 20 / zoom)
+        return canvasPoint.x >= pillOrigin.x
+            && canvasPoint.x <= pillOrigin.x + pillSize.x
+            && canvasPoint.y >= pillOrigin.y
+            && canvasPoint.y <= pillOrigin.y + pillSize.y
+    }
+
+    private func showStatusMenu(nodeID: UUID, at point: CGPoint) {
+        guard let view else { return }
+
+        let handler = StatusMenuHandler { [weak self] newStatus in
+            guard let self, case .taskCard(var data) = self.document.nodes[nodeID]?.kind else { return }
+            data.transition(to: newStatus)
+            self.document.nodes[nodeID]?.kind = .taskCard(data)
+            self.document.scheduleSave()
+        }
+        statusMenuHandler = handler
+
+        let menu = NSMenu()
+        for status in TaskCardData.Status.allCases {
+            let item = NSMenuItem(title: status.label, action: #selector(StatusMenuHandler.select(_:)), keyEquivalent: "")
+            item.target = handler
+            item.representedObject = status.rawValue
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: point, in: view)
     }
 
     private func isExpandHit(canvasPoint: SIMD2<Float>, node: CanvasNode) -> Bool {
@@ -436,5 +518,36 @@ final class CanvasInputHandler {
         case (.taskCard, .taskCard): return .blocks
         case (.terminal, .taskCard): return .assignedTo
         }
+    }
+}
+
+private final class EditingDelegate: NSObject, NSTextFieldDelegate {
+    var onCommit: (() -> Void)?
+    var onCancel: (() -> Void)?
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        onCommit?()
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy sel: Selector) -> Bool {
+        if sel == #selector(NSResponder.insertNewline(_:)) {
+            onCommit?()
+            return true
+        }
+        if sel == #selector(NSResponder.cancelOperation(_:)) {
+            onCancel?()
+            return true
+        }
+        return false
+    }
+}
+
+private final class StatusMenuHandler: NSObject {
+    let onChange: (TaskCardData.Status) -> Void
+    init(onChange: @escaping (TaskCardData.Status) -> Void) { self.onChange = onChange }
+    @objc func select(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let status = TaskCardData.Status(rawValue: raw) else { return }
+        onChange(status)
     }
 }

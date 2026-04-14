@@ -57,7 +57,10 @@ struct CanvasHostView: View {
         CanvasContainerView(document: document)
             .toolbar {
                 ToolbarItemGroup {
-                    Button(action: { document.addNode(kind: .taskCard(TaskCardData())) }) {
+                    Button(action: {
+                        let id = document.addNode(kind: .taskCard(TaskCardData(title: "")))
+                        document.onStartInlineEdit?(id)
+                    }) {
                         Label("Task Card", systemImage: "square.text.square")
                     }
                     Button(action: { document.showTerminalConfig = true }) {

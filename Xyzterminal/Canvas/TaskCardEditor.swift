@@ -25,65 +25,119 @@ struct TaskCardEditor: View {
         }
     }
 
+    private var showResult: Bool {
+        !result.isEmpty || status == .done || status == .failed
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TextField("Title", text: $title)
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            Divider()
+            editorBody
+            Divider()
+            footer
+        }
+        .frame(width: 500, height: showResult ? 540 : 440)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .onDisappear { save() }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            TextField("Task title", text: $title)
                 .textFieldStyle(.plain)
                 .font(.title2.bold())
-                .foregroundStyle(.primary)
 
-            HStack {
-                Picker("Status", selection: $status) {
-                    ForEach(TaskCardData.Status.allCases, id: \.self) { s in
-                        Text(s.rawValue).tag(s)
-                    }
-                }
-                .pickerStyle(.segmented)
+            HStack(spacing: 12) {
+                statusPicker
 
                 if let elapsed = taskDuration {
-                    Text(elapsed)
+                    Label(elapsed, systemImage: "clock")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-            }
 
-            Text("Description")
-                .font(.subheadline.bold())
-                .foregroundStyle(.secondary)
-
-            TextEditor(text: $content)
-                .font(.body)
-                .scrollContentBackground(.hidden)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .cornerRadius(6)
-                .frame(minHeight: 100)
-
-            if !result.isEmpty || status == .done || status == .failed {
-                Text("Result")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.secondary)
-
-                TextEditor(text: $result)
-                    .font(.body)
-                    .scrollContentBackground(.hidden)
-                    .background(Color(nsColor: .controlBackgroundColor))
-                    .cornerRadius(6)
-                    .frame(minHeight: 60)
-            }
-
-            HStack {
                 Spacer()
-                Button("Done") {
-                    save()
-                    dismiss()
-                }
-                .keyboardShortcut(.return, modifiers: .command)
             }
         }
-        .padding(20)
-        .frame(width: 450, height: result.isEmpty && status != .done && status != .failed ? 360 : 480)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .onDisappear { save() }
+        .padding(24)
+    }
+
+    private var editorBody: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                section("Description") {
+                    TextEditor(text: $content)
+                        .font(.body)
+                        .scrollContentBackground(.hidden)
+                        .padding(8)
+                        .frame(minHeight: 120)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+
+                if showResult {
+                    section("Result") {
+                        TextEditor(text: $result)
+                            .font(.body)
+                            .scrollContentBackground(.hidden)
+                            .padding(8)
+                            .frame(minHeight: 80)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+            }
+            .padding(24)
+        }
+    }
+
+    private var footer: some View {
+        HStack {
+            Spacer()
+            Button("Done") {
+                save()
+                dismiss()
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+            .controlSize(.large)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private var statusPicker: some View {
+        Menu {
+            ForEach(TaskCardData.Status.allCases, id: \.self) { s in
+                Button(s.label) { status = s }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(status.color)
+                    .frame(width: 8, height: 8)
+                Text(status.label)
+                    .font(.subheadline.weight(.medium))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 
     private var taskDuration: String? {

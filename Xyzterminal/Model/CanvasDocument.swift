@@ -17,6 +17,8 @@ final class CanvasDocument {
     var showTerminalConfig = false
     var minimapCollapsed = false
     var mcpServer: MCPServer?
+    var inlineEditingNodeID: UUID?
+    var onStartInlineEdit: ((UUID) -> Void)?
 
     private var saveTask: Task<Void, Never>?
 
@@ -26,7 +28,8 @@ final class CanvasDocument {
         mcpServer?.stop()
     }
 
-    func addNode(kind: NodeKind) {
+    @discardableResult
+    func addNode(kind: NodeKind) -> UUID {
         let defaultSize: SIMD2<Float> = switch kind {
         case .terminal: SIMD2<Float>(400, 300)
         case .taskCard: SIMD2<Float>(250, 100)
@@ -36,6 +39,7 @@ final class CanvasDocument {
         let node = CanvasNode(id: UUID(), position: position, size: defaultSize, kind: kind)
         nodes[node.id] = node
         scheduleSave()
+        return node.id
     }
 
     func addEdge(from sourceID: UUID, to targetID: UUID, type: EdgeType) {

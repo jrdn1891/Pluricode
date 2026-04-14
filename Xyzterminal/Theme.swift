@@ -57,13 +57,4 @@ struct Theme {
     var terminalForeground: NSColor {
         isDark ? .white : NSColor(red: 0.13, green: 0.13, blue: 0.15, alpha: 1)
     }
-
-    var inlineEditorBackground: NSColor {
-        isDark ? NSColor(red: 0.18, green: 0.18, blue: 0.22, alpha: 1)
-               : NSColor(red: 0.96, green: 0.96, blue: 0.98, alpha: 1)
-    }
-
-    var inlineEditorTextColor: NSColor {
-        isDark ? .white : .black
-    }
 }
