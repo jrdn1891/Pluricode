@@ -6,6 +6,7 @@ final class MCPServer {
     private var listener: NWListener?
     private var connections: [NWConnection] = []
     private(set) var port: UInt16 = 0
+    var onPortReady: (() -> Void)?
 
     init(document: CanvasDocument) {
         self.document = document
@@ -23,6 +24,8 @@ final class MCPServer {
         listener?.stateUpdateHandler = { [weak self] state in
             if case .ready = state, let port = self?.listener?.port {
                 self?.port = port.rawValue
+                self?.onPortReady?()
+                self?.onPortReady = nil
             }
         }
 

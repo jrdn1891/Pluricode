@@ -6,6 +6,7 @@ final class TerminalManager {
     var worktreeManager: WorktreeManager?
     private static let titleBarHeight: Float = 30
     private var lastIsDark: Bool?
+    private var pendingMCPConfigs: [(path: String, nodeID: UUID)] = []
 
     init(document: CanvasDocument) {
         self.document = document
@@ -121,13 +122,29 @@ final class TerminalManager {
     }
 
     private func writeMCPConfig(to worktreePath: String, nodeID: UUID) {
-        guard let port = document.mcpServer?.port, port > 0 else { return }
+        guard let server = document.mcpServer else { return }
+
+        guard server.port > 0 else {
+            pendingMCPConfigs.append((worktreePath, nodeID))
+            if server.onPortReady == nil {
+                server.onPortReady = { [weak self] in
+                    guard let self else { return }
+                    let pending = self.pendingMCPConfigs
+                    self.pendingMCPConfigs.removeAll()
+                    for config in pending {
+                        self.writeMCPConfig(to: config.path, nodeID: config.nodeID)
+                    }
+                }
+            }
+            return
+        }
+
         let appPath = Bundle.main.executablePath ?? ProcessInfo.processInfo.arguments[0]
         let config: [String: Any] = [
             "mcpServers": [
                 "xyzterminal": [
                     "command": appPath,
-                    "args": ["--mcp-bridge", "--port", "\(port)", "--node-id", nodeID.uuidString]
+                    "args": ["--mcp-bridge", "--port", "\(server.port)", "--node-id", nodeID.uuidString]
                 ]
             ]
         ]

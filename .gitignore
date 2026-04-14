@@ -5,3 +5,4 @@ DerivedData/
 .build/
 .xyzterminal/worktrees/
 *.swp
+.mcp.json
