@@ -497,11 +497,18 @@ final class CanvasInputHandler {
         for id in document.selectedNodeIDs {
             guard let node = document.nodes[id] else { continue }
             let offset = SIMD2<Float>(30, 30)
+            var kind = node.kind
+            if case .terminal(var data) = kind {
+                data.worktreePath = nil
+                data.branchName = nil
+                data.status = .idle
+                kind = .terminal(data)
+            }
             let newNode = CanvasNode(
                 id: UUID(),
                 position: node.position + offset,
                 size: node.size,
-                kind: node.kind
+                kind: kind
             )
             document.nodes[newNode.id] = newNode
         }
