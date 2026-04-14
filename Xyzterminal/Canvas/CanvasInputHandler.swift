@@ -141,7 +141,19 @@ final class CanvasInputHandler {
     func handleMouseUp(_ event: NSEvent) {
         guard let view else { return }
 
-        if case .movingNodes = dragState {
+        if case .movingNodes(_, let startMouse) = dragState {
+            let screenPoint = view.convert(event.locationInWindow, from: nil)
+            let canvasPoint = document.camera.screenToCanvas(screenPoint, viewportSize: viewportSize)
+            let moved = simd_length(canvasPoint - startMouse) > 5
+
+            if moved, document.selectedNodeIDs.count == 1,
+               let draggedID = document.selectedNodeIDs.first,
+               let draggedNode = document.nodes[draggedID],
+               case .taskCard(let taskData) = draggedNode.kind {
+                if let targetID = findTerminalUnder(canvasPoint, excluding: draggedID) {
+                    assignTask(taskData: taskData, taskID: draggedID, to: targetID)
+                }
+            }
             document.scheduleSave()
         }
 
@@ -160,6 +172,35 @@ final class CanvasInputHandler {
         dragState = .none
     }
 
+    private func findTerminalUnder(_ point: SIMD2<Float>, excluding: UUID) -> UUID? {
+        for (id, node) in document.nodes {
+            guard id != excluding, case .terminal = node.kind else { continue }
+            if point.x >= node.position.x && point.x <= node.position.x + node.size.x
+                && point.y >= node.position.y && point.y <= node.position.y + node.size.y {
+                return id
+            }
+        }
+        return nil
+    }
+
+    private func assignTask(taskData: TaskCardData, taskID: UUID, to terminalID: UUID) {
+        guard let session = terminalManager?.sessions[terminalID] else { return }
+
+        document.addEdge(from: taskID, to: terminalID, type: .assignedTo)
+
+        var updatedTask = taskData
+        updatedTask.status = .inProgress
+        document.nodes[taskID]?.kind = .taskCard(updatedTask)
+
+        let prompt = "# Task: \(taskData.title)\n\n\(taskData.body)\n"
+        let bytes = Array(prompt.utf8)
+        session.terminalView.process?.send(data: bytes[...])
+        let newline = Array("\n".utf8)
+        session.terminalView.process?.send(data: newline[...])
+
+        document.scheduleSave()
+    }
+
     func handleKeyDown(_ event: NSEvent) {
         if event.keyCode == 51 || event.keyCode == 117 {
             document.deleteSelected()
@@ -175,6 +216,8 @@ final class CanvasInputHandler {
             document.addNode(kind: .taskCard(TaskCardData()))
         case "e":
             document.showTerminalConfig = true
+        case "d":
+            duplicateSelected()
         default:
             break
         }
@@ -184,6 +227,21 @@ final class CanvasInputHandler {
         guard let edge = document.edges[edgeID],
               let sessions = terminalManager?.sessions else { return }
         WiringAction.send(edge: edge, document: document, sessions: sessions)
+    }
+
+    private func duplicateSelected() {
+        for id in document.selectedNodeIDs {
+            guard let node = document.nodes[id] else { continue }
+            let offset = SIMD2<Float>(30, 30)
+            let newNode = CanvasNode(
+                id: UUID(),
+                position: node.position + offset,
+                size: node.size,
+                kind: node.kind
+            )
+            document.nodes[newNode.id] = newNode
+        }
+        document.scheduleSave()
     }
 
     private func inferEdgeType(sourceID: UUID, targetID: UUID) -> EdgeType {

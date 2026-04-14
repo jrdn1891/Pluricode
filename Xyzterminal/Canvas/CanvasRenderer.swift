@@ -71,6 +71,7 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
 
         drawEdges(encoder: encoder, uniforms: &uniforms)
         drawNodes(encoder: encoder, uniforms: &uniforms)
+        drawMinimap(encoder: encoder, viewportPoints: viewportPoints, contentsScale: uniforms.contentsScale)
 
         encoder.endEncoding()
         commandBuffer.present(drawable)
@@ -168,5 +169,96 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         case .assignedTo: return SIMD4<Float>(0.35, 0.55, 1.0, 0.8)
         case .blocks, .blockedBy: return SIMD4<Float>(0.7, 0.3, 0.3, 0.8)
         }
+    }
+
+    private func drawMinimap(encoder: MTLRenderCommandEncoder, viewportPoints: SIMD2<Float>, contentsScale: Float) {
+        let nodes = Array(document.nodes.values)
+        guard !nodes.isEmpty else { return }
+
+        var minP = SIMD2<Float>(Float.greatestFiniteMagnitude, Float.greatestFiniteMagnitude)
+        var maxP = SIMD2<Float>(-Float.greatestFiniteMagnitude, -Float.greatestFiniteMagnitude)
+        for node in nodes {
+            minP = simd_min(minP, node.position)
+            maxP = simd_max(maxP, node.position + node.size)
+        }
+
+        let padding: Float = 200
+        minP -= SIMD2<Float>(padding, padding)
+        maxP += SIMD2<Float>(padding, padding)
+        let worldSize = maxP - minP
+        guard worldSize.x > 0 && worldSize.y > 0 else { return }
+
+        let mapW: Float = 160
+        let mapH = mapW * (worldSize.y / worldSize.x)
+        let mapMargin: Float = 12
+        let mapX = viewportPoints.x - mapW - mapMargin
+        let mapY = viewportPoints.y - mapH - mapMargin
+
+        let mapScale = mapW / worldSize.x
+
+        var instances: [NodeInstance] = []
+
+        instances.append(NodeInstance(
+            position: SIMD2<Float>(mapX, mapY),
+            size: SIMD2<Float>(mapW, mapH),
+            color: SIMD4<Float>(0.12, 0.12, 0.15, 0.85),
+            cornerRadius: 6,
+            selected: 0
+        ))
+
+        for node in nodes {
+            let rel = (node.position - minP) * mapScale
+            let sz = node.size * mapScale
+            let color: SIMD4<Float> = switch node.kind {
+            case .terminal: SIMD4<Float>(0.3, 0.8, 0.3, 0.9)
+            case .taskCard: SIMD4<Float>(0.5, 0.5, 0.65, 0.9)
+            }
+            instances.append(NodeInstance(
+                position: SIMD2<Float>(mapX + rel.x, mapY + rel.y),
+                size: SIMD2<Float>(max(3, sz.x), max(2, sz.y)),
+                color: color,
+                cornerRadius: 1,
+                selected: 0
+            ))
+        }
+
+        let cam = document.camera
+        let vpCanvasW = viewportPoints.x / cam.zoom
+        let vpCanvasH = viewportPoints.y / cam.zoom
+        let vpTopLeft = SIMD2<Float>(cam.offset.x - vpCanvasW * 0.5, cam.offset.y - vpCanvasH * 0.5)
+        let vpRel = (vpTopLeft - minP) * mapScale
+        let vpSz = SIMD2<Float>(vpCanvasW, vpCanvasH) * mapScale
+        instances.append(NodeInstance(
+            position: SIMD2<Float>(mapX + vpRel.x, mapY + vpRel.y),
+            size: SIMD2<Float>(max(4, vpSz.x), max(4, vpSz.y)),
+            color: SIMD4<Float>(1.0, 1.0, 1.0, 0.25),
+            cornerRadius: 2,
+            selected: 0
+        ))
+
+        guard let buffer = device.makeBuffer(
+            bytes: instances,
+            length: MemoryLayout<NodeInstance>.stride * instances.count,
+            options: .storageModeShared
+        ) else { return }
+
+        let sx: Float = 2.0 / viewportPoints.x
+        let sy: Float = -2.0 / viewportPoints.y
+        var mapUniforms = Uniforms(
+            viewProjection: simd_float4x4(
+                SIMD4<Float>(sx, 0, 0, 0),
+                SIMD4<Float>(0, sy, 0, 0),
+                SIMD4<Float>(0, 0, 1, 0),
+                SIMD4<Float>(-1, 1, 0, 1)
+            ),
+            viewportSize: viewportPoints,
+            zoom: 1,
+            contentsScale: contentsScale
+        )
+
+        encoder.setRenderPipelineState(nodePipeline)
+        encoder.setVertexBuffer(buffer, offset: 0, index: 0)
+        encoder.setVertexBytes(&mapUniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
     }
 }

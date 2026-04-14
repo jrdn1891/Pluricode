@@ -72,15 +72,17 @@
 - `reviews`: gathers diff, sends code review request prompt to target terminal
 - Each send logged as EdgePayload with timestamp and branch ref (persisted)
 
-### Known issue
-- SwiftUI overlay views on macOS Tahoe create opaque layers covering Metal content
-- Workaround: edge actions moved to toolbar instead of canvas overlay
-- NodeLabelOverlay works in ZStack but EdgeActionOverlay does not
+## Phase 9: Minimap, Drag-to-Assign, Polish ✅
+- Minimap rendered in Metal (bottom-right corner), avoids SwiftUI overlay issues
+- Shows all nodes as colored dots with viewport rectangle
+- Auto-scales to fit all content
+- Drag task card onto terminal → auto-creates assignedTo edge, sets task to inProgress, sends prompt
+- Duplicate selected node with D key
+- Edge actions moved to toolbar (workaround for macOS Tahoe overlay compositing)
 
-## Remaining
+## Known Issues
+- SwiftUI overlay views on macOS Tahoe create opaque layers covering Metal content; only NodeLabelOverlay works in ZStack, additional overlays break rendering
+- Project directory picker needed on first launch (macOS sets cwd to / for GUI apps)
+- Worktree/branch name not always visible in terminal title bar depending on project setup
 
-### Phase 9: Minimap, Drag-to-Assign, Polish
-- Minimap overlay
-- Drag task card onto terminal → agent receives task as prompt
-- Duplicate terminal node
-- Settings panel
+## All 9 phases complete — V1 feature set delivered
