@@ -25,14 +25,20 @@ struct NodeLabelOverlay: View {
     private func nodeLabelView(node: CanvasNode, width: CGFloat, height: CGFloat) -> some View {
         switch node.kind {
         case .taskCard(let data):
+            let blocked = !document.unresolvedBlockers(for: node.id).isEmpty
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(statusColor(data.status))
                         .frame(width: 8, height: 8)
+                    if blocked {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: max(8, 10 * CGFloat(document.camera.zoom))))
+                            .foregroundStyle(.red.opacity(0.7))
+                    }
                     Text(data.title)
                         .font(.system(size: max(10, 13 * CGFloat(document.camera.zoom)), weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(blocked ? .white.opacity(0.5) : .white)
                         .lineLimit(1)
                     Spacer()
                     Image(systemName: "arrow.up.left.and.arrow.down.right")

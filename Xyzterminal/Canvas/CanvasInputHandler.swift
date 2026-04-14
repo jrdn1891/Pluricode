@@ -198,6 +198,7 @@ final class CanvasInputHandler {
     }
 
     private func assignTask(taskData: TaskCardData, taskID: UUID, to terminalID: UUID) {
+        guard document.unresolvedBlockers(for: taskID).isEmpty else { return }
         guard let session = terminalManager?.sessions[terminalID],
               let process = session.terminalView.process else { return }
 

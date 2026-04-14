@@ -55,6 +55,16 @@ final class CanvasDocument {
         scheduleSave()
     }
 
+    func unresolvedBlockers(for nodeID: UUID) -> [UUID] {
+        edges.values.compactMap { edge in
+            guard edge.targetID == nodeID, edge.edgeType == .blocks else { return nil }
+            guard let source = nodes[edge.sourceID],
+                  case .taskCard(let data) = source.kind,
+                  data.status != .done else { return nil }
+            return edge.sourceID
+        }
+    }
+
     func scheduleSave() {
         saveTask?.cancel()
         saveTask = Task { @MainActor [weak self] in
