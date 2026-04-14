@@ -13,6 +13,7 @@ final class CanvasInputHandler {
         case movingNodes(startPositions: [UUID: SIMD2<Float>], startMouse: SIMD2<Float>)
         case boxSelecting(startCanvas: SIMD2<Float>)
         case creatingEdge(sourceID: UUID)
+        case resizingNode(nodeID: UUID, corner: ResizeCorner, startSize: SIMD2<Float>, startPosition: SIMD2<Float>, startMouse: SIMD2<Float>)
     }
 
     private var dragState: DragState = .none
@@ -80,6 +81,12 @@ final class CanvasInputHandler {
             return
         }
 
+        if let (hitID, corner) = HitTesting.resizeHandleAt(canvasPoint, in: document.nodes, selectedIDs: document.selectedNodeIDs),
+           let node = document.nodes[hitID] {
+            dragState = .resizingNode(nodeID: hitID, corner: corner, startSize: node.size, startPosition: node.position, startMouse: canvasPoint)
+            return
+        }
+
         if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes) {
             document.selectedEdgeID = nil
             if optionHeld {
@@ -137,6 +144,48 @@ final class CanvasInputHandler {
                 }
                 document.nodes[id]?.position = pos
             }
+        case .resizingNode(let nodeID, let corner, let startSize, let startPosition, let startMouse):
+            let delta = canvasPoint - startMouse
+            var newSize = startSize
+            var newPos = startPosition
+
+            switch corner {
+            case .bottomRight:
+                newSize = startSize + delta
+            case .bottomLeft:
+                newSize.x = startSize.x - delta.x
+                newSize.y = startSize.y + delta.y
+                newPos.x = startPosition.x + delta.x
+            case .topRight:
+                newSize.x = startSize.x + delta.x
+                newSize.y = startSize.y - delta.y
+                newPos.y = startPosition.y + delta.y
+            case .topLeft:
+                newSize = startSize - delta
+                newPos = startPosition + delta
+            }
+
+            let minSize = minSizeFor(document.nodes[nodeID]?.kind)
+            if newSize.x < minSize.x {
+                if corner == .bottomLeft || corner == .topLeft {
+                    newPos.x = startPosition.x + startSize.x - minSize.x
+                }
+                newSize.x = minSize.x
+            }
+            if newSize.y < minSize.y {
+                if corner == .topLeft || corner == .topRight {
+                    newPos.y = startPosition.y + startSize.y - minSize.y
+                }
+                newSize.y = minSize.y
+            }
+
+            if document.snapToGrid {
+                newSize.x = (newSize.x / 20).rounded() * 20
+                newSize.y = (newSize.y / 20).rounded() * 20
+            }
+
+            document.nodes[nodeID]?.size = newSize
+            document.nodes[nodeID]?.position = newPos
         case .boxSelecting(let startCanvas):
             document.selectionRect = SelectionRect(
                 origin: startCanvas,
@@ -168,6 +217,10 @@ final class CanvasInputHandler {
                     assignTask(taskData: taskData, taskID: draggedID, to: targetID)
                 }
             }
+            document.scheduleSave()
+        }
+
+        if case .resizingNode = dragState {
             document.scheduleSave()
         }
 
@@ -322,6 +375,26 @@ final class CanvasInputHandler {
             node.kind = .taskCard(d)
             self?.document.nodes[nodeID] = node
             self?.document.scheduleSave()
+        }
+    }
+
+    func handleMouseMoved(_ event: NSEvent) {
+        guard let view else { return }
+        let screenPoint = view.convert(event.locationInWindow, from: nil)
+        let canvasPoint = document.camera.screenToCanvas(screenPoint, viewportSize: viewportSize)
+
+        if HitTesting.resizeHandleAt(canvasPoint, in: document.nodes, selectedIDs: document.selectedNodeIDs) != nil {
+            NSCursor.crosshair.set()
+        } else {
+            NSCursor.arrow.set()
+        }
+    }
+
+    private func minSizeFor(_ kind: NodeKind?) -> SIMD2<Float> {
+        guard let kind else { return SIMD2<Float>(80, 40) }
+        return switch kind {
+        case .terminal: SIMD2<Float>(200, 120)
+        case .taskCard: SIMD2<Float>(120, 50)
         }
     }
 

@@ -1,7 +1,44 @@
 import Foundation
 import simd
 
+enum ResizeCorner {
+    case topLeft, topRight, bottomLeft, bottomRight
+}
+
 enum HitTesting {
+    static func resizeHandleAt(
+        _ canvasPoint: SIMD2<Float>,
+        in nodes: [UUID: CanvasNode],
+        selectedIDs: Set<UUID>,
+        handleSize: Float = 14
+    ) -> (UUID, ResizeCorner)? {
+        for id in selectedIDs {
+            guard let node = nodes[id] else { continue }
+            let minX = node.position.x
+            let minY = node.position.y
+            let maxX = minX + node.size.x
+            let maxY = minY + node.size.y
+
+            if canvasPoint.x >= maxX - handleSize && canvasPoint.x <= maxX
+                && canvasPoint.y >= maxY - handleSize && canvasPoint.y <= maxY {
+                return (id, .bottomRight)
+            }
+            if canvasPoint.x >= minX && canvasPoint.x <= minX + handleSize
+                && canvasPoint.y >= maxY - handleSize && canvasPoint.y <= maxY {
+                return (id, .bottomLeft)
+            }
+            if canvasPoint.x >= maxX - handleSize && canvasPoint.x <= maxX
+                && canvasPoint.y >= minY && canvasPoint.y <= minY + handleSize {
+                return (id, .topRight)
+            }
+            if canvasPoint.x >= minX && canvasPoint.x <= minX + handleSize
+                && canvasPoint.y >= minY && canvasPoint.y <= minY + handleSize {
+                return (id, .topLeft)
+            }
+        }
+        return nil
+    }
+
     static func nodeAt(_ canvasPoint: SIMD2<Float>, in nodes: [UUID: CanvasNode]) -> UUID? {
         for (id, node) in nodes {
             if canvasPoint.x >= node.position.x
