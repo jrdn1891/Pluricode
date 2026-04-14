@@ -22,7 +22,7 @@ enum MCPToolHandlers {
         let result: Response
         switch request.tool {
         case "update_task":
-            result = updateTask(request.args, document: document)
+            result = updateTask(request.args, document: document, sessions: sessions)
         case "create_task":
             result = createTask(request.args, document: document, nearNodeID: request.nodeID)
         case "get_task":
@@ -38,7 +38,7 @@ enum MCPToolHandlers {
         return encode(result)
     }
 
-    private static func updateTask(_ args: [String: String], document: CanvasDocument) -> Response {
+    private static func updateTask(_ args: [String: String], document: CanvasDocument, sessions: [UUID: TerminalSession]) -> Response {
         guard let taskIDStr = args["task_id"],
               let taskID = UUID(uuidString: taskIDStr) else {
             return Response(success: false, error: "missing or invalid task_id")
@@ -49,6 +49,7 @@ enum MCPToolHandlers {
             return Response(success: false, error: "task not found")
         }
 
+        let wasNotDone = data.status != .done
         if let statusStr = args["status"],
            let status = TaskCardData.Status(rawValue: statusStr) {
             data.transition(to: status)
@@ -59,6 +60,10 @@ enum MCPToolHandlers {
         node.kind = .taskCard(data)
         document.nodes[taskID] = node
         document.scheduleSave()
+
+        if wasNotDone && data.status == .done {
+            WorkflowEngine.dispatchDownstream(completedTaskID: taskID, document: document, sessions: sessions)
+        }
 
         return Response(success: true)
     }

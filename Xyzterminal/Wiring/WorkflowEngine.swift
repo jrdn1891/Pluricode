@@ -53,17 +53,30 @@ enum WorkflowEngine {
             }
         }
 
-        let blockerTitles = document.edges.values
+        let predecessors = document.edges.values
             .filter { $0.targetID == taskID && $0.edgeType == .blocks }
-            .compactMap { edge -> String? in
+            .compactMap { edge -> (String, TaskCardData)? in
                 guard let node = document.nodes[edge.sourceID],
                       case .taskCard(let d) = node.kind else { return nil }
-                return "- \(d.title) (\(d.status.rawValue))"
+                return (edge.sourceID.uuidString, d)
             }
-        if !blockerTitles.isEmpty {
+
+        let incomplete = predecessors.filter { $0.1.status != .done }
+        if !incomplete.isEmpty {
             lines.append("")
             lines.append("Dependencies:")
-            lines.append(contentsOf: blockerTitles)
+            lines.append(contentsOf: incomplete.map { "- \($0.1.title) (\($0.1.status.rawValue))" })
+        }
+
+        let completed = predecessors.filter { $0.1.status == .done && !$0.1.result.isEmpty }
+        if !completed.isEmpty {
+            lines.append("")
+            lines.append("## Predecessor Results")
+            for (_, pred) in completed {
+                lines.append("### \(pred.title)")
+                lines.append(pred.result)
+                lines.append("")
+            }
         }
 
         lines.append("")
@@ -74,5 +87,33 @@ enum WorkflowEngine {
         lines.append("")
 
         return lines.joined(separator: "\n")
+    }
+
+    static func dispatchDownstream(completedTaskID: UUID, document: CanvasDocument, sessions: [UUID: TerminalSession]) {
+        let downstreamEdges = document.edges.values.filter {
+            $0.sourceID == completedTaskID && $0.edgeType == .blocks
+        }
+
+        for edge in downstreamEdges {
+            let targetID = edge.targetID
+            guard let targetNode = document.nodes[targetID],
+                  case .taskCard(let data) = targetNode.kind,
+                  data.status != .done, data.status != .inProgress else { continue }
+
+            guard document.unresolvedBlockers(for: targetID).isEmpty else { continue }
+
+            let assignmentEdge = document.edges.values.first {
+                $0.sourceID == targetID && $0.edgeType == .assignedTo
+            }
+
+            if let terminalID = assignmentEdge?.targetID {
+                assign(taskID: targetID, terminalID: terminalID, document: document, sessions: sessions)
+            } else {
+                var updated = data
+                updated.transition(to: .ready)
+                document.nodes[targetID]?.kind = .taskCard(updated)
+                document.scheduleSave()
+            }
+        }
     }
 }
