@@ -224,9 +224,9 @@ final class CanvasInputHandler {
             if moved, document.selectedNodeIDs.count == 1,
                let draggedID = document.selectedNodeIDs.first,
                let draggedNode = document.nodes[draggedID],
-               case .taskCard(let taskData) = draggedNode.kind {
+               case .taskCard = draggedNode.kind {
                 if let targetID = findTerminalUnder(canvasPoint, excluding: draggedID) {
-                    assignTask(taskData: taskData, taskID: draggedID, to: targetID)
+                    assignTask(taskID: draggedID, to: targetID)
                 }
             }
             document.scheduleSave()
@@ -262,77 +262,9 @@ final class CanvasInputHandler {
         return nil
     }
 
-    private func assignTask(taskData: TaskCardData, taskID: UUID, to terminalID: UUID) {
-        guard document.unresolvedBlockers(for: taskID).isEmpty else { return }
-        guard let session = terminalManager?.sessions[terminalID],
-              let process = session.terminalView.process else { return }
-
-        let existingEdgeIDs = document.edges.values
-            .filter { $0.sourceID == taskID && $0.edgeType == .assignedTo }
-            .map(\.id)
-        for edgeID in existingEdgeIDs {
-            document.edges.removeValue(forKey: edgeID)
-        }
-
-        document.addEdge(from: taskID, to: terminalID, type: .assignedTo)
-
-        var updatedTask = taskData
-        updatedTask.transition(to: .inProgress)
-        document.nodes[taskID]?.kind = .taskCard(updatedTask)
-
-        let prompt = buildAssignmentPrompt(taskData: taskData, taskID: taskID, terminalID: terminalID)
-        let bytes = Array(prompt.utf8)
-        process.send(data: bytes[...])
-
-        document.scheduleSave()
-    }
-
-    private func buildAssignmentPrompt(taskData: TaskCardData, taskID: UUID, terminalID: UUID) -> String {
-        var lines = ["# Task: \(taskData.title)", ""]
-
-        if !taskData.body.isEmpty {
-            lines.append(taskData.body)
-            lines.append("")
-        }
-
-        lines.append("## Context")
-        if let projectPath = document.projectPath?.path {
-            lines.append("Project: \(projectPath)")
-        }
-        if let termNode = document.nodes[terminalID],
-           case .terminal(let termData) = termNode.kind {
-            if let role = termData.role {
-                lines.append("Role: \(role.rawValue)")
-            }
-            if let branch = termData.branchName {
-                lines.append("Branch: `\(branch)`")
-            }
-            if let path = termData.worktreePath {
-                lines.append("Worktree: \(path)")
-            }
-        }
-
-        let blockerTitles = document.edges.values
-            .filter { $0.targetID == taskID && $0.edgeType == .blocks }
-            .compactMap { edge -> String? in
-                guard let node = document.nodes[edge.sourceID],
-                      case .taskCard(let d) = node.kind else { return nil }
-                return "- \(d.title) (\(d.status.rawValue))"
-            }
-        if !blockerTitles.isEmpty {
-            lines.append("")
-            lines.append("Dependencies:")
-            lines.append(contentsOf: blockerTitles)
-        }
-
-        lines.append("")
-        lines.append("When finished, report completion via the `xyzterminal` MCP tool `update_task`:")
-        lines.append("- task_id: \(taskID.uuidString)")
-        lines.append("- status: \"done\" or \"failed\"")
-        lines.append("- result: a brief summary of what you did")
-        lines.append("")
-
-        return lines.joined(separator: "\n")
+    private func assignTask(taskID: UUID, to terminalID: UUID) {
+        guard let sessions = terminalManager?.sessions else { return }
+        WorkflowEngine.assign(taskID: taskID, terminalID: terminalID, document: document, sessions: sessions)
     }
 
     func handleKeyDown(_ event: NSEvent) {
@@ -549,7 +481,7 @@ final class CanvasInputHandler {
         case (.terminal, .terminal): return .handsOffTo
         case (.taskCard, .terminal): return .assignedTo
         case (.taskCard, .taskCard): return .blocks
-        case (.terminal, .taskCard): return .assignedTo
+        case (.terminal, .taskCard): return .blocks
         }
     }
 }
