@@ -53,6 +53,10 @@ struct Theme {
         isDark ? SIMD4(0.25, 0.25, 0.30, 0.6) : SIMD4(0.78, 0.78, 0.82, 0.6)
     }
 
+    var terminalHighlightColor: SIMD4<Float> {
+        isDark ? SIMD4(0.16, 0.20, 0.26, 1) : SIMD4(0.84, 0.88, 0.96, 1)
+    }
+
     var minimapBackground: SIMD4<Float> {
         isDark ? SIMD4(0.12, 0.12, 0.15, 0.85) : SIMD4(0.90, 0.90, 0.92, 0.85)
     }

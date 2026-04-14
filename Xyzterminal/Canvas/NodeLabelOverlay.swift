@@ -176,6 +176,7 @@ struct NodeLabelOverlay: View {
         case .inProgress: "Active"
         case .done: "Done"
         case .failed: "Failed"
+        case .flagged: "Flagged"
         }
     }
 }

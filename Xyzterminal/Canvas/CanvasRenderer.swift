@@ -184,9 +184,12 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
             if case .section = node.kind { continue }
             let isSelected = document.selectedNodeIDs.contains(node.id)
             let entry = layouts[node.id]
+            let isTerminalHighlighted = document.highlightedTerminalID == node.id
             let color: SIMD4<Float> = switch node.kind {
             case .terminal(let data):
-                if let pid = data.profileID, let profile = document.agentProfiles[pid] {
+                if isTerminalHighlighted {
+                    theme.terminalHighlightColor
+                } else if let pid = data.profileID, let profile = document.agentProfiles[pid] {
                     SIMD4(profile.color.x * 0.25, profile.color.y * 0.25, profile.color.z * 0.25, 1.0)
                 } else {
                     theme.terminalNodeColor

@@ -180,23 +180,31 @@ final class CanvasInputHandler {
                 }
                 document.nodes[id]?.position = pos
             }
+            document.highlightedSectionID = nil
+            document.highlightedColumnIndex = nil
+            document.highlightedTerminalID = nil
+
             if document.selectedNodeIDs.count == 1,
                let draggedID = document.selectedNodeIDs.first,
-               let draggedNode = document.nodes[draggedID],
-               case .taskCard = draggedNode.kind {
-                let sectionID = findSectionUnder(canvasPoint, excluding: draggedID)
-                document.highlightedSectionID = sectionID
-                if let sectionID,
-                   let section = document.nodes[sectionID],
-                   case .section(let sData) = section.kind,
-                   sData.viewType == .kanban {
-                    document.highlightedColumnIndex = kanbanColumnIndex(at: canvasPoint, section: section)
-                } else {
-                    document.highlightedColumnIndex = nil
+               let draggedNode = document.nodes[draggedID] {
+                switch draggedNode.kind {
+                case .taskCard:
+                    let sectionID = findSectionUnder(canvasPoint, excluding: draggedID)
+                    document.highlightedSectionID = sectionID
+                    if let sectionID,
+                       let section = document.nodes[sectionID],
+                       case .section(let sData) = section.kind,
+                       sData.viewType == .kanban {
+                        document.highlightedColumnIndex = kanbanColumnIndex(at: canvasPoint, section: section)
+                    }
+                    document.highlightedTerminalID = findTerminalUnder(canvasPoint, excluding: draggedID)
+                case .section:
+                    document.highlightedTerminalID = findTerminalUnder(canvasPoint, excluding: draggedID)
+                case .terminal:
+                    break
                 }
-            } else {
-                document.highlightedSectionID = nil
-                document.highlightedColumnIndex = nil
+            } else if document.selectedNodeIDs.count > 1 {
+                document.highlightedTerminalID = findTerminalUnder(canvasPoint, excludingSet: document.selectedNodeIDs)
             }
         case .resizingNode(let nodeID, let corner, let startSize, let startPosition, let startMouse):
             let delta = canvasPoint - startMouse
@@ -266,32 +274,68 @@ final class CanvasInputHandler {
 
             if moved, document.selectedNodeIDs.count == 1,
                let draggedID = document.selectedNodeIDs.first,
-               let draggedNode = document.nodes[draggedID],
-               case .taskCard(var taskData) = draggedNode.kind {
-                if let targetID = findTerminalUnder(canvasPoint, excluding: draggedID) {
-                    assignTask(taskID: draggedID, to: targetID)
-                } else if let sectionID = findSectionUnder(canvasPoint, excluding: draggedID) {
-                    if taskData.sectionID == sectionID {
-                        if let section = document.nodes[sectionID],
-                           case .section(let sData) = section.kind,
-                           sData.viewType == .kanban,
-                           let newStatus = kanbanColumnStatus(at: canvasPoint, section: section) {
-                            taskData.transition(to: newStatus)
+               let draggedNode = document.nodes[draggedID] {
+
+                switch draggedNode.kind {
+                case .taskCard(var taskData):
+                    if let targetID = findTerminalUnder(canvasPoint, excluding: draggedID) {
+                        assignTask(taskID: draggedID, to: targetID)
+                    } else if let sectionID = findSectionUnder(canvasPoint, excluding: draggedID) {
+                        if taskData.sectionID == sectionID {
+                            if let section = document.nodes[sectionID],
+                               case .section(let sData) = section.kind,
+                               sData.viewType == .kanban,
+                               let newStatus = kanbanColumnStatus(at: canvasPoint, section: section) {
+                                taskData.transition(to: newStatus)
+                            }
+                        } else {
+                            taskData.sectionID = sectionID
+                            let existing = document.tasksInSection(sectionID)
+                            taskData.orderIndex = (existing.map(\.data.orderIndex).max() ?? -1) + 1
                         }
-                    } else {
-                        taskData.sectionID = sectionID
-                        let existing = document.tasksInSection(sectionID)
-                        taskData.orderIndex = (existing.map(\.data.orderIndex).max() ?? -1) + 1
+                        document.nodes[draggedID]?.kind = .taskCard(taskData)
+                    } else if taskData.sectionID != nil {
+                        taskData.sectionID = nil
+                        document.nodes[draggedID]?.kind = .taskCard(taskData)
                     }
-                    document.nodes[draggedID]?.kind = .taskCard(taskData)
-                } else if taskData.sectionID != nil {
-                    taskData.sectionID = nil
-                    document.nodes[draggedID]?.kind = .taskCard(taskData)
+
+                case .section:
+                    if let targetID = findTerminalUnder(canvasPoint, excluding: draggedID) {
+                        if case .movingNodes(let startPositions, _) = dragState,
+                           let originalPos = startPositions[draggedID] {
+                            document.nodes[draggedID]?.position = originalPos
+                        }
+                        assignSection(sectionID: draggedID, to: targetID)
+                    }
+
+                case .terminal:
+                    break
+                }
+            }
+
+            if moved, document.selectedNodeIDs.count > 1 {
+                if let targetID = findTerminalUnder(canvasPoint, excludingSet: document.selectedNodeIDs) {
+                    var taskIDs: [UUID] = []
+                    for id in document.selectedNodeIDs {
+                        guard let node = document.nodes[id] else { continue }
+                        switch node.kind {
+                        case .taskCard:
+                            taskIDs.append(id)
+                        case .section:
+                            taskIDs.append(contentsOf: document.tasksInSection(id).map(\.id))
+                        case .terminal:
+                            break
+                        }
+                    }
+                    if !taskIDs.isEmpty {
+                        assignBatch(taskIDs: taskIDs, to: targetID)
+                    }
                 }
             }
 
             document.highlightedSectionID = nil
             document.highlightedColumnIndex = nil
+            document.highlightedTerminalID = nil
             document.scheduleSave()
         }
 
@@ -316,8 +360,12 @@ final class CanvasInputHandler {
     }
 
     private func findTerminalUnder(_ point: SIMD2<Float>, excluding: UUID) -> UUID? {
+        findTerminalUnder(point, excludingSet: [excluding])
+    }
+
+    private func findTerminalUnder(_ point: SIMD2<Float>, excludingSet: Set<UUID>) -> UUID? {
         for (id, node) in document.nodes {
-            guard id != excluding, case .terminal = node.kind else { continue }
+            guard !excludingSet.contains(id), case .terminal = node.kind else { continue }
             if point.x >= node.position.x && point.x <= node.position.x + node.size.x
                 && point.y >= node.position.y && point.y <= node.position.y + node.size.y {
                 return id
@@ -329,6 +377,157 @@ final class CanvasInputHandler {
     private func assignTask(taskID: UUID, to terminalID: UUID) {
         guard let sessions = terminalManager?.sessions else { return }
         WorkflowEngine.assign(taskID: taskID, terminalID: terminalID, document: document, sessions: sessions)
+    }
+
+    private func assignSection(sectionID: UUID, to terminalID: UUID) {
+        guard let session = terminalManager?.sessions[terminalID],
+              let process = session.terminalView.process else { return }
+        guard case .section(let sectionData) = document.nodes[sectionID]?.kind else { return }
+
+        let tasks = document.tasksInSection(sectionID)
+        var eligible: [(id: UUID, data: TaskCardData)] = []
+        var skipped: [(title: String, reason: String)] = []
+
+        for task in tasks.sorted(by: { $0.data.orderIndex < $1.data.orderIndex }) {
+            if task.data.status == .inProgress || task.data.status == .done || task.data.status == .failed {
+                skipped.append((task.data.title, "already \(task.data.status.rawValue)"))
+            } else if !document.unresolvedBlockers(for: task.id).isEmpty {
+                skipped.append((task.data.title, "has unresolved blockers"))
+            } else {
+                eligible.append(task)
+            }
+        }
+
+        guard !eligible.isEmpty else { return }
+
+        let existingEdgeIDs = document.edges.values
+            .filter { $0.sourceID == sectionID && $0.edgeType == .assignedTo }
+            .map(\.id)
+        for edgeID in existingEdgeIDs {
+            document.edges.removeValue(forKey: edgeID)
+        }
+        document.addEdge(from: sectionID, to: terminalID, type: .assignedTo)
+
+        for task in eligible {
+            if case .taskCard(var data) = document.nodes[task.id]?.kind {
+                data.transition(to: .inProgress)
+                document.nodes[task.id]?.kind = .taskCard(data)
+            }
+        }
+
+        let prompt = buildBatchPrompt(eligible: eligible, skipped: skipped, sectionTitle: sectionData.title, terminalID: terminalID)
+        process.send(data: Array(prompt.utf8)[...])
+        document.scheduleSave()
+    }
+
+    private func assignBatch(taskIDs: [UUID], to terminalID: UUID) {
+        guard let session = terminalManager?.sessions[terminalID],
+              let process = session.terminalView.process else { return }
+
+        var eligible: [(id: UUID, data: TaskCardData)] = []
+        var skipped: [(title: String, reason: String)] = []
+
+        for taskID in taskIDs {
+            guard let node = document.nodes[taskID],
+                  case .taskCard(let data) = node.kind else { continue }
+            if data.status == .inProgress || data.status == .done || data.status == .failed {
+                skipped.append((data.title, "already \(data.status.rawValue)"))
+            } else if !document.unresolvedBlockers(for: taskID).isEmpty {
+                skipped.append((data.title, "has unresolved blockers"))
+            } else {
+                eligible.append((id: taskID, data: data))
+            }
+        }
+
+        guard !eligible.isEmpty else { return }
+
+        for task in eligible {
+            let existingEdgeIDs = document.edges.values
+                .filter { $0.sourceID == task.id && $0.edgeType == .assignedTo }
+                .map(\.id)
+            for edgeID in existingEdgeIDs {
+                document.edges.removeValue(forKey: edgeID)
+            }
+            document.addEdge(from: task.id, to: terminalID, type: .assignedTo)
+
+            if case .taskCard(var data) = document.nodes[task.id]?.kind {
+                data.transition(to: .inProgress)
+                document.nodes[task.id]?.kind = .taskCard(data)
+            }
+        }
+
+        let prompt = buildBatchPrompt(eligible: eligible, skipped: skipped, sectionTitle: nil, terminalID: terminalID)
+        process.send(data: Array(prompt.utf8)[...])
+        document.scheduleSave()
+    }
+
+    private func buildBatchPrompt(
+        eligible: [(id: UUID, data: TaskCardData)],
+        skipped: [(title: String, reason: String)],
+        sectionTitle: String?,
+        terminalID: UUID
+    ) -> String {
+        let heading = sectionTitle ?? "Batch Assignment"
+        var lines = ["# Assignment: \(heading) (\(eligible.count) tasks)", ""]
+        lines.append("Work through the tasks below in order. After completing each, report via")
+        lines.append("the `xyzterminal` MCP tool `update_task` with the task's ID, status, and")
+        lines.append("a brief result summary.")
+        lines.append("")
+
+        lines.append("## Context")
+        if let projectPath = document.projectPath?.path {
+            lines.append("Project: \(projectPath)")
+        }
+        if let termNode = document.nodes[terminalID],
+           case .terminal(let termData) = termNode.kind {
+            if let pid = termData.profileID, let profile = document.agentProfiles[pid] {
+                lines.append("Agent: \(profile.name)")
+            }
+            if let branch = termData.branchName { lines.append("Branch: `\(branch)`") }
+            if let path = termData.worktreePath { lines.append("Worktree: \(path)") }
+        }
+        lines.append("")
+
+        lines.append("## Tasks")
+        lines.append("")
+        for (i, task) in eligible.enumerated() {
+            lines.append("### \(i + 1). \(task.data.title)")
+            lines.append("task_id: \(task.id.uuidString)")
+            if !task.data.body.isEmpty {
+                lines.append(task.data.body)
+            }
+
+            let blockers = document.edges.values
+                .filter { $0.targetID == task.id && $0.edgeType == .blocks }
+                .compactMap { edge -> String? in
+                    guard let node = document.nodes[edge.sourceID],
+                          case .taskCard(let d) = node.kind else { return nil }
+                    return "- \(d.title) (\(d.status.rawValue))"
+                }
+            if !blockers.isEmpty {
+                lines.append("")
+                lines.append("Dependencies:")
+                lines.append(contentsOf: blockers)
+            }
+            lines.append("")
+        }
+
+        if !skipped.isEmpty {
+            lines.append("## Skipped")
+            for s in skipped {
+                lines.append("- \(s.title): \(s.reason)")
+            }
+            lines.append("")
+        }
+
+        lines.append("## Completion Protocol")
+        lines.append("For EACH task, call `update_task`:")
+        lines.append("- task_id: UUID shown above")
+        lines.append("- status: \"done\" or \"failed\"")
+        lines.append("- result: brief summary")
+        lines.append("")
+
+        return lines.joined(separator: "\n")
     }
 
     func handleKeyDown(_ event: NSEvent) {
