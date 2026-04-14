@@ -17,7 +17,7 @@ final class TerminalManager {
     }
 
     func sync(containerView: NSView) {
-        let theme = Theme(from: containerView.effectiveAppearance)
+        let theme = Theme(from: NSApp.effectiveAppearance)
         if lastIsDark != theme.isDark {
             lastIsDark = theme.isDark
             for session in sessions.values {

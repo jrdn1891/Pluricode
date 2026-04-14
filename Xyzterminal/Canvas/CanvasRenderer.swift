@@ -53,7 +53,7 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
     }
 
     func draw(in view: MTKView) {
-        theme = Theme(from: view.effectiveAppearance)
+        theme = Theme(from: NSApp.effectiveAppearance)
         view.clearColor = theme.canvasClearColor
         terminalManager?.sync(containerView: view)
 
