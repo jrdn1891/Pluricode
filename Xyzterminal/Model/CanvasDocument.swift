@@ -15,6 +15,7 @@ final class CanvasDocument {
     var editingNodeID: UUID?
     var projectPath: URL?
     var showTerminalConfig = false
+    var minimapCollapsed = false
     var mcpServer: MCPServer?
 
     private var saveTask: Task<Void, Never>?

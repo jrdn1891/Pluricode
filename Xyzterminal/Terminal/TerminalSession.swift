@@ -6,13 +6,22 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
     let terminalView: LocalProcessTerminalView
     var worktreePath: String?
     var onProcessTerminated: ((Int32?) -> Void)?
+    private var lastAppliedZoom: Float = 1.0
+
+    static let baseFontSize: CGFloat = 13
 
     init(nodeID: UUID) {
         self.nodeID = nodeID
         self.terminalView = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 270))
         super.init()
         terminalView.processDelegate = self
-        terminalView.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize, weight: .regular)
+    }
+
+    func applyZoom(_ zoom: Float) {
+        guard zoom != lastAppliedZoom else { return }
+        lastAppliedZoom = zoom
+        terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize * CGFloat(zoom), weight: .regular)
     }
 
     func updateColors(theme: Theme) {

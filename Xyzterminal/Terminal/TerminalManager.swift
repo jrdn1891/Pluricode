@@ -115,8 +115,11 @@ final class TerminalManager {
                 && frame.intersects(containerView.bounds)
 
             session.terminalView.isHidden = !visible
-            if visible && session.terminalView.frame != frame {
-                session.terminalView.frame = frame
+            if visible {
+                session.applyZoom(document.camera.zoom)
+                if session.terminalView.frame != frame {
+                    session.terminalView.frame = frame
+                }
             }
         }
     }
