@@ -106,6 +106,7 @@ extension TaskCardData.Status {
         case .inProgress: "In Progress"
         case .done: "Done"
         case .failed: "Failed"
+        case .flagged: "Flagged"
         }
     }
 
@@ -116,6 +117,7 @@ extension TaskCardData.Status {
         case .inProgress: .orange
         case .done: .green
         case .failed: .red
+        case .flagged: .yellow
         }
     }
 }

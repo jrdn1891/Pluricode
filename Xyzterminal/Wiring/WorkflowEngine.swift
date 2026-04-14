@@ -55,7 +55,7 @@ enum WorkflowEngine {
         }
 
         let predecessors = document.edges.values
-            .filter { $0.targetID == taskID && $0.edgeType == .blocks }
+            .filter { $0.targetID == taskID && ($0.edgeType == .blocks || $0.edgeType == .flowsTo) }
             .compactMap { edge -> (String, TaskCardData)? in
                 guard let node = document.nodes[edge.sourceID],
                       case .taskCard(let d) = node.kind else { return nil }
@@ -84,6 +84,7 @@ enum WorkflowEngine {
         lines.append("When finished, report completion via the `xyzterminal` MCP tool `update_task`:")
         lines.append("- task_id: \(taskID.uuidString)")
         lines.append("- status: \"done\" or \"failed\"")
+        lines.append("- outcome: a routing keyword (e.g. \"approved\", \"needs_changes\", \"needs_human_review\")")
         lines.append("- summary: a brief summary of what you did")
         lines.append("")
 
@@ -91,12 +92,31 @@ enum WorkflowEngine {
     }
 
     static func dispatchDownstream(completedTaskID: UUID, document: CanvasDocument, sessions: [UUID: TerminalSession]) {
+        guard let completedNode = document.nodes[completedTaskID],
+              case .taskCard(let completedData) = completedNode.kind else { return }
+
         let downstreamEdges = document.edges.values.filter {
-            $0.sourceID == completedTaskID && $0.edgeType == .blocks
+            $0.sourceID == completedTaskID && ($0.edgeType == .blocks || $0.edgeType == .flowsTo)
         }
 
         for edge in downstreamEdges {
+            if let condition = edge.condition, !condition.isEmpty {
+                guard completedData.outcome == condition else { continue }
+            }
+
             let targetID = edge.targetID
+
+            if completedData.outcome == "needs_human_review" {
+                if var targetNode = document.nodes[targetID],
+                   case .taskCard(var data) = targetNode.kind {
+                    data.transition(to: .flagged)
+                    targetNode.kind = .taskCard(data)
+                    document.nodes[targetID] = targetNode
+                    document.scheduleSave()
+                }
+                continue
+            }
+
             guard let targetNode = document.nodes[targetID],
                   case .taskCard(let data) = targetNode.kind,
                   data.status != .done, data.status != .inProgress else { continue }

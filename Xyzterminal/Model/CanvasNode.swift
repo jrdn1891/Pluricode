@@ -68,11 +68,12 @@ struct TerminalNodeData: Codable {
 
 struct TaskCardData: Codable {
     enum Status: String, Codable, CaseIterable {
-        case draft, ready, inProgress, done, failed
+        case draft, ready, inProgress, done, failed, flagged
     }
     var title: String = "New Task"
     var body: String = ""
     var result: String = ""
+    var outcome: String = ""
     var status: Status = .draft
     var createdAt: Date = Date()
     var startedAt: Date?
@@ -87,6 +88,8 @@ struct TaskCardData: Codable {
         case .done, .failed:
             completedAt = Date()
             if startedAt == nil { startedAt = Date() }
+        case .flagged:
+            break
         case .draft, .ready:
             startedAt = nil
             completedAt = nil

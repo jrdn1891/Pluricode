@@ -59,6 +59,9 @@ enum MCPToolHandlers {
         if let summary = args["summary"] {
             data.result = summary
         }
+        if let outcome = args["outcome"] {
+            data.outcome = outcome
+        }
         node.kind = .taskCard(data)
         document.nodes[taskID] = node
         document.scheduleSave()

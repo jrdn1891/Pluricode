@@ -7,8 +7,25 @@ struct EdgeActionToolbar: View {
         if let edgeID = document.selectedEdgeID,
            let edge = document.edges[edgeID] {
             HStack(spacing: 8) {
-                Text(edge.edgeType.rawValue)
+                Text(edge.edgeType.label)
                     .font(.caption.bold())
+
+                if edge.edgeType == .flowsTo || edge.edgeType == .blocks {
+                    TextField(
+                        "condition",
+                        text: Binding(
+                            get: { document.edges[edgeID]?.condition ?? "" },
+                            set: {
+                                document.edges[edgeID]?.condition = $0.isEmpty ? nil : $0
+                                document.scheduleSave()
+                            }
+                        )
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(width: 120)
+                }
+
                 Button(action: { triggerSend(edgeID) }) {
                     Label("Send", systemImage: "paperplane.fill")
                         .font(.caption)
@@ -35,5 +52,18 @@ struct EdgeActionToolbar: View {
             if let found = findCanvasMTKView(in: sub) { return found }
         }
         return nil
+    }
+}
+
+extension EdgeType {
+    var label: String {
+        switch self {
+        case .handsOffTo: "Hands Off"
+        case .reviews: "Reviews"
+        case .assignedTo: "Assigned"
+        case .blocks: "Blocks"
+        case .blockedBy: "Blocked By"
+        case .flowsTo: "Flows To"
+        }
     }
 }

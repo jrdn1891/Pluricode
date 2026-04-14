@@ -480,7 +480,7 @@ final class CanvasInputHandler {
         switch (source.kind, target.kind) {
         case (.terminal, .terminal): return .handsOffTo
         case (.taskCard, .terminal): return .assignedTo
-        case (.taskCard, .taskCard): return .blocks
+        case (.taskCard, .taskCard): return .flowsTo
         case (.terminal, .taskCard): return .blocks
         }
     }

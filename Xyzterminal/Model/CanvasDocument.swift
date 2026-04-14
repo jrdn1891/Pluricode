@@ -106,7 +106,7 @@ final class CanvasDocument {
 
     func unresolvedBlockers(for nodeID: UUID) -> [UUID] {
         edges.values.compactMap { edge in
-            guard edge.targetID == nodeID, edge.edgeType == .blocks else { return nil }
+            guard edge.targetID == nodeID, (edge.edgeType == .blocks || edge.edgeType == .flowsTo) else { return nil }
             guard let source = nodes[edge.sourceID],
                   case .taskCard(let data) = source.kind,
                   data.status != .done else { return nil }
@@ -129,6 +129,7 @@ struct Edge: Identifiable, Codable {
     var sourceID: UUID
     var targetID: UUID
     var edgeType: EdgeType
+    var condition: String?
     var payloadLog: [EdgePayload] = []
 }
 
@@ -140,7 +141,7 @@ struct EdgePayload: Codable, Identifiable {
 }
 
 enum EdgeType: String, Codable {
-    case handsOffTo, reviews, assignedTo, blocks, blockedBy
+    case handsOffTo, reviews, assignedTo, blocks, blockedBy, flowsTo
 }
 
 struct SelectionRect {

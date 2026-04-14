@@ -176,6 +176,7 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         case .reviews: return SIMD4<Float>(0.7, 0.5, 0.2, 0.8)
         case .assignedTo: return SIMD4<Float>(0.35, 0.55, 1.0, 0.8)
         case .blocks, .blockedBy: return SIMD4<Float>(0.7, 0.3, 0.3, 0.8)
+        case .flowsTo: return SIMD4<Float>(0.5, 0.4, 0.9, 0.8)
         }
     }
 
