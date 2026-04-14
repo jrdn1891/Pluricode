@@ -49,8 +49,8 @@ enum MCPToolHandlers {
            let status = TaskCardData.Status(rawValue: statusStr) {
             data.transition(to: status)
         }
-        if let result = args["result"] {
-            data.result = result
+        if let summary = args["summary"] {
+            data.result = summary
         }
         node.kind = .taskCard(data)
         document.nodes[taskID] = node
