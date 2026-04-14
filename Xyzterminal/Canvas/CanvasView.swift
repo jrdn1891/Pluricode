@@ -95,13 +95,24 @@ struct CanvasContainerView: View {
     let document: CanvasDocument
 
     var body: some View {
-        ZStack {
-            CanvasMetalView(document: document)
-            NodeLabelOverlay(document: document)
-            MinimapToggleButton(document: document)
+        HStack(spacing: 0) {
+            if document.showWorktreePanel {
+                WorktreePanel(document: document)
+                Divider()
+            }
+            ZStack {
+                CanvasMetalView(document: document)
+                NodeLabelOverlay(document: document)
+                MinimapToggleButton(document: document)
+            }
         }
         .ignoresSafeArea()
         .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button(action: { document.showWorktreePanel.toggle() }) {
+                    Label("Worktrees", systemImage: "sidebar.left")
+                }
+            }
             ToolbarItem(placement: .automatic) {
                 if document.selectedEdgeID != nil {
                     EdgeActionToolbar(document: document)

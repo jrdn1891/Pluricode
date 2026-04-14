@@ -16,6 +16,7 @@ final class CanvasDocument {
     var projectPath: URL?
     var showTerminalConfig = false
     var minimapCollapsed = false
+    var showWorktreePanel = false
     var mcpServer: MCPServer?
     var inlineEditingNodeID: UUID?
     var onStartInlineEdit: ((UUID) -> Void)?

@@ -83,6 +83,12 @@ final class WorktreeManager {
         return worktrees
     }
 
+    func uncommittedCount(at path: URL) -> Int {
+        guard let result = try? run("git", args: ["-C", path.path, "status", "--porcelain"]),
+              result.status == 0 else { return 0 }
+        return result.stdout.components(separatedBy: "\n").filter { !$0.isEmpty }.count
+    }
+
     func currentBranch(at path: URL) -> String? {
         guard let result = try? run("git", args: ["-C", path.path, "rev-parse", "--abbrev-ref", "HEAD"]),
               result.status == 0 else { return nil }
