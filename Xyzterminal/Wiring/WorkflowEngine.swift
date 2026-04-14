@@ -80,6 +80,41 @@ enum WorkflowEngine {
             }
         }
 
+        let pipeline = walkPipeline(taskID: taskID, document: document)
+        if pipeline.count > 1 {
+            lines.append("")
+            lines.append("## Workflow Context")
+            let currentIndex = pipeline.firstIndex(of: taskID)
+            lines.append("You are step \(currentIndex.map { $0 + 1 } ?? 0) of \(pipeline.count) in this pipeline:")
+            for (i, stepID) in pipeline.enumerated() {
+                guard let stepNode = document.nodes[stepID],
+                      case .taskCard(let stepData) = stepNode.kind else { continue }
+                let marker = stepID == taskID ? " <- you are here" : ""
+                let outcomeStr = stepData.outcome.isEmpty ? "" : " -> \(stepData.outcome)"
+                lines.append("\(i + 1). [\(stepData.status.rawValue)] \"\(stepData.title)\"\(outcomeStr)\(marker)")
+            }
+
+            let downstream = document.edges.values.filter {
+                $0.sourceID == taskID && ($0.edgeType == .flowsTo || $0.edgeType == .blocks)
+            }
+            for edge in downstream {
+                guard let targetNode = document.nodes[edge.targetID],
+                      case .taskCard(let targetData) = targetNode.kind else { continue }
+                let assignedProfile = document.edges.values
+                    .first { $0.sourceID == edge.targetID && $0.edgeType == .assignedTo }
+                    .flatMap { document.nodes[$0.targetID] }
+                    .flatMap { node -> String? in
+                        if case .terminal(let d) = node.kind, let pid = d.profileID {
+                            return document.agentProfiles[pid]?.name
+                        }
+                        return nil
+                    }
+                let agent = assignedProfile.map { " by a \($0) agent" } ?? ""
+                let cond = edge.condition.map { " (when outcome = \"\($0)\")" } ?? ""
+                lines.append("After you complete this, \"\(targetData.title)\" will be handled\(agent)\(cond)")
+            }
+        }
+
         lines.append("")
         lines.append("When finished, report completion via the `xyzterminal` MCP tool `update_task`:")
         lines.append("- task_id: \(taskID.uuidString)")
@@ -89,6 +124,38 @@ enum WorkflowEngine {
         lines.append("")
 
         return lines.joined(separator: "\n")
+    }
+
+    private static func walkPipeline(taskID: UUID, document: CanvasDocument) -> [UUID] {
+        var root = taskID
+        var visited: Set<UUID> = [root]
+        while let edge = document.edges.values.first(where: {
+            $0.targetID == root && ($0.edgeType == .flowsTo || $0.edgeType == .blocks)
+        }), !visited.contains(edge.sourceID) {
+            if case .taskCard = document.nodes[edge.sourceID]?.kind {
+                visited.insert(edge.sourceID)
+                root = edge.sourceID
+            } else {
+                break
+            }
+        }
+
+        var ordered: [UUID] = []
+        var queue = [root]
+        var seen: Set<UUID> = []
+        while !queue.isEmpty {
+            let current = queue.removeFirst()
+            guard seen.insert(current).inserted else { continue }
+            guard case .taskCard = document.nodes[current]?.kind else { continue }
+            ordered.append(current)
+            let downstream = document.edges.values.filter {
+                $0.sourceID == current && ($0.edgeType == .flowsTo || $0.edgeType == .blocks)
+            }
+            for edge in downstream {
+                if !seen.contains(edge.targetID) { queue.append(edge.targetID) }
+            }
+        }
+        return ordered
     }
 
     static func dispatchDownstream(completedTaskID: UUID, document: CanvasDocument, sessions: [UUID: TerminalSession]) {
