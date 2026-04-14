@@ -69,18 +69,20 @@ final class TerminalManager {
                         document.scheduleSave()
                     }
                 } else {
-                    session.start()
+                    session.start(in: document.projectPath?.path)
                 }
             } else {
-                session.start()
+                session.start(in: document.projectPath?.path)
             }
+
+            let mcpDir = session.worktreePath ?? document.projectPath?.path
 
             if let node = document.nodes[id], case .terminal(let data) = node.kind {
                 if let role = data.role, let path = session.worktreePath {
                     let agent = AgentDefinition.builtins.first { $0.name == data.agentName } ?? .claudeCode
                     RoleInjector.inject(role: role, method: agent.roleInjection, worktreePath: path)
                 }
-                if let path = session.worktreePath {
+                if let path = mcpDir {
                     writeMCPConfig(to: path, nodeID: id)
                 }
                 if let script = data.startupScript, !script.isEmpty {
