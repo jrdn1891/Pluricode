@@ -38,7 +38,7 @@ struct NodeLabelOverlay: View {
                     Text(data.title.isEmpty ? "Untitled" : data.title)
                         .font(.system(size: max(10, 13 * zoom), weight: .semibold))
                         .foregroundStyle(.primary.opacity(isEditing ? 0 : (data.title.isEmpty ? 0.4 : (blocked ? 0.5 : 1))))
-                        .lineLimit(1)
+                        .lineLimit(2)
                     Spacer()
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: max(8, 10 * zoom)))
