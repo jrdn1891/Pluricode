@@ -12,6 +12,16 @@ final class CanvasMTKView: MTKView {
         window?.appearance = NSAppearance(named: .darkAqua)
     }
 
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas { removeTrackingArea(area) }
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        inputHandler?.handleMouseMoved(event)
+    }
+
     override func scrollWheel(with event: NSEvent) {
         inputHandler?.handleScroll(event)
     }
