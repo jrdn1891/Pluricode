@@ -28,11 +28,13 @@ enum MCPToolHandlers {
         case "get_task":
             result = getTask(request.args, document: document)
         case "list_tasks":
-            result = listTasks(document: document)
+            result = listTasks(request.args, document: document)
         case "request_review":
             result = requestReview(request.args, callerNodeID: request.nodeID, document: document, sessions: sessions)
         case "update_terminal_status":
             result = updateTerminalStatus(request.args, callerNodeID: request.nodeID, document: document, sessions: sessions)
+        case "list_sections":
+            result = listSections(document: document)
         default:
             result = Response(success: false, error: "unknown tool: \(request.tool)")
         }
@@ -76,6 +78,15 @@ enum MCPToolHandlers {
     private static func createTask(_ args: [String: String], document: CanvasDocument, nearNodeID: String) -> Response {
         let title = args["title"] ?? "Untitled"
         let body = args["body"] ?? ""
+        let sectionID = args["section_id"].flatMap { UUID(uuidString: $0) }
+
+        var taskData = TaskCardData(title: title, body: body, status: .ready)
+        taskData.sectionID = sectionID
+
+        if let sectionID {
+            let existing = document.tasksInSection(sectionID)
+            taskData.orderIndex = (existing.map(\.data.orderIndex).max() ?? -1) + 1
+        }
 
         var position = document.camera.offset
         if let sourceID = UUID(uuidString: nearNodeID),
@@ -83,7 +94,6 @@ enum MCPToolHandlers {
             position = sourceNode.position + SIMD2<Float>(Float.random(in: 50...150), Float.random(in: -100...100))
         }
 
-        let taskData = TaskCardData(title: title, body: body, status: .ready)
         let node = CanvasNode(
             id: UUID(),
             position: position,
@@ -120,18 +130,19 @@ enum MCPToolHandlers {
         return Response(success: true, data: entry)
     }
 
-    private static func listTasks(document: CanvasDocument) -> Response {
+    private static func listTasks(_ args: [String: String], document: CanvasDocument) -> Response {
+        let filterSectionID = args["section_id"].flatMap { UUID(uuidString: $0) }
         var tasks: [[String: String]] = []
         for (id, node) in document.nodes {
             if case .taskCard(let data) = node.kind {
+                if let filterID = filterSectionID, data.sectionID != filterID { continue }
                 var entry: [String: String] = [
                     "id": id.uuidString,
                     "title": data.title,
                     "status": data.status.rawValue
                 ]
-                if !data.result.isEmpty {
-                    entry["result"] = data.result
-                }
+                if !data.result.isEmpty { entry["result"] = data.result }
+                if let sid = data.sectionID { entry["section_id"] = sid.uuidString }
                 tasks.append(entry)
             }
         }
@@ -186,6 +197,25 @@ enum MCPToolHandlers {
         }
 
         return Response(success: true)
+    }
+
+    private static func listSections(document: CanvasDocument) -> Response {
+        var sections: [[String: String]] = []
+        for (id, node) in document.nodes {
+            if case .section(let data) = node.kind {
+                sections.append([
+                    "id": id.uuidString,
+                    "title": data.title,
+                    "view_type": data.viewType.rawValue,
+                    "task_count": "\(document.tasksInSection(id).count)"
+                ])
+            }
+        }
+        guard let jsonData = try? JSONEncoder().encode(sections),
+              let jsonStr = String(data: jsonData, encoding: .utf8) else {
+            return Response(success: true, data: ["sections": "[]"])
+        }
+        return Response(success: true, data: ["sections": jsonStr])
     }
 
     private static func encode(_ response: Response) -> String {

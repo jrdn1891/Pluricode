@@ -63,6 +63,9 @@ struct CanvasHostView: View {
                     }) {
                         Label("Task Card", systemImage: "square.text.square")
                     }
+                    Button(action: { document.addNode(kind: .section(SectionData())) }) {
+                        Label("Section", systemImage: "rectangle.3.group")
+                    }
                     Button(action: { document.showTerminalConfig = true }) {
                         Label("Terminal", systemImage: "terminal")
                     }

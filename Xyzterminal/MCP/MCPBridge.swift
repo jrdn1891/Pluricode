@@ -79,7 +79,8 @@ enum MCPBridge {
                     description: "Create a new task card on the Xyzterminal canvas",
                     properties: [
                         "title": ["type": "string"],
-                        "body": ["type": "string"]
+                        "body": ["type": "string"],
+                        "section_id": ["type": "string", "description": "UUID of section to place the task in"]
                     ],
                     required: ["title"]
                 ),
@@ -102,6 +103,14 @@ enum MCPBridge {
                 toolDef(
                     name: "list_tasks",
                     description: "List all task cards on the Xyzterminal canvas",
+                    properties: [
+                        "section_id": ["type": "string", "description": "UUID of section to filter by"]
+                    ],
+                    required: []
+                ),
+                toolDef(
+                    name: "list_sections",
+                    description: "List all sections on the Xyzterminal canvas",
                     properties: [:],
                     required: []
                 )

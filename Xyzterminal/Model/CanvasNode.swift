@@ -12,11 +12,13 @@ struct CanvasNode: Identifiable, Codable {
 enum NodeKind: Codable {
     case terminal(TerminalNodeData)
     case taskCard(TaskCardData)
+    case section(SectionData)
 
     var defaultSize: SIMD2<Float> {
         switch self {
         case .terminal: SIMD2<Float>(400, 300)
         case .taskCard: SIMD2<Float>(250, 100)
+        case .section: SIMD2<Float>(600, 400)
         }
     }
 
@@ -31,6 +33,9 @@ enum NodeKind: Codable {
         case .taskCard(let d):
             try c.encode("taskCard", forKey: .type)
             try c.encode(d, forKey: .data)
+        case .section(let d):
+            try c.encode("section", forKey: .type)
+            try c.encode(d, forKey: .data)
         }
     }
 
@@ -39,6 +44,7 @@ enum NodeKind: Codable {
         switch try c.decode(String.self, forKey: .type) {
         case "terminal": self = .terminal(try c.decode(TerminalNodeData.self, forKey: .data))
         case "taskCard": self = .taskCard(try c.decode(TaskCardData.self, forKey: .data))
+        case "section": self = .section(try c.decode(SectionData.self, forKey: .data))
         default: self = .taskCard(TaskCardData())
         }
     }
@@ -78,6 +84,32 @@ struct TaskCardData: Codable {
     var createdAt: Date = Date()
     var startedAt: Date?
     var completedAt: Date?
+    var sectionID: UUID?
+    var orderIndex: Int = 0
+
+    private enum CodingKeys: String, CodingKey {
+        case title, body, result, status, createdAt, startedAt, completedAt, sectionID, orderIndex
+    }
+
+    init(title: String = "New Task", body: String = "", result: String = "", status: Status = .draft) {
+        self.title = title
+        self.body = body
+        self.result = result
+        self.status = status
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? "New Task"
+        body = try c.decodeIfPresent(String.self, forKey: .body) ?? ""
+        result = try c.decodeIfPresent(String.self, forKey: .result) ?? ""
+        status = try c.decodeIfPresent(Status.self, forKey: .status) ?? .draft
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt)
+        completedAt = try c.decodeIfPresent(Date.self, forKey: .completedAt)
+        sectionID = try c.decodeIfPresent(UUID.self, forKey: .sectionID)
+        orderIndex = try c.decodeIfPresent(Int.self, forKey: .orderIndex) ?? 0
+    }
 
     mutating func transition(to newStatus: Status) {
         status = newStatus
@@ -95,6 +127,12 @@ struct TaskCardData: Codable {
             completedAt = nil
         }
     }
+}
+
+struct SectionData: Codable {
+    enum ViewType: String, Codable, CaseIterable { case list, kanban }
+    var title: String = "Untitled"
+    var viewType: ViewType = .list
 }
 
 extension SIMD2: Encodable where Scalar: Encodable {

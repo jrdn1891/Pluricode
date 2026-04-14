@@ -41,6 +41,18 @@ struct Theme {
         isDark ? SIMD4(0.20, 0.20, 0.25, 1) : SIMD4(1.0, 1.0, 1.0, 1)
     }
 
+    var sectionNodeColor: SIMD4<Float> {
+        isDark ? SIMD4(0.11, 0.11, 0.14, 1) : SIMD4(0.93, 0.93, 0.96, 1)
+    }
+
+    var sectionHighlightColor: SIMD4<Float> {
+        isDark ? SIMD4(0.14, 0.16, 0.22, 1) : SIMD4(0.88, 0.90, 0.97, 1)
+    }
+
+    var sectionDividerColor: SIMD4<Float> {
+        isDark ? SIMD4(0.25, 0.25, 0.30, 0.6) : SIMD4(0.78, 0.78, 0.82, 0.6)
+    }
+
     var minimapBackground: SIMD4<Float> {
         isDark ? SIMD4(0.12, 0.12, 0.15, 0.85) : SIMD4(0.90, 0.90, 0.92, 0.85)
     }

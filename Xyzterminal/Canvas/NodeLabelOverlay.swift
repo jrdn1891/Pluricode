@@ -7,11 +7,15 @@ struct NodeLabelOverlay: View {
         GeometryReader { geo in
             let vp = geo.size
             let zoom = CGFloat(document.camera.zoom)
+            let layouts = document.allSectionLayouts()
             if zoom > 0.25 {
                 ForEach(Array(document.nodes.values), id: \.id) { node in
-                    let pos = document.camera.canvasToSwiftUI(node.position, viewportSize: vp)
-                    let w = CGFloat(node.size.x) * zoom
-                    let h = CGFloat(node.size.y) * zoom
+                    let entry = layouts[node.id]
+                    let effectivePos = entry?.position ?? node.position
+                    let effectiveSize = entry?.size ?? node.size
+                    let pos = document.camera.canvasToSwiftUI(effectivePos, viewportSize: vp)
+                    let w = CGFloat(effectiveSize.x) * zoom
+                    let h = CGFloat(effectiveSize.y) * zoom
 
                     nodeLabelView(node: node, width: w, height: h)
                         .position(x: pos.x + w * 0.5, y: pos.y + h * 0.5)
@@ -94,6 +98,50 @@ struct NodeLabelOverlay: View {
             }
             .padding(8)
             .frame(width: width, height: height, alignment: .topLeading)
+
+        case .section(let data):
+            let zoom = CGFloat(document.camera.zoom)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 6) {
+                    Image(systemName: "rectangle.3.group")
+                        .font(.system(size: max(9, 11 * zoom)))
+                        .foregroundStyle(.purple.opacity(0.7))
+                    Text(data.title)
+                        .font(.system(size: max(10, 13 * zoom), weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(data.viewType.rawValue.capitalized)
+                        .font(.system(size: max(8, 10 * zoom)))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(height: 40 * zoom)
+
+                if data.viewType == .kanban, width > 200 {
+                    HStack(spacing: 0) {
+                        ForEach(TaskCardData.Status.allCases, id: \.self) { status in
+                            Text(columnLabel(status))
+                                .font(.system(size: max(7, 9 * zoom)))
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .frame(height: 28 * zoom)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .frame(width: width, height: height, alignment: .topLeading)
+        }
+    }
+
+    private func columnLabel(_ status: TaskCardData.Status) -> String {
+        switch status {
+        case .draft: "Draft"
+        case .ready: "Ready"
+        case .inProgress: "Active"
+        case .done: "Done"
+        case .failed: "Failed"
         }
     }
 }

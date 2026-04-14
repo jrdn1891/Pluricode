@@ -15,11 +15,23 @@ enum EdgeTessellator {
         to targetNode: CanvasNode,
         color: SIMD4<Float>
     ) -> [EdgeVertex] {
-        let sourceCenter = sourceNode.position + sourceNode.size * 0.5
-        let targetCenter = targetNode.position + targetNode.size * 0.5
+        tessellate(
+            sourcePos: sourceNode.position, sourceSize: sourceNode.size,
+            targetPos: targetNode.position, targetSize: targetNode.size,
+            color: color
+        )
+    }
 
-        let sourcePort = portPoint(from: sourceCenter, toward: targetCenter, nodeSize: sourceNode.size)
-        let targetPort = portPoint(from: targetCenter, toward: sourceCenter, nodeSize: targetNode.size)
+    static func tessellate(
+        sourcePos: SIMD2<Float>, sourceSize: SIMD2<Float>,
+        targetPos: SIMD2<Float>, targetSize: SIMD2<Float>,
+        color: SIMD4<Float>
+    ) -> [EdgeVertex] {
+        let sourceCenter = sourcePos + sourceSize * 0.5
+        let targetCenter = targetPos + targetSize * 0.5
+
+        let sourcePort = portPoint(from: sourceCenter, toward: targetCenter, nodeSize: sourceSize)
+        let targetPort = portPoint(from: targetCenter, toward: sourceCenter, nodeSize: targetSize)
 
         let dist = abs(targetPort.x - sourcePort.x)
         let handleOffset = max(50.0, dist * 0.4)

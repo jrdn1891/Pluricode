@@ -14,6 +14,9 @@ final class CanvasDocument {
     var selectionRect: SelectionRect?
     var edgeDrag: EdgeDrag?
     var editingNodeID: UUID?
+    var highlightedSectionID: UUID?
+    var highlightedColumnIndex: Int?
+    var highlightedTerminalID: UUID?
     var projectPath: URL?
     var showTerminalConfig = false
     var minimapCollapsed = false
@@ -68,6 +71,22 @@ final class CanvasDocument {
         }
 
         let idsToDelete = selectedNodeIDs
+
+        for id in idsToDelete {
+            guard case .section = nodes[id]?.kind else { continue }
+            let entries = layoutForSection(id)?.entries
+            for (taskID, _) in tasksInSection(id) {
+                if case .taskCard(var data) = nodes[taskID]?.kind {
+                    data.sectionID = nil
+                    nodes[taskID]?.kind = .taskCard(data)
+                    if let entry = entries?[taskID] {
+                        nodes[taskID]?.position = entry.position
+                        nodes[taskID]?.size = entry.size
+                    }
+                }
+            }
+        }
+
         let terminalIDs = idsToDelete.filter { id in
             if case .terminal = nodes[id]?.kind { return true }
             return false
@@ -112,6 +131,38 @@ final class CanvasDocument {
                   data.status != .done else { return nil }
             return edge.sourceID
         }
+    }
+
+    func tasksInSection(_ sectionID: UUID) -> [(id: UUID, data: TaskCardData)] {
+        nodes.values.compactMap { node in
+            guard case .taskCard(let data) = node.kind, data.sectionID == sectionID else { return nil }
+            return (id: node.id, data: data)
+        }
+    }
+
+    func layoutForSection(_ sectionID: UUID) -> SectionLayout.Result? {
+        guard let section = nodes[sectionID],
+              case .section(let sectionData) = section.kind else { return nil }
+        return SectionLayout.layout(
+            section: section,
+            tasks: tasksInSection(sectionID),
+            viewType: sectionData.viewType,
+            isCollapsed: sectionData.isCollapsed
+        )
+    }
+
+    func allSectionLayouts() -> [UUID: SectionLayout.Entry] {
+        var result: [UUID: SectionLayout.Entry] = [:]
+        for (id, node) in nodes {
+            guard case .section = node.kind else { continue }
+            guard let layout = layoutForSection(id) else { continue }
+            result.merge(layout.entries) { _, new in new }
+            let minHeight = max(200, layout.contentHeight)
+            if node.size.y < minHeight {
+                nodes[id]?.size.y = minHeight
+            }
+        }
+        return result
     }
 
     func scheduleSave() {

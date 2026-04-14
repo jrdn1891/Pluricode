@@ -64,25 +64,35 @@ final class CanvasInputHandler {
         let screenPoint = view.convert(event.locationInWindow, from: nil)
         let canvasPoint = document.camera.screenToCanvas(screenPoint, viewportSize: viewportSize)
         let optionHeld = NSEvent.modifierFlags.contains(.option)
+        let layouts = document.allSectionLayouts()
 
         if editingTextField != nil {
             endInlineEdit(commit: true)
         }
 
         if event.clickCount == 2 {
-            if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes),
-               case .taskCard = document.nodes[hitID]?.kind {
-                beginInlineEdit(nodeID: hitID)
+            if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes, layouts: layouts),
+               let node = document.nodes[hitID] {
+                switch node.kind {
+                case .taskCard:
+                    beginInlineEdit(nodeID: hitID)
+                case .section:
+                    beginSectionInlineEdit(nodeID: hitID)
+                case .terminal:
+                    break
+                }
             }
             return
         }
 
-        if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes),
+        if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes, layouts: layouts),
            let node = document.nodes[hitID],
-           case .taskCard = node.kind,
-           isExpandHit(canvasPoint: canvasPoint, node: node) {
-            document.editingNodeID = hitID
-            return
+           case .taskCard = node.kind {
+            let entry = layouts[hitID]
+            if isExpandHit(canvasPoint: canvasPoint, position: entry?.position ?? node.position, size: entry?.size ?? node.size) {
+                document.editingNodeID = hitID
+                return
+            }
         }
 
         if let (hitID, corner) = HitTesting.resizeHandleAt(canvasPoint, in: document.nodes, selectedIDs: document.selectedNodeIDs),
@@ -91,7 +101,7 @@ final class CanvasInputHandler {
             return
         }
 
-        if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes),
+        if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes, layouts: layouts),
            let node = document.nodes[hitID],
            case .taskCard = node.kind,
            isStatusPillHit(canvasPoint: canvasPoint, node: node) {
@@ -99,7 +109,7 @@ final class CanvasInputHandler {
             return
         }
 
-        if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes) {
+        if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes, layouts: layouts) {
             document.selectedEdgeID = nil
             if optionHeld {
                 dragState = .creatingEdge(sourceID: hitID)
@@ -121,7 +131,8 @@ final class CanvasInputHandler {
             var startPositions: [UUID: SIMD2<Float>] = [:]
             for id in document.selectedNodeIDs {
                 if let node = document.nodes[id] {
-                    startPositions[id] = node.position
+                    let entry = layouts[id]
+                    startPositions[id] = entry?.position ?? node.position
                 }
             }
             dragState = .movingNodes(startPositions: startPositions, startMouse: canvasPoint)
@@ -155,6 +166,14 @@ final class CanvasInputHandler {
                     pos.y = (pos.y / 20).rounded() * 20
                 }
                 document.nodes[id]?.position = pos
+            }
+            if document.selectedNodeIDs.count == 1,
+               let draggedID = document.selectedNodeIDs.first,
+               let draggedNode = document.nodes[draggedID],
+               case .taskCard = draggedNode.kind {
+                document.highlightedSectionID = findSectionUnder(canvasPoint, excluding: draggedID)
+            } else {
+                document.highlightedSectionID = nil
             }
         case .resizingNode(let nodeID, let corner, let startSize, let startPosition, let startMouse):
             let delta = canvasPoint - startMouse
@@ -206,7 +225,8 @@ final class CanvasInputHandler {
             document.selectedNodeIDs = HitTesting.nodesInRect(
                 origin: startCanvas,
                 size: canvasPoint - startCanvas,
-                in: document.nodes
+                in: document.nodes,
+                layouts: document.allSectionLayouts()
             )
         case .none:
             break
@@ -224,11 +244,30 @@ final class CanvasInputHandler {
             if moved, document.selectedNodeIDs.count == 1,
                let draggedID = document.selectedNodeIDs.first,
                let draggedNode = document.nodes[draggedID],
-               case .taskCard = draggedNode.kind {
+               case .taskCard(var taskData) = draggedNode.kind {
                 if let targetID = findTerminalUnder(canvasPoint, excluding: draggedID) {
                     assignTask(taskID: draggedID, to: targetID)
+                } else if let sectionID = findSectionUnder(canvasPoint, excluding: draggedID) {
+                    if taskData.sectionID == sectionID {
+                        if let section = document.nodes[sectionID],
+                           case .section(let sData) = section.kind,
+                           sData.viewType == .kanban,
+                           let newStatus = kanbanColumnStatus(at: canvasPoint, section: section) {
+                            taskData.transition(to: newStatus)
+                        }
+                    } else {
+                        taskData.sectionID = sectionID
+                        let existing = document.tasksInSection(sectionID)
+                        taskData.orderIndex = (existing.map(\.data.orderIndex).max() ?? -1) + 1
+                    }
+                    document.nodes[draggedID]?.kind = .taskCard(taskData)
+                } else if taskData.sectionID != nil {
+                    taskData.sectionID = nil
+                    document.nodes[draggedID]?.kind = .taskCard(taskData)
                 }
             }
+
+            document.highlightedSectionID = nil
             document.scheduleSave()
         }
 
@@ -239,8 +278,9 @@ final class CanvasInputHandler {
         if case .creatingEdge(let sourceID) = dragState {
             let screenPoint = view.convert(event.locationInWindow, from: nil)
             let canvasPoint = document.camera.screenToCanvas(screenPoint, viewportSize: viewportSize)
+            let layouts = document.allSectionLayouts()
 
-            if let targetID = HitTesting.nodeAt(canvasPoint, in: document.nodes), targetID != sourceID {
+            if let targetID = HitTesting.nodeAt(canvasPoint, in: document.nodes, layouts: layouts), targetID != sourceID {
                 let edgeType = inferEdgeType(sourceID: sourceID, targetID: targetID)
                 document.addEdge(from: sourceID, to: targetID, type: edgeType)
             }
@@ -289,6 +329,10 @@ final class CanvasInputHandler {
             beginInlineEdit(nodeID: id)
         case "e":
             document.showTerminalConfig = true
+        case "s":
+            document.addNode(kind: .section(SectionData()))
+        case "v":
+            toggleSectionViewType()
         case "d":
             duplicateSelected()
         case "m":
@@ -313,9 +357,13 @@ final class CanvasInputHandler {
 
         endInlineEdit(commit: false)
 
+        let layouts = document.allSectionLayouts()
+        let pos = layouts[nodeID]?.position ?? node.position
+        let sz = layouts[nodeID]?.size ?? node.size
+
         let zoom = CGFloat(document.camera.zoom)
-        let screenTL = document.camera.canvasToScreen(node.position, viewportSize: viewportSize)
-        let cardW = CGFloat(node.size.x) * zoom
+        let screenTL = document.camera.canvasToScreen(pos, viewportSize: viewportSize)
+        let cardW = CGFloat(sz.x) * zoom
         let fontSize = max(10, 13 * zoom)
         let tfHeight = ceil(fontSize * 1.6)
 
@@ -349,6 +397,67 @@ final class CanvasInputHandler {
         editingTextField = tf
         editingDelegate = delegate
         document.inlineEditingNodeID = nodeID
+    }
+
+    private func beginSectionInlineEdit(nodeID: UUID) {
+        guard let view,
+              let node = document.nodes[nodeID],
+              case .section(let data) = node.kind else { return }
+
+        endInlineEdit(commit: false)
+
+        let zoom = CGFloat(document.camera.zoom)
+        let titlePos = node.position + SIMD2<Float>(32, 8)
+        let titleSize = SIMD2<Float>(node.size.x - 100, 24)
+        let screenTL = document.camera.canvasToScreen(titlePos, viewportSize: viewportSize)
+        let screenBR = document.camera.canvasToScreen(titlePos + titleSize, viewportSize: viewportSize)
+        let frame = NSRect(
+            x: screenTL.x,
+            y: screenBR.y,
+            width: screenBR.x - screenTL.x,
+            height: screenTL.y - screenBR.y
+        )
+        guard frame.width > 40 else { return }
+
+        let delegate = EditingDelegate()
+        delegate.onCommit = { [weak self] in self?.endSectionInlineEdit(nodeID: nodeID, commit: true) }
+        delegate.onCancel = { [weak self] in self?.endSectionInlineEdit(nodeID: nodeID, commit: false) }
+
+        let fontSize = max(10, 13 * zoom)
+        let tf = NSTextField(frame: frame)
+        tf.stringValue = data.title
+        tf.font = .systemFont(ofSize: fontSize, weight: .semibold)
+        tf.isBezeled = false
+        tf.drawsBackground = false
+        tf.focusRingType = .none
+        tf.textColor = .labelColor
+        tf.cell?.isScrollable = true
+        tf.cell?.wraps = false
+        tf.delegate = delegate
+
+        view.addSubview(tf)
+        view.window?.makeFirstResponder(tf)
+        tf.selectText(nil)
+
+        editingTextField = tf
+        editingDelegate = delegate
+        document.inlineEditingNodeID = nodeID
+    }
+
+    private func endSectionInlineEdit(nodeID: UUID, commit: Bool) {
+        document.inlineEditingNodeID = nil
+
+        if commit, let text = editingTextField?.stringValue {
+            if case .section(var d) = document.nodes[nodeID]?.kind {
+                d.title = text
+                document.nodes[nodeID]?.kind = .section(d)
+                document.scheduleSave()
+            }
+        }
+
+        editingTextField?.removeFromSuperview()
+        editingTextField = nil
+        editingDelegate = nil
     }
 
     private func endInlineEdit(commit: Bool) {
@@ -385,6 +494,7 @@ final class CanvasInputHandler {
         return switch kind {
         case .terminal: SIMD2<Float>(200, 120)
         case .taskCard: SIMD2<Float>(120, 50)
+        case .section: SIMD2<Float>(300, 200)
         }
     }
 
@@ -419,11 +529,8 @@ final class CanvasInputHandler {
         menu.popUp(positioning: nil, at: point, in: view)
     }
 
-    private func isExpandHit(canvasPoint: SIMD2<Float>, node: CanvasNode) -> Bool {
-        let expandOrigin = SIMD2<Float>(
-            node.position.x + node.size.x - 28,
-            node.position.y + 4
-        )
+    private func isExpandHit(canvasPoint: SIMD2<Float>, position: SIMD2<Float>, size: SIMD2<Float>) -> Bool {
+        let expandOrigin = SIMD2<Float>(position.x + size.x - 28, position.y + 4)
         return canvasPoint.x >= expandOrigin.x
             && canvasPoint.x <= expandOrigin.x + 24
             && canvasPoint.y >= expandOrigin.y
@@ -441,12 +548,11 @@ final class CanvasInputHandler {
                 data.status = .idle
                 kind = .terminal(data)
             }
-            let newNode = CanvasNode(
-                id: UUID(),
-                position: node.position + offset,
-                size: node.size,
-                kind: kind
-            )
+            if case .section(var data) = kind {
+                data.title += " (copy)"
+                kind = .section(data)
+            }
+            let newNode = CanvasNode(id: UUID(), position: node.position + offset, size: node.size, kind: kind)
             document.nodes[newNode.id] = newNode
         }
         document.scheduleSave()
@@ -482,7 +588,43 @@ final class CanvasInputHandler {
         case (.taskCard, .terminal): return .assignedTo
         case (.taskCard, .taskCard): return .flowsTo
         case (.terminal, .taskCard): return .blocks
+        case (.section, .terminal), (.terminal, .section): return .handsOffTo
+        case (.section, .taskCard), (.taskCard, .section): return .assignedTo
+        case (.section, .section): return .handsOffTo
         }
+    }
+
+    private func findSectionUnder(_ point: SIMD2<Float>, excluding: UUID) -> UUID? {
+        for (id, node) in document.nodes {
+            guard id != excluding, case .section = node.kind else { continue }
+            if point.x >= node.position.x && point.x <= node.position.x + node.size.x
+                && point.y >= node.position.y && point.y <= node.position.y + node.size.y {
+                return id
+            }
+        }
+        return nil
+    }
+
+    private func kanbanColumnStatus(at point: SIMD2<Float>, section: CanvasNode) -> TaskCardData.Status? {
+        let statuses = TaskCardData.Status.allCases
+        let numCols = Float(statuses.count)
+        let colW = (section.size.x - SectionLayout.padding * 2 - SectionLayout.colGap * (numCols - 1)) / numCols
+        let relX = point.x - section.position.x - SectionLayout.padding
+        guard relX >= 0 else { return nil }
+        let colIndex = Int(relX / (colW + SectionLayout.colGap))
+        guard colIndex >= 0 && colIndex < statuses.count else { return nil }
+        return statuses[colIndex]
+    }
+
+    private func toggleSectionViewType() {
+        for id in document.selectedNodeIDs {
+            guard var node = document.nodes[id],
+                  case .section(var data) = node.kind else { continue }
+            data.viewType = data.viewType == .list ? .kanban : .list
+            node.kind = .section(data)
+            document.nodes[id] = node
+        }
+        document.scheduleSave()
     }
 }
 

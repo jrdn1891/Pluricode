@@ -72,9 +72,10 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
               let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor) else { return }
         encoder.setCullMode(.none)
 
-        drawEdges(encoder: encoder, uniforms: &uniforms)
-        drawNodes(encoder: encoder, uniforms: &uniforms)
-        drawMinimap(encoder: encoder, viewportPoints: viewportPoints, contentsScale: uniforms.contentsScale)
+        let layouts = document.allSectionLayouts()
+        drawEdges(encoder: encoder, uniforms: &uniforms, layouts: layouts)
+        drawNodes(encoder: encoder, uniforms: &uniforms, layouts: layouts)
+        drawMinimap(encoder: encoder, viewportPoints: viewportPoints, contentsScale: uniforms.contentsScale, layouts: layouts)
 
         encoder.endEncoding()
         commandBuffer.present(drawable)
@@ -83,7 +84,7 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
-    private func drawEdges(encoder: MTLRenderCommandEncoder, uniforms: inout Uniforms) {
+    private func drawEdges(encoder: MTLRenderCommandEncoder, uniforms: inout Uniforms, layouts: [UUID: SectionLayout.Entry]) {
         var allVertices: [EdgeVertex] = []
 
         for edge in document.edges.values {
@@ -93,20 +94,27 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
             if document.selectedEdgeID == edge.id {
                 color = SIMD4<Float>(0.5, 0.8, 1.0, 1.0)
             }
-            allVertices.append(contentsOf: EdgeTessellator.tessellate(from: source, to: target, color: color))
+            let srcEntry = layouts[edge.sourceID]
+            let tgtEntry = layouts[edge.targetID]
+            allVertices.append(contentsOf: EdgeTessellator.tessellate(
+                sourcePos: srcEntry?.position ?? source.position,
+                sourceSize: srcEntry?.size ?? source.size,
+                targetPos: tgtEntry?.position ?? target.position,
+                targetSize: tgtEntry?.size ?? target.size,
+                color: color
+            ))
         }
 
-        if let drag = document.edgeDrag {
-            let dummyTarget = CanvasNode(
-                id: UUID(),
-                position: drag.currentPoint - SIMD2<Float>(1, 1),
-                size: SIMD2<Float>(2, 2),
-                kind: .taskCard(TaskCardData())
-            )
-            if let source = document.nodes[drag.sourceNodeID] {
-                let color = SIMD4<Float>(0.5, 0.5, 0.6, 0.5)
-                allVertices.append(contentsOf: EdgeTessellator.tessellate(from: source, to: dummyTarget, color: color))
-            }
+        if let drag = document.edgeDrag,
+           let source = document.nodes[drag.sourceNodeID] {
+            let srcEntry = layouts[drag.sourceNodeID]
+            allVertices.append(contentsOf: EdgeTessellator.tessellate(
+                sourcePos: srcEntry?.position ?? source.position,
+                sourceSize: srcEntry?.size ?? source.size,
+                targetPos: drag.currentPoint - SIMD2<Float>(1, 1),
+                targetSize: SIMD2<Float>(2, 2),
+                color: SIMD4<Float>(0.5, 0.5, 0.6, 0.5)
+            ))
         }
 
         guard !allVertices.isEmpty else { return }
@@ -123,9 +131,42 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: allVertices.count)
     }
 
-    private func drawNodes(encoder: MTLRenderCommandEncoder, uniforms: inout Uniforms) {
-        var instances = document.nodes.values.map { node -> NodeInstance in
+    private func drawNodes(encoder: MTLRenderCommandEncoder, uniforms: inout Uniforms, layouts: [UUID: SectionLayout.Entry]) {
+        var instances: [NodeInstance] = []
+
+        for node in document.nodes.values {
+            guard case .section(let sectionData) = node.kind else { continue }
             let isSelected = document.selectedNodeIDs.contains(node.id)
+            let isHighlighted = document.highlightedSectionID == node.id
+            instances.append(NodeInstance(
+                position: node.position,
+                size: node.size,
+                color: isHighlighted ? theme.sectionHighlightColor : theme.sectionNodeColor,
+                cornerRadius: 12,
+                selected: isSelected ? 1 : 0
+            ))
+
+            if sectionData.viewType == .kanban {
+                let statuses = TaskCardData.Status.allCases
+                let numCols = Float(statuses.count)
+                let colW = (node.size.x - SectionLayout.padding * 2 - SectionLayout.colGap * (numCols - 1)) / numCols
+                for i in 1..<statuses.count {
+                    let x = node.position.x + SectionLayout.padding + (colW + SectionLayout.colGap) * Float(i) - SectionLayout.colGap * 0.5
+                    instances.append(NodeInstance(
+                        position: SIMD2<Float>(x - 0.5, node.position.y + SectionLayout.headerHeight),
+                        size: SIMD2<Float>(1, node.size.y - SectionLayout.headerHeight - 8),
+                        color: theme.sectionDividerColor,
+                        cornerRadius: 0.5,
+                        selected: 0
+                    ))
+                }
+            }
+        }
+
+        for node in document.nodes.values {
+            if case .section = node.kind { continue }
+            let isSelected = document.selectedNodeIDs.contains(node.id)
+            let entry = layouts[node.id]
             let color: SIMD4<Float> = switch node.kind {
             case .terminal(let data):
                 if let pid = data.profileID, let profile = document.agentProfiles[pid] {
@@ -134,14 +175,15 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
                     theme.terminalNodeColor
                 }
             case .taskCard: theme.taskCardNodeColor
+            case .section: theme.sectionNodeColor
             }
-            return NodeInstance(
-                position: node.position,
-                size: node.size,
+            instances.append(NodeInstance(
+                position: entry?.position ?? node.position,
+                size: entry?.size ?? node.size,
                 color: color,
                 cornerRadius: 8,
                 selected: isSelected ? 1 : 0
-            )
+            ))
         }
 
         if let rect = document.selectionRect {
@@ -180,12 +222,20 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         }
     }
 
-    private func drawMinimap(encoder: MTLRenderCommandEncoder, viewportPoints: SIMD2<Float>, contentsScale: Float) {
+    private func drawMinimap(encoder: MTLRenderCommandEncoder, viewportPoints: SIMD2<Float>, contentsScale: Float, layouts: [UUID: SectionLayout.Entry]) {
         guard !document.minimapCollapsed else { return }
 
         let nodes = Array(document.nodes.values)
-        guard let rawBounds = CanvasDocument.nodeBounds(nodes) else { return }
-        var (minP, maxP) = rawBounds
+        guard !nodes.isEmpty else { return }
+
+        var minP = SIMD2<Float>(Float.greatestFiniteMagnitude, Float.greatestFiniteMagnitude)
+        var maxP = SIMD2<Float>(-Float.greatestFiniteMagnitude, -Float.greatestFiniteMagnitude)
+        for node in nodes {
+            let pos = layouts[node.id]?.position ?? node.position
+            let size = layouts[node.id]?.size ?? node.size
+            minP = simd_min(minP, pos)
+            maxP = simd_max(maxP, pos + size)
+        }
 
         let padding: Float = 200
         minP -= SIMD2<Float>(padding, padding)
@@ -212,11 +262,14 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         ))
 
         for node in nodes {
-            let rel = (node.position - minP) * mapScale
-            let sz = node.size * mapScale
+            let pos = layouts[node.id]?.position ?? node.position
+            let size = layouts[node.id]?.size ?? node.size
+            let rel = (pos - minP) * mapScale
+            let sz = size * mapScale
             let color: SIMD4<Float> = switch node.kind {
             case .terminal: SIMD4<Float>(0.3, 0.8, 0.3, 0.9)
             case .taskCard: SIMD4<Float>(0.5, 0.5, 0.65, 0.9)
+            case .section: SIMD4<Float>(0.4, 0.4, 0.55, 0.5)
             }
             instances.append(NodeInstance(
                 position: SIMD2<Float>(mapX + rel.x, mapY + rel.y),

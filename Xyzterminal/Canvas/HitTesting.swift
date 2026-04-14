@@ -14,6 +14,7 @@ enum HitTesting {
     ) -> (UUID, ResizeCorner)? {
         for id in selectedIDs {
             guard let node = nodes[id] else { continue }
+            if case .taskCard(let data) = node.kind, data.sectionID != nil { continue }
             let minX = node.position.x
             let minY = node.position.y
             let maxX = minX + node.size.x
@@ -40,22 +41,52 @@ enum HitTesting {
     }
 
     static func nodeAt(_ canvasPoint: SIMD2<Float>, in nodes: [UUID: CanvasNode]) -> UUID? {
-        for (id, node) in nodes {
-            if canvasPoint.x >= node.position.x
-                && canvasPoint.x <= node.position.x + node.size.x
-                && canvasPoint.y >= node.position.y
-                && canvasPoint.y <= node.position.y + node.size.y
-            {
+        nodeAt(canvasPoint, in: nodes, layouts: [:])
+    }
+
+    static func nodeAt(
+        _ canvasPoint: SIMD2<Float>,
+        in nodes: [UUID: CanvasNode],
+        layouts: [UUID: SectionLayout.Entry]
+    ) -> UUID? {
+        for (id, entry) in layouts {
+            if canvasPoint.x >= entry.position.x
+                && canvasPoint.x <= entry.position.x + entry.size.x
+                && canvasPoint.y >= entry.position.y
+                && canvasPoint.y <= entry.position.y + entry.size.y {
                 return id
             }
         }
+
+        for (id, node) in nodes {
+            if case .section = node.kind { continue }
+            if case .taskCard(let data) = node.kind, data.sectionID != nil { continue }
+            if canvasPoint.x >= node.position.x
+                && canvasPoint.x <= node.position.x + node.size.x
+                && canvasPoint.y >= node.position.y
+                && canvasPoint.y <= node.position.y + node.size.y {
+                return id
+            }
+        }
+
+        for (id, node) in nodes {
+            guard case .section = node.kind else { continue }
+            if canvasPoint.x >= node.position.x
+                && canvasPoint.x <= node.position.x + node.size.x
+                && canvasPoint.y >= node.position.y
+                && canvasPoint.y <= node.position.y + node.size.y {
+                return id
+            }
+        }
+
         return nil
     }
 
     static func nodesInRect(
         origin: SIMD2<Float>,
         size: SIMD2<Float>,
-        in nodes: [UUID: CanvasNode]
+        in nodes: [UUID: CanvasNode],
+        layouts: [UUID: SectionLayout.Entry] = [:]
     ) -> Set<UUID> {
         let minX = min(origin.x, origin.x + size.x)
         let maxX = max(origin.x, origin.x + size.x)
@@ -64,11 +95,10 @@ enum HitTesting {
 
         var result = Set<UUID>()
         for (id, node) in nodes {
-            let nodeMaxX = node.position.x + node.size.x
-            let nodeMaxY = node.position.y + node.size.y
-            if nodeMaxX > minX && node.position.x < maxX
-                && nodeMaxY > minY && node.position.y < maxY
-            {
+            let pos = layouts[id]?.position ?? node.position
+            let sz = layouts[id]?.size ?? node.size
+            if pos.x + sz.x > minX && pos.x < maxX
+                && pos.y + sz.y > minY && pos.y < maxY {
                 result.insert(id)
             }
         }
