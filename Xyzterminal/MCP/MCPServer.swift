@@ -3,6 +3,7 @@ import Network
 
 final class MCPServer {
     let document: CanvasDocument
+    weak var terminalManager: TerminalManager?
     private var listener: NWListener?
     private var connections: [NWConnection] = []
     private(set) var port: UInt16 = 0
@@ -55,7 +56,7 @@ final class MCPServer {
 
             if let request = String(data: data, encoding: .utf8) {
                 for line in request.components(separatedBy: "\n") where !line.isEmpty {
-                    let response = MCPToolHandlers.handle(line, document: self.document)
+                    let response = MCPToolHandlers.handle(line, document: self.document, sessions: self.terminalManager?.sessions ?? [:])
                     let responseData = Data((response + "\n").utf8)
                     connection.send(content: responseData, completion: .contentProcessed { _ in })
                 }

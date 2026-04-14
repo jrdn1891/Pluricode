@@ -84,6 +84,14 @@ enum MCPBridge {
                     required: ["title"]
                 ),
                 toolDef(
+                    name: "request_review",
+                    description: "Trigger a code review on the terminal connected via a reviews edge",
+                    properties: [
+                        "message": ["type": "string", "description": "Optional message to include with the review request"]
+                    ],
+                    required: []
+                ),
+                toolDef(
                     name: "get_task",
                     description: "Get details of a specific task card by ID",
                     properties: [

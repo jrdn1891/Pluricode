@@ -13,7 +13,7 @@ enum MCPToolHandlers {
         var error: String?
     }
 
-    static func handle(_ line: String, document: CanvasDocument) -> String {
+    static func handle(_ line: String, document: CanvasDocument, sessions: [UUID: TerminalSession]) -> String {
         guard let data = line.data(using: .utf8),
               let request = try? JSONDecoder().decode(Request.self, from: data) else {
             return encode(Response(success: false, error: "invalid request"))
@@ -29,6 +29,8 @@ enum MCPToolHandlers {
             result = getTask(request.args, document: document)
         case "list_tasks":
             result = listTasks(document: document)
+        case "request_review":
+            result = requestReview(request.args, callerNodeID: request.nodeID, document: document, sessions: sessions)
         default:
             result = Response(success: false, error: "unknown tool: \(request.tool)")
         }
@@ -128,6 +130,28 @@ enum MCPToolHandlers {
             return Response(success: true, data: ["tasks": "[]"])
         }
         return Response(success: true, data: ["tasks": jsonStr])
+    }
+
+    private static func requestReview(_ args: [String: String], callerNodeID: String, document: CanvasDocument, sessions: [UUID: TerminalSession]) -> Response {
+        guard let sourceID = UUID(uuidString: callerNodeID) else {
+            return Response(success: false, error: "invalid caller node ID")
+        }
+
+        let reviewEdge = document.edges.values.first {
+            $0.sourceID == sourceID && $0.edgeType == .reviews
+        }
+
+        guard let edge = reviewEdge else {
+            return Response(success: false, error: "no reviews edge from this terminal")
+        }
+
+        guard sessions[edge.targetID] != nil else {
+            return Response(success: false, error: "target terminal not active")
+        }
+
+        WiringAction.send(edge: edge, document: document, sessions: sessions)
+
+        return Response(success: true, data: ["target_id": edge.targetID.uuidString])
     }
 
     private static func encode(_ response: Response) -> String {

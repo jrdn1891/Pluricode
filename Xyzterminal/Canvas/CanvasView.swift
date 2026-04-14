@@ -72,6 +72,7 @@ struct CanvasMetalView: NSViewRepresentable {
         view.enableSetNeedsDisplay = false
 
         let terminalManager = TerminalManager(document: document)
+        document.mcpServer?.terminalManager = terminalManager
 
         let renderer = CanvasRenderer(device: device, document: document)
         renderer.terminalManager = terminalManager
