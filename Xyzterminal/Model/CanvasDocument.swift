@@ -19,6 +19,7 @@ final class CanvasDocument {
     var showTerminalConfig = false
     var minimapCollapsed = false
     var showWorktreePanel = false
+    var pendingWorktreeDeletions: [String] = []
     var mcpServer: MCPServer?
     var inlineEditingNodeID: UUID?
     var onStartInlineEdit: ((UUID) -> Void)?

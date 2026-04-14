@@ -133,5 +133,24 @@ struct CanvasContainerView: View {
                 document.addNode(kind: .terminal(data))
             }
         }
+        .alert(
+            "Delete worktrees?",
+            isPresented: Binding(
+                get: { !document.pendingWorktreeDeletions.isEmpty },
+                set: { if !$0 { document.pendingWorktreeDeletions.removeAll() } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                let paths = document.pendingWorktreeDeletions
+                document.pendingWorktreeDeletions.removeAll()
+                document.mcpServer?.terminalManager?.cleanupWorktrees(paths)
+            }
+            Button("Keep", role: .cancel) {
+                document.pendingWorktreeDeletions.removeAll()
+            }
+        } message: {
+            let count = document.pendingWorktreeDeletions.count
+            Text("\(count) worktree\(count == 1 ? "" : "s") from deleted terminals. Delete the branch\(count == 1 ? "" : "es") or keep for later?")
+        }
     }
 }

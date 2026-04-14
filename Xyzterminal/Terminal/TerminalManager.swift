@@ -29,6 +29,13 @@ final class TerminalManager {
         }
     }
 
+    func cleanupWorktrees(_ paths: [String]) {
+        guard let wm = worktreeManager else { return }
+        for path in paths {
+            Task.detached { try? wm.removeWorktree(at: URL(fileURLWithPath: path)) }
+        }
+    }
+
     func saveAllScrollback() {
         guard let dir = scrollbackDir else { return }
         for session in sessions.values {
@@ -53,8 +60,8 @@ final class TerminalManager {
         for id in Array(sessions.keys) where !terminalNodeIDs.contains(id) {
             let session = sessions.removeValue(forKey: id)
             session?.terminalView.removeFromSuperview()
-            if let path = session?.worktreePath, let wm = worktreeManager {
-                Task.detached { try? wm.removeWorktree(at: URL(fileURLWithPath: path)) }
+            if let path = session?.worktreePath, worktreeManager != nil {
+                document.pendingWorktreeDeletions.append(path)
             }
         }
 
