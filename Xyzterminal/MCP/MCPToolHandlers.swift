@@ -31,6 +31,8 @@ enum MCPToolHandlers {
             result = listTasks(document: document)
         case "request_review":
             result = requestReview(request.args, callerNodeID: request.nodeID, document: document, sessions: sessions)
+        case "update_terminal_status":
+            result = updateTerminalStatus(request.args, callerNodeID: request.nodeID, document: document, sessions: sessions)
         default:
             result = Response(success: false, error: "unknown tool: \(request.tool)")
         }
@@ -157,6 +159,30 @@ enum MCPToolHandlers {
         WiringAction.send(edge: edge, document: document, sessions: sessions)
 
         return Response(success: true, data: ["target_id": edge.targetID.uuidString])
+    }
+
+    private static func updateTerminalStatus(_ args: [String: String], callerNodeID: String, document: CanvasDocument, sessions: [UUID: TerminalSession]) -> Response {
+        guard let nodeID = UUID(uuidString: callerNodeID),
+              var node = document.nodes[nodeID],
+              case .terminal(var data) = node.kind else {
+            return Response(success: false, error: "terminal not found")
+        }
+
+        guard let statusStr = args["status"],
+              let status = TerminalNodeData.Status(rawValue: statusStr) else {
+            return Response(success: false, error: "invalid status")
+        }
+
+        data.status = status
+        node.kind = .terminal(data)
+        document.nodes[nodeID] = node
+        document.scheduleSave()
+
+        if status == .idle {
+            WorkflowEngine.dispatchReady(document: document, sessions: sessions)
+        }
+
+        return Response(success: true)
     }
 
     private static func encode(_ response: Response) -> String {

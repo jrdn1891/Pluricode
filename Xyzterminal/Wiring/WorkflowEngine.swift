@@ -108,12 +108,39 @@ enum WorkflowEngine {
             }
 
             if let terminalID = assignmentEdge?.targetID {
-                assign(taskID: targetID, terminalID: terminalID, document: document, sessions: sessions)
+                if let termNode = document.nodes[terminalID],
+                   case .terminal(let termData) = termNode.kind,
+                   termData.status == .working {
+                    var updated = data
+                    updated.transition(to: .ready)
+                    document.nodes[targetID]?.kind = .taskCard(updated)
+                    document.scheduleSave()
+                } else {
+                    assign(taskID: targetID, terminalID: terminalID, document: document, sessions: sessions)
+                }
             } else {
                 var updated = data
                 updated.transition(to: .ready)
                 document.nodes[targetID]?.kind = .taskCard(updated)
                 document.scheduleSave()
+            }
+        }
+    }
+
+    static func dispatchReady(document: CanvasDocument, sessions: [UUID: TerminalSession]) {
+        for (taskID, node) in document.nodes {
+            guard case .taskCard(let data) = node.kind, data.status == .ready else { continue }
+            guard document.unresolvedBlockers(for: taskID).isEmpty else { continue }
+
+            let assignmentEdge = document.edges.values.first {
+                $0.sourceID == taskID && $0.edgeType == .assignedTo
+            }
+            guard let terminalID = assignmentEdge?.targetID else { continue }
+
+            if let termNode = document.nodes[terminalID],
+               case .terminal(let termData) = termNode.kind,
+               termData.status != .working {
+                assign(taskID: taskID, terminalID: terminalID, document: document, sessions: sessions)
             }
         }
     }
