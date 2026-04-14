@@ -8,6 +8,13 @@ final class TerminalManager {
     private var lastIsDark: Bool?
     private var pendingMCPConfigs: [(path: String, nodeID: UUID)] = []
 
+    var scrollbackDir: URL? {
+        guard let projectPath = document.projectPath else { return nil }
+        let dir = projectPath.appendingPathComponent(".xyzterminal/scrollback", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
     init(document: CanvasDocument) {
         self.document = document
         if let projectPath = document.projectPath,
@@ -19,6 +26,13 @@ final class TerminalManager {
     deinit {
         for session in sessions.values {
             session.terminalView.removeFromSuperview()
+        }
+    }
+
+    func saveAllScrollback() {
+        guard let dir = scrollbackDir else { return }
+        for session in sessions.values {
+            session.saveScrollback(to: dir)
         }
     }
 
@@ -48,6 +62,10 @@ final class TerminalManager {
             let session = TerminalSession(nodeID: id)
             session.updateColors(theme: theme)
             containerView.addSubview(session.terminalView)
+
+            if let dir = scrollbackDir {
+                session.restoreScrollback(from: dir)
+            }
 
             if let wm = worktreeManager {
                 let shortID = id.uuidString.prefix(8).lowercased()

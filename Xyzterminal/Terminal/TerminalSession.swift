@@ -38,6 +38,19 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
         terminalView.process?.send(data: bytes[...])
     }
 
+    func saveScrollback(to dir: URL) {
+        let data = terminalView.getTerminal().getBufferAsData()
+        let file = dir.appendingPathComponent("\(nodeID.uuidString).txt")
+        try? data.write(to: file, options: .atomic)
+    }
+
+    func restoreScrollback(from dir: URL) {
+        let file = dir.appendingPathComponent("\(nodeID.uuidString).txt")
+        guard let data = try? Data(contentsOf: file), !data.isEmpty else { return }
+        terminalView.getTerminal().feed(byteArray: Array(data))
+        terminalView.getTerminal().feed(text: "\r\n--- session restored ---\r\n\r\n")
+    }
+
     func applyZoom(_ zoom: Float) {
         guard zoom != lastAppliedZoom else { return }
         lastAppliedZoom = zoom

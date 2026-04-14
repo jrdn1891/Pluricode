@@ -30,6 +30,8 @@ enum Persistence {
         } catch {
             NSLog("Xyzterminal: failed to save canvas: %@", error.localizedDescription)
         }
+
+        document.mcpServer?.terminalManager?.saveAllScrollback()
     }
 
     static func load(into document: CanvasDocument) {
