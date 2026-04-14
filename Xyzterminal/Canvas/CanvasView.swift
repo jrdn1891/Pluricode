@@ -134,23 +134,24 @@ struct CanvasContainerView: View {
             }
         }
         .alert(
-            "Delete worktrees?",
+            "Delete terminals?",
             isPresented: Binding(
-                get: { !document.pendingWorktreeDeletions.isEmpty },
-                set: { if !$0 { document.pendingWorktreeDeletions.removeAll() } }
+                get: { !document.pendingTerminalDeletions.isEmpty },
+                set: { if !$0 { document.pendingTerminalDeletions.removeAll() } }
             )
         ) {
-            Button("Delete", role: .destructive) {
-                let paths = document.pendingWorktreeDeletions
-                document.pendingWorktreeDeletions.removeAll()
-                document.mcpServer?.terminalManager?.cleanupWorktrees(paths)
+            Button("Delete & clean up worktrees", role: .destructive) {
+                document.confirmTerminalDeletion(cleanup: true)
             }
-            Button("Keep", role: .cancel) {
-                document.pendingWorktreeDeletions.removeAll()
+            Button("Delete & keep worktrees") {
+                document.confirmTerminalDeletion(cleanup: false)
+            }
+            Button("Cancel", role: .cancel) {
+                document.pendingTerminalDeletions.removeAll()
             }
         } message: {
-            let count = document.pendingWorktreeDeletions.count
-            Text("\(count) worktree\(count == 1 ? "" : "s") from deleted terminals. Delete the branch\(count == 1 ? "" : "es") or keep for later?")
+            let count = document.pendingTerminalDeletions.count
+            Text("This will remove \(count) terminal\(count == 1 ? "" : "s"). Delete the associated worktree branch\(count == 1 ? "" : "es") too, or keep them?")
         }
     }
 }

@@ -116,9 +116,6 @@ final class CanvasInputHandler {
                 }
             } else if !document.selectedNodeIDs.contains(hitID) {
                 document.selectedNodeIDs = [hitID]
-                for group in document.groups.values where group.nodeIDs.contains(hitID) {
-                    document.selectedNodeIDs.formUnion(group.nodeIDs)
-                }
             }
 
             var startPositions: [UUID: SIMD2<Float>] = [:]
@@ -364,10 +361,6 @@ final class CanvasInputHandler {
             duplicateSelected()
         case "m":
             document.minimapCollapsed.toggle()
-        case "g":
-            document.groupSelected()
-        case "u":
-            document.ungroupSelected()
         default:
             break
         }

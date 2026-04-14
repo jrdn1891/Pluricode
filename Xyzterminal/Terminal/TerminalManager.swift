@@ -59,9 +59,6 @@ final class TerminalManager {
         for id in Array(sessions.keys) where !terminalNodeIDs.contains(id) {
             let session = sessions.removeValue(forKey: id)
             session?.terminalView.removeFromSuperview()
-            if let path = session?.worktreePath, worktreeManager != nil {
-                document.pendingWorktreeDeletions.append(path)
-            }
         }
 
         for id in terminalNodeIDs where sessions[id] == nil {

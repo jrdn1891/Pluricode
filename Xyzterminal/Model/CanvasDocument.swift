@@ -6,7 +6,6 @@ import simd
 final class CanvasDocument {
     var nodes: [UUID: CanvasNode] = [:]
     var edges: [UUID: Edge] = [:]
-    var groups: [UUID: NodeGroup] = [:]
     var camera = Camera()
     var selectedNodeIDs: Set<UUID> = []
     var selectedEdgeID: UUID?
@@ -18,7 +17,7 @@ final class CanvasDocument {
     var showTerminalConfig = false
     var minimapCollapsed = false
     var showWorktreePanel = false
-    var pendingWorktreeDeletions: [String] = []
+    var pendingTerminalDeletions: Set<UUID> = []
     var mcpServer: MCPServer?
     var inlineEditingNodeID: UUID?
     var onStartInlineEdit: ((UUID) -> Void)?
@@ -50,32 +49,6 @@ final class CanvasDocument {
         scheduleSave()
     }
 
-    func groupSelected(name: String = "Group") {
-        guard selectedNodeIDs.count >= 2 else { return }
-        for (id, group) in groups {
-            var updated = group
-            updated.nodeIDs.subtract(selectedNodeIDs)
-            if updated.nodeIDs.isEmpty {
-                groups.removeValue(forKey: id)
-            } else {
-                groups[id] = updated
-            }
-        }
-        let group = NodeGroup(id: UUID(), name: name, nodeIDs: selectedNodeIDs)
-        groups[group.id] = group
-        scheduleSave()
-    }
-
-    func ungroupSelected() {
-        let selected = selectedNodeIDs
-        for (id, group) in groups {
-            if !group.nodeIDs.isDisjoint(with: selected) {
-                groups.removeValue(forKey: id)
-            }
-        }
-        scheduleSave()
-    }
-
     static func nodeBounds(_ nodes: some Collection<CanvasNode>) -> (min: SIMD2<Float>, max: SIMD2<Float>)? {
         guard !nodes.isEmpty else { return nil }
         var minP = SIMD2<Float>(Float.greatestFiniteMagnitude, Float.greatestFiniteMagnitude)
@@ -87,30 +60,44 @@ final class CanvasDocument {
         return (minP, maxP)
     }
 
-    func groupBounds(for group: NodeGroup) -> (min: SIMD2<Float>, max: SIMD2<Float>)? {
-        Self.nodeBounds(group.nodeIDs.compactMap { nodes[$0] })
-    }
-
     func deleteSelected() {
         if let edgeID = selectedEdgeID {
             edges.removeValue(forKey: edgeID)
             selectedEdgeID = nil
         }
+
         let idsToDelete = selectedNodeIDs
-        for id in idsToDelete {
-            nodes.removeValue(forKey: id)
+        let terminalIDs = idsToDelete.filter { id in
+            if case .terminal = nodes[id]?.kind { return true }
+            return false
         }
-        if !idsToDelete.isEmpty {
-            edges = edges.filter { !idsToDelete.contains($0.value.sourceID) && !idsToDelete.contains($0.value.targetID) }
-            for (gid, group) in groups {
-                var updated = group
-                updated.nodeIDs.subtract(idsToDelete)
-                if updated.nodeIDs.count < 2 {
-                    groups.removeValue(forKey: gid)
-                } else {
-                    groups[gid] = updated
+
+        if !terminalIDs.isEmpty {
+            pendingTerminalDeletions = idsToDelete
+            return
+        }
+
+        removeNodes(idsToDelete)
+    }
+
+    func confirmTerminalDeletion(cleanup: Bool) {
+        let ids = pendingTerminalDeletions
+        pendingTerminalDeletions.removeAll()
+        removeNodes(ids)
+        if cleanup {
+            mcpServer?.terminalManager?.cleanupWorktrees(
+                ids.compactMap { id -> String? in
+                    guard case .terminal(let d) = nodes[id]?.kind else { return nil }
+                    return d.worktreePath
                 }
-            }
+            )
+        }
+    }
+
+    private func removeNodes(_ ids: Set<UUID>) {
+        for id in ids { nodes.removeValue(forKey: id) }
+        if !ids.isEmpty {
+            edges = edges.filter { !ids.contains($0.value.sourceID) && !ids.contains($0.value.targetID) }
         }
         selectedNodeIDs.removeAll()
         scheduleSave()
@@ -167,13 +154,4 @@ struct EdgeDrag {
 
 struct EditingNode: Identifiable {
     let id: UUID
-}
-
-struct NodeGroup: Identifiable, Codable {
-    static let color = SIMD4<Float>(0.4, 0.5, 0.7, 0.15)
-    static let padding: Float = 20
-
-    let id: UUID
-    var name: String
-    var nodeIDs: Set<UUID>
 }
