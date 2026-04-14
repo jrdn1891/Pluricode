@@ -3,6 +3,7 @@ import Foundation
 struct CanvasSnapshot: Codable {
     var nodes: [CanvasNode]
     var edges: [Edge]
+    var groups: [NodeGroup]?
     var cameraOffset: SIMD2<Float>
     var cameraZoom: Float
 }
@@ -19,6 +20,7 @@ enum Persistence {
         let snapshot = CanvasSnapshot(
             nodes: Array(document.nodes.values),
             edges: Array(document.edges.values),
+            groups: Array(document.groups.values),
             cameraOffset: document.camera.offset,
             cameraZoom: document.camera.zoom
         )
@@ -42,6 +44,7 @@ enum Persistence {
             let snapshot = try JSONDecoder().decode(CanvasSnapshot.self, from: data)
             document.nodes = Dictionary(uniqueKeysWithValues: snapshot.nodes.map { ($0.id, $0) })
             document.edges = Dictionary(uniqueKeysWithValues: snapshot.edges.map { ($0.id, $0) })
+            document.groups = Dictionary(uniqueKeysWithValues: (snapshot.groups ?? []).map { ($0.id, $0) })
             document.camera.offset = snapshot.cameraOffset
             document.camera.zoom = snapshot.cameraZoom
         } catch {

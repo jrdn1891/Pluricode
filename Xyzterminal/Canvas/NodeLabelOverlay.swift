@@ -8,6 +8,16 @@ struct NodeLabelOverlay: View {
             let vp = geo.size
             let zoom = CGFloat(document.camera.zoom)
             if zoom > 0.25 {
+                ForEach(Array(document.groups.values), id: \.id) { group in
+                    if let bounds = document.groupBounds(for: group) {
+                        let padding: CGFloat = 20
+                        let topLeft = document.camera.canvasToSwiftUI(bounds.min - SIMD2<Float>(Float(padding), Float(padding)), viewportSize: vp)
+                        Text(group.name)
+                            .font(.system(size: max(9, 11 * zoom), weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .position(x: topLeft.x + 30, y: topLeft.y - 6)
+                    }
+                }
                 ForEach(Array(document.nodes.values), id: \.id) { node in
                     let pos = document.camera.canvasToSwiftUI(node.position, viewportSize: vp)
                     let w = CGFloat(node.size.x) * zoom

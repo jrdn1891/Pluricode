@@ -72,6 +72,7 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
               let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor) else { return }
         encoder.setCullMode(.none)
 
+        drawGroups(encoder: encoder, uniforms: &uniforms)
         drawEdges(encoder: encoder, uniforms: &uniforms)
         drawNodes(encoder: encoder, uniforms: &uniforms)
         drawMinimap(encoder: encoder, viewportPoints: viewportPoints, contentsScale: uniforms.contentsScale)
@@ -82,6 +83,34 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+
+    private func drawGroups(encoder: MTLRenderCommandEncoder, uniforms: inout Uniforms) {
+        let padding: Float = 20
+        var instances: [NodeInstance] = []
+
+        for group in document.groups.values {
+            guard let bounds = document.groupBounds(for: group) else { continue }
+            instances.append(NodeInstance(
+                position: bounds.min - SIMD2<Float>(padding, padding),
+                size: (bounds.max - bounds.min) + SIMD2<Float>(padding * 2, padding * 2),
+                color: group.color,
+                cornerRadius: 12,
+                selected: 0
+            ))
+        }
+
+        guard !instances.isEmpty else { return }
+        guard let buffer = device.makeBuffer(
+            bytes: instances,
+            length: MemoryLayout<NodeInstance>.stride * instances.count,
+            options: .storageModeShared
+        ) else { return }
+
+        encoder.setRenderPipelineState(nodePipeline)
+        encoder.setVertexBuffer(buffer, offset: 0, index: 0)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
+    }
 
     private func drawEdges(encoder: MTLRenderCommandEncoder, uniforms: inout Uniforms) {
         var allVertices: [EdgeVertex] = []
