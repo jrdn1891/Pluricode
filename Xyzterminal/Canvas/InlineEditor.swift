@@ -22,7 +22,7 @@ final class InlineEditor: NSObject, NSTextFieldDelegate {
         tf.font = .systemFont(ofSize: 14, weight: .semibold)
         tf.isBezeled = false
         tf.drawsBackground = true
-        let theme = Theme(from: containerView.effectiveAppearance)
+        let theme = Theme(from: NSApp.effectiveAppearance)
         tf.backgroundColor = theme.inlineEditorBackground
         tf.textColor = theme.inlineEditorTextColor
         tf.focusRingType = .exterior
