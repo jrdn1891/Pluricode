@@ -116,49 +116,28 @@ struct TaskCardEditor: View {
     }
 
     private var statusPicker: some View {
-        HStack(spacing: 2) {
+        Menu {
             ForEach(TaskCardData.Status.allCases, id: \.self) { s in
-                Button {
-                    status = s
-                } label: {
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(statusColor(s))
-                            .frame(width: 6, height: 6)
-                        Text(statusLabel(s))
-                            .font(.caption.weight(.medium))
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(status == s ? statusColor(s).opacity(0.15) : .clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
-                .buttonStyle(.plain)
+                Button(s.label) { status = s }
             }
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(status.color)
+                    .frame(width: 8, height: 8)
+                Text(status.label)
+                    .font(.subheadline.weight(.medium))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
-        .padding(3)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func statusLabel(_ s: TaskCardData.Status) -> String {
-        switch s {
-        case .draft: "Draft"
-        case .ready: "Ready"
-        case .inProgress: "In Progress"
-        case .done: "Done"
-        case .failed: "Failed"
-        }
-    }
-
-    private func statusColor(_ s: TaskCardData.Status) -> Color {
-        switch s {
-        case .draft: .gray
-        case .ready: .blue
-        case .inProgress: .orange
-        case .done: .green
-        case .failed: .red
-        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 
     private var taskDuration: String? {

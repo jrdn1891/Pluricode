@@ -18,6 +18,7 @@ final class CanvasInputHandler {
     private var dragState: DragState = .none
     private var editingTextField: NSTextField?
     private var editingDelegate: EditingDelegate?
+    private var statusMenuHandler: StatusMenuHandler?
 
     init(document: CanvasDocument, view: NSView) {
         self.document = document
@@ -87,6 +88,14 @@ final class CanvasInputHandler {
         if let (hitID, corner) = HitTesting.resizeHandleAt(canvasPoint, in: document.nodes, selectedIDs: document.selectedNodeIDs),
            let node = document.nodes[hitID] {
             dragState = .resizingNode(nodeID: hitID, corner: corner, startSize: node.size, startPosition: node.position, startMouse: canvasPoint)
+            return
+        }
+
+        if let hitID = HitTesting.nodeAt(canvasPoint, in: document.nodes),
+           let node = document.nodes[hitID],
+           case .taskCard = node.kind,
+           isStatusPillHit(canvasPoint: canvasPoint, node: node) {
+            showStatusMenu(nodeID: hitID, at: screenPoint)
             return
         }
 
@@ -372,9 +381,9 @@ final class CanvasInputHandler {
         let tfHeight = ceil(fontSize * 1.6)
 
         let frame = NSRect(
-            x: screenTL.x + 22,
+            x: screenTL.x + 8,
             y: screenTL.y - 8 - tfHeight,
-            width: cardW - 52,
+            width: cardW - 38,
             height: tfHeight
         )
         guard frame.width > 40 else { return }
@@ -440,6 +449,37 @@ final class CanvasInputHandler {
         }
     }
 
+    private func isStatusPillHit(canvasPoint: SIMD2<Float>, node: CanvasNode) -> Bool {
+        let zoom = document.camera.zoom
+        let pillOrigin = node.position + SIMD2<Float>(8 / zoom, 26 / zoom)
+        let pillSize = SIMD2<Float>(80 / zoom, 20 / zoom)
+        return canvasPoint.x >= pillOrigin.x
+            && canvasPoint.x <= pillOrigin.x + pillSize.x
+            && canvasPoint.y >= pillOrigin.y
+            && canvasPoint.y <= pillOrigin.y + pillSize.y
+    }
+
+    private func showStatusMenu(nodeID: UUID, at point: CGPoint) {
+        guard let view else { return }
+
+        let handler = StatusMenuHandler { [weak self] newStatus in
+            guard let self, case .taskCard(var data) = self.document.nodes[nodeID]?.kind else { return }
+            data.transition(to: newStatus)
+            self.document.nodes[nodeID]?.kind = .taskCard(data)
+            self.document.scheduleSave()
+        }
+        statusMenuHandler = handler
+
+        let menu = NSMenu()
+        for status in TaskCardData.Status.allCases {
+            let item = NSMenuItem(title: status.label, action: #selector(StatusMenuHandler.select(_:)), keyEquivalent: "")
+            item.target = handler
+            item.representedObject = status.rawValue
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: point, in: view)
+    }
+
     private func isExpandHit(canvasPoint: SIMD2<Float>, node: CanvasNode) -> Bool {
         let expandOrigin = SIMD2<Float>(
             node.position.x + node.size.x - 28,
@@ -497,5 +537,15 @@ private final class EditingDelegate: NSObject, NSTextFieldDelegate {
             return true
         }
         return false
+    }
+}
+
+private final class StatusMenuHandler: NSObject {
+    let onChange: (TaskCardData.Status) -> Void
+    init(onChange: @escaping (TaskCardData.Status) -> Void) { self.onChange = onChange }
+    @objc func select(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let status = TaskCardData.Status(rawValue: raw) else { return }
+        onChange(status)
     }
 }
