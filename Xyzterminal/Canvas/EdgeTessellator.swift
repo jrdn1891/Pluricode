@@ -35,6 +35,7 @@ enum EdgeTessellator {
             let t = Float(i) / Float(segmentCount)
             points.append(cubicBezier(p0, p1, p2, p3, t))
         }
+        guard points.count >= 2 else { return [] }
 
         var strip: [(SIMD2<Float>, SIMD2<Float>)] = []
         for i in 0..<points.count {

@@ -65,8 +65,8 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
             contentsScale: Float(view.window?.backingScaleFactor ?? 2.0)
         )
 
-        let commandBuffer = commandQueue.makeCommandBuffer()!
-        let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor)!
+        guard let commandBuffer = commandQueue.makeCommandBuffer(),
+              let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: passDescriptor) else { return }
         encoder.setCullMode(.none)
 
         drawEdges(encoder: encoder, uniforms: &uniforms)

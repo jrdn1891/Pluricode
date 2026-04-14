@@ -4,13 +4,14 @@ enum WiringAction {
     static func send(edge: Edge, document: CanvasDocument, sessions: [UUID: TerminalSession]) {
         guard let sourceNode = document.nodes[edge.sourceID],
               let targetNode = document.nodes[edge.targetID],
-              let targetSession = sessions[edge.targetID] else { return }
+              let targetSession = sessions[edge.targetID],
+              let process = targetSession.terminalView.process else { return }
 
         let context = gatherContext(from: sourceNode, sessions: sessions)
         let prompt = formatPrompt(edgeType: edge.edgeType, context: context, sourceNode: sourceNode)
 
         let bytes = Array("\(prompt)\n".utf8)
-        targetSession.terminalView.process?.send(data: bytes[...])
+        process.send(data: bytes[...])
 
         let payload = EdgePayload(
             id: UUID(),

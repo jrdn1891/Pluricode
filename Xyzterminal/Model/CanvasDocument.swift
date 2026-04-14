@@ -44,9 +44,12 @@ final class CanvasDocument {
             edges.removeValue(forKey: edgeID)
             selectedEdgeID = nil
         }
-        for id in selectedNodeIDs {
+        let idsToDelete = selectedNodeIDs
+        for id in idsToDelete {
             nodes.removeValue(forKey: id)
-            edges = edges.filter { $0.value.sourceID != id && $0.value.targetID != id }
+        }
+        if !idsToDelete.isEmpty {
+            edges = edges.filter { !idsToDelete.contains($0.value.sourceID) && !idsToDelete.contains($0.value.targetID) }
         }
         selectedNodeIDs.removeAll()
         scheduleSave()

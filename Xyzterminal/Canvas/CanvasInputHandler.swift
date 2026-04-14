@@ -184,7 +184,8 @@ final class CanvasInputHandler {
     }
 
     private func assignTask(taskData: TaskCardData, taskID: UUID, to terminalID: UUID) {
-        guard let session = terminalManager?.sessions[terminalID] else { return }
+        guard let session = terminalManager?.sessions[terminalID],
+              let process = session.terminalView.process else { return }
 
         document.addEdge(from: taskID, to: terminalID, type: .assignedTo)
 
@@ -192,11 +193,9 @@ final class CanvasInputHandler {
         updatedTask.status = .inProgress
         document.nodes[taskID]?.kind = .taskCard(updatedTask)
 
-        let prompt = "# Task: \(taskData.title)\n\n\(taskData.body)\n"
+        let prompt = "# Task: \(taskData.title)\n\n\(taskData.body)\n\n"
         let bytes = Array(prompt.utf8)
-        session.terminalView.process?.send(data: bytes[...])
-        let newline = Array("\n".utf8)
-        session.terminalView.process?.send(data: newline[...])
+        process.send(data: bytes[...])
 
         document.scheduleSave()
     }

@@ -127,11 +127,14 @@ enum MCPBridge {
 
         requestStr += "\n"
         let bytes = Array(requestStr.utf8)
-        write(socketFD, bytes, bytes.count)
+        let written = write(socketFD, bytes, bytes.count)
+        guard written == bytes.count else {
+            return errorContent("Failed to send request to app")
+        }
 
         var buffer = [UInt8](repeating: 0, count: 65536)
         let n = read(socketFD, &buffer, buffer.count)
-        guard n > 0, let responseStr = String(bytes: buffer[..<n], encoding: .utf8) else {
+        guard n > 0, let responseStr = String(bytes: buffer[..<Int(n)], encoding: .utf8) else {
             return errorContent("No response from app")
         }
 

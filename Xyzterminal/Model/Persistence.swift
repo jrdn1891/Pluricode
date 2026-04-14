@@ -24,20 +24,27 @@ enum Persistence {
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(snapshot) else { return }
-        try? data.write(to: saveURL(for: projectPath), options: .atomic)
+        do {
+            let data = try encoder.encode(snapshot)
+            try data.write(to: saveURL(for: projectPath), options: .atomic)
+        } catch {
+            NSLog("Xyzterminal: failed to save canvas: %@", error.localizedDescription)
+        }
     }
 
     static func load(into document: CanvasDocument) {
         guard let projectPath = document.projectPath else { return }
         let url = saveURL(for: projectPath)
-        guard let data = try? Data(contentsOf: url),
-              let snapshot = try? JSONDecoder().decode(CanvasSnapshot.self, from: data) else { return }
-
-        document.nodes = Dictionary(uniqueKeysWithValues: snapshot.nodes.map { ($0.id, $0) })
-        document.edges = Dictionary(uniqueKeysWithValues: snapshot.edges.map { ($0.id, $0) })
-        document.camera.offset = snapshot.cameraOffset
-        document.camera.zoom = snapshot.cameraZoom
+        do {
+            let data = try Data(contentsOf: url)
+            let snapshot = try JSONDecoder().decode(CanvasSnapshot.self, from: data)
+            document.nodes = Dictionary(uniqueKeysWithValues: snapshot.nodes.map { ($0.id, $0) })
+            document.edges = Dictionary(uniqueKeysWithValues: snapshot.edges.map { ($0.id, $0) })
+            document.camera.offset = snapshot.cameraOffset
+            document.camera.zoom = snapshot.cameraZoom
+        } catch {
+            NSLog("Xyzterminal: failed to load canvas: %@", error.localizedDescription)
+        }
     }
 
     static var lastProjectPath: URL? {
