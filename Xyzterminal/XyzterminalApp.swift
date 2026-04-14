@@ -4,6 +4,7 @@ import AppKit
 struct XyzterminalApp: App {
     @State private var document = CanvasDocument()
     @State private var hasProject = false
+    @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
 
     var body: some Scene {
         WindowGroup {
@@ -25,6 +26,14 @@ struct XyzterminalApp: App {
                                 )) {
                                     Label("Snap", systemImage: "grid")
                                 }
+                                Divider()
+                                Picker("Appearance", selection: $appearanceModeRaw) {
+                                    ForEach(AppearanceMode.allCases, id: \.rawValue) { mode in
+                                        Label(mode.rawValue.capitalized, systemImage: mode.icon)
+                                            .tag(mode.rawValue)
+                                    }
+                                }
+                                .pickerStyle(.menu)
                             }
                         }
                 } else {
@@ -34,10 +43,14 @@ struct XyzterminalApp: App {
                 }
             }
             .onAppear {
+                (AppearanceMode(rawValue: appearanceModeRaw) ?? .system).apply()
                 if let last = Persistence.lastProjectPath,
                    FileManager.default.fileExists(atPath: last.path) {
                     openProject(last)
                 }
+            }
+            .onChange(of: appearanceModeRaw) { _, newValue in
+                (AppearanceMode(rawValue: newValue) ?? .system).apply()
             }
         }
         .defaultSize(width: 1200, height: 800)

@@ -8,6 +8,7 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
     let edgePipeline: MTLRenderPipelineState
     let document: CanvasDocument
     var terminalManager: TerminalManager?
+    private(set) var theme = Theme(from: NSApp.effectiveAppearance)
 
     init(device: MTLDevice, document: CanvasDocument) {
         self.device = device
@@ -52,6 +53,8 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
     }
 
     func draw(in view: MTKView) {
+        theme = Theme(from: view.effectiveAppearance)
+        view.clearColor = theme.canvasClearColor
         terminalManager?.sync(containerView: view)
 
         guard let drawable = view.currentDrawable,
@@ -124,8 +127,8 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         var instances = document.nodes.values.map { node -> NodeInstance in
             let isSelected = document.selectedNodeIDs.contains(node.id)
             let color: SIMD4<Float> = switch node.kind {
-            case .terminal: SIMD4<Float>(0.14, 0.14, 0.18, 1.0)
-            case .taskCard: SIMD4<Float>(0.20, 0.20, 0.25, 1.0)
+            case .terminal: theme.terminalNodeColor
+            case .taskCard: theme.taskCardNodeColor
             }
             return NodeInstance(
                 position: node.position,
@@ -201,7 +204,7 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         instances.append(NodeInstance(
             position: SIMD2<Float>(mapX, mapY),
             size: SIMD2<Float>(mapW, mapH),
-            color: SIMD4<Float>(0.12, 0.12, 0.15, 0.85),
+            color: theme.minimapBackground,
             cornerRadius: 6,
             selected: 0
         ))
@@ -231,7 +234,7 @@ final class CanvasRenderer: NSObject, MTKViewDelegate {
         instances.append(NodeInstance(
             position: SIMD2<Float>(mapX + vpRel.x, mapY + vpRel.y),
             size: SIMD2<Float>(max(4, vpSz.x), max(4, vpSz.y)),
-            color: SIMD4<Float>(1.0, 1.0, 1.0, 0.25),
+            color: theme.minimapViewportFrame,
             cornerRadius: 2,
             selected: 0
         ))

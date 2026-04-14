@@ -5,6 +5,7 @@ final class TerminalManager {
     var sessions: [UUID: TerminalSession] = [:]
     var worktreeManager: WorktreeManager?
     private static let titleBarHeight: Float = 30
+    private var lastIsDark: Bool?
 
     init(document: CanvasDocument) {
         self.document = document
@@ -15,6 +16,14 @@ final class TerminalManager {
     }
 
     func sync(containerView: NSView) {
+        let theme = Theme(from: containerView.effectiveAppearance)
+        if lastIsDark != theme.isDark {
+            lastIsDark = theme.isDark
+            for session in sessions.values {
+                session.updateColors(theme: theme)
+            }
+        }
+
         let terminalNodeIDs = Set(document.nodes.values.compactMap { node -> UUID? in
             if case .terminal = node.kind { return node.id }
             return nil
@@ -30,6 +39,7 @@ final class TerminalManager {
 
         for id in terminalNodeIDs where sessions[id] == nil {
             let session = TerminalSession(nodeID: id)
+            session.updateColors(theme: theme)
             containerView.addSubview(session.terminalView)
 
             if let wm = worktreeManager {

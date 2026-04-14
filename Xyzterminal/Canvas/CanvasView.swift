@@ -9,7 +9,6 @@ final class CanvasMTKView: MTKView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
-        window?.appearance = NSAppearance(named: .darkAqua)
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -58,7 +57,7 @@ struct CanvasMetalView: NSViewRepresentable {
         let view = CanvasMTKView()
         view.device = device
         view.colorPixelFormat = .bgra8Unorm
-        view.clearColor = MTLClearColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.0)
+        view.clearColor = Theme(from: NSApp.effectiveAppearance).canvasClearColor
         view.isPaused = false
         view.enableSetNeedsDisplay = false
 
