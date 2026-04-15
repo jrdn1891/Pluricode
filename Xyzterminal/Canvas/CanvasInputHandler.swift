@@ -279,6 +279,10 @@ final class CanvasInputHandler {
                 switch draggedNode.kind {
                 case .taskCard(var taskData):
                     if let targetID = findTerminalUnder(canvasPoint, excluding: draggedID) {
+                        if case .movingNodes(let startPositions, _) = dragState,
+                           let originalPos = startPositions[draggedID] {
+                            document.nodes[draggedID]?.position = originalPos
+                        }
                         assignTask(taskID: draggedID, to: targetID)
                     } else if let sectionID = findSectionUnder(canvasPoint, excluding: draggedID) {
                         if taskData.sectionID == sectionID {
@@ -315,6 +319,13 @@ final class CanvasInputHandler {
 
             if moved, document.selectedNodeIDs.count > 1 {
                 if let targetID = findTerminalUnder(canvasPoint, excludingSet: document.selectedNodeIDs) {
+                    if case .movingNodes(let startPositions, _) = dragState {
+                        for id in document.selectedNodeIDs {
+                            if let originalPos = startPositions[id] {
+                                document.nodes[id]?.position = originalPos
+                            }
+                        }
+                    }
                     var taskIDs: [UUID] = []
                     for id in document.selectedNodeIDs {
                         guard let node = document.nodes[id] else { continue }
