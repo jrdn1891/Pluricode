@@ -5,6 +5,7 @@ struct XyzterminalApp: App {
     @State private var repoStore = RepoStore()
     @State private var profileStore = AgentProfileStore()
     @State private var taskStoreRegistry = TaskStoreRegistry()
+    @State private var workspaceRegistry = WorkspaceRegistry()
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
 
     var body: some Scene {
@@ -21,7 +22,8 @@ struct XyzterminalApp: App {
                     WorkspaceView(
                         repo: repo,
                         profileStore: profileStore,
-                        taskStoreRegistry: taskStoreRegistry
+                        taskStoreRegistry: taskStoreRegistry,
+                        workspaceRegistry: workspaceRegistry
                     )
                     .id(repo.id)
                 } else {

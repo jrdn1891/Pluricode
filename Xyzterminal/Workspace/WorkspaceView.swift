@@ -4,28 +4,16 @@ struct WorkspaceView: View {
     let repo: RepoEntry
     let profileStore: AgentProfileStore
     let taskStoreRegistry: TaskStoreRegistry
-    @State private var workspace: Workspace?
+    let workspaceRegistry: WorkspaceRegistry
 
     var body: some View {
-        Group {
-            if let workspace {
-                WorkspaceBody(workspace: workspace)
-                    .focusedSceneValue(\.workspace, workspace)
-            } else {
-                Color.clear
-            }
-        }
-        .onAppear {
-            if workspace == nil {
-                let taskStore = taskStoreRegistry.store(for: repo.path)
-                let ws = Workspace(repo: repo, profileStore: profileStore, taskStore: taskStore)
-                ws.load()
-                workspace = ws
-            }
-        }
-        .onDisappear {
-            workspace?.save()
-        }
+        let workspace = workspaceRegistry.workspace(
+            for: repo,
+            profileStore: profileStore,
+            taskStore: taskStoreRegistry.store(for: repo.path)
+        )
+        WorkspaceBody(workspace: workspace)
+            .focusedSceneValue(\.workspace, workspace)
     }
 }
 

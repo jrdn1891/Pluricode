@@ -21,7 +21,69 @@ struct RepoSidebarView: View {
         )) {
             Section("Repositories") {
                 ForEach(repoStore.repos) { repo in
-                    repoSection(repo)
+                    RepoRow(repo: repo, isExpanded: expanded.contains(repo.id), toggle: { toggle(repo) })
+                        .tag(repo.id)
+                        .contextMenu {
+                            Button("Show in Finder") {
+                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.path.path)
+                            }
+                            Divider()
+                            Button("Remove", role: .destructive) {
+                                repoStore.removeRepo(id: repo.id)
+                            }
+                        }
+
+                    if expanded.contains(repo.id) {
+                        ForEach(worktrees[repo.id] ?? []) { wt in
+                            WorktreeRow(worktree: wt, profileStore: profileStore)
+                                .padding(.leading, 20)
+                                .contextMenu {
+                                    Button("Configure...") {
+                                        configureTarget = RenameTarget(repo: repo, worktree: wt)
+                                    }
+                                    Button("Rename...") {
+                                        renameTarget = RenameTarget(repo: repo, worktree: wt)
+                                    }
+                                    Button("Show in Finder") {
+                                        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: wt.path)
+                                    }
+                                    Divider()
+                                    Button("Delete", role: .destructive) {
+                                        deleteCandidate = DeleteCandidate(repo: repo, worktree: wt)
+                                    }
+                                }
+                        }
+
+                        Button(action: { newWorktreeRepo = repo }) {
+                            Label("New Worktree", systemImage: "plus.circle")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.leading, 20)
+                        .padding(.vertical, 2)
+
+                        ForEach(taskStoreRegistry.store(for: repo.path).lists) { list in
+                            TaskListRow(list: list)
+                                .padding(.leading, 20)
+                                .contextMenu {
+                                    Button("Rename...") {
+                                        renameListTarget = ListTarget(repo: repo, list: list)
+                                    }
+                                    Divider()
+                                    Button("Delete", role: .destructive) {
+                                        deleteListCandidate = ListTarget(repo: repo, list: list)
+                                    }
+                                }
+                        }
+
+                        Button(action: { newListRepo = repo }) {
+                            Label("New Task List", systemImage: "plus.circle")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.leading, 20)
+                        .padding(.vertical, 2)
+                    }
                 }
             }
         }
@@ -72,75 +134,6 @@ struct RepoSidebarView: View {
                 },
                 secondaryButton: .cancel()
             )
-        }
-    }
-
-    @ViewBuilder
-    private func repoSection(_ repo: RepoEntry) -> some View {
-        RepoRow(repo: repo, isExpanded: expanded.contains(repo.id), toggle: { toggle(repo) })
-            .tag(repo.id)
-            .contextMenu {
-                Button("Show in Finder") {
-                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.path.path)
-                }
-                Divider()
-                Button("Remove", role: .destructive) {
-                    repoStore.removeRepo(id: repo.id)
-                }
-            }
-
-        if expanded.contains(repo.id) {
-            let worktreeList = worktrees[repo.id] ?? []
-            ForEach(worktreeList) { wt in
-                WorktreeRow(worktree: wt, profileStore: profileStore)
-                    .padding(.leading, 20)
-                    .contextMenu {
-                        Button("Configure...") {
-                            configureTarget = RenameTarget(repo: repo, worktree: wt)
-                        }
-                        Button("Rename...") {
-                            renameTarget = RenameTarget(repo: repo, worktree: wt)
-                        }
-                        Button("Show in Finder") {
-                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: wt.path)
-                        }
-                        Divider()
-                        Button("Delete", role: .destructive) {
-                            deleteCandidate = DeleteCandidate(repo: repo, worktree: wt)
-                        }
-                    }
-            }
-
-            Button(action: { newWorktreeRepo = repo }) {
-                Label("New Worktree", systemImage: "plus.circle")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 20)
-            .padding(.vertical, 2)
-
-            let store = taskStoreRegistry.store(for: repo.path)
-            ForEach(store.lists) { list in
-                TaskListRow(list: list)
-                    .padding(.leading, 20)
-                    .contextMenu {
-                        Button("Rename...") {
-                            renameListTarget = ListTarget(repo: repo, list: list)
-                        }
-                        Divider()
-                        Button("Delete", role: .destructive) {
-                            deleteListCandidate = ListTarget(repo: repo, list: list)
-                        }
-                    }
-            }
-
-            Button(action: { newListRepo = repo }) {
-                Label("New Task List", systemImage: "plus.circle")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 20)
-            .padding(.vertical, 2)
         }
     }
 

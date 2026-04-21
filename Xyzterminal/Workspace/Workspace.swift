@@ -14,6 +14,29 @@ extension FocusedValues {
 }
 
 @Observable
+final class WorkspaceRegistry {
+    private var workspaces: [String: Workspace] = [:]
+
+    func workspace(for repo: RepoEntry, profileStore: AgentProfileStore, taskStore: TaskStore) -> Workspace {
+        let key = repo.path.standardizedFileURL.path
+        if let existing = workspaces[key] { return existing }
+        let ws = Workspace(repo: repo, profileStore: profileStore, taskStore: taskStore)
+        ws.load()
+        workspaces[key] = ws
+        return ws
+    }
+
+    func remove(repoPath: URL) {
+        let key = repoPath.standardizedFileURL.path
+        workspaces.removeValue(forKey: key)
+    }
+
+    func saveAll() {
+        for ws in workspaces.values { ws.save() }
+    }
+}
+
+@Observable
 final class Workspace {
     let repo: RepoEntry
     let profileStore: AgentProfileStore
