@@ -3,6 +3,7 @@ import SwiftUI
 struct WorkspaceView: View {
     let repo: RepoEntry
     let profileStore: AgentProfileStore
+    let taskStoreRegistry: TaskStoreRegistry
     @State private var workspace: Workspace?
 
     var body: some View {
@@ -16,7 +17,8 @@ struct WorkspaceView: View {
         }
         .onAppear {
             if workspace == nil {
-                let ws = Workspace(repo: repo, profileStore: profileStore)
+                let taskStore = taskStoreRegistry.store(for: repo.path)
+                let ws = Workspace(repo: repo, profileStore: profileStore, taskStore: taskStore)
                 ws.load()
                 workspace = ws
             }
@@ -86,8 +88,8 @@ private struct WorkspacePane: View {
             switch pane.content {
             case .terminal(let worktreeID):
                 TerminalPaneBody(paneID: pane.id, worktreeID: worktreeID, workspace: workspace)
-            case .tasks:
-                TaskPaneBody(paneID: pane.id, workspace: workspace)
+            case .tasks(let listID):
+                TaskPaneBody(paneID: pane.id, listID: listID, workspace: workspace)
             }
         }
     }
@@ -113,6 +115,7 @@ private struct PaneFrame<Content: View>: View {
 
 private struct TaskPaneBody: View {
     let paneID: UUID
+    let listID: UUID
     let workspace: Workspace
     @State private var isTargeted = false
 
@@ -120,6 +123,7 @@ private struct TaskPaneBody: View {
         GeometryReader { geo in
             TaskPaneView(
                 paneID: paneID,
+                listID: listID,
                 store: workspace.taskStore,
                 focused: workspace.focusedPaneID == paneID,
                 onActivate: { workspace.setFocus(paneID: paneID) },

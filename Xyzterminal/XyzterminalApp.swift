@@ -4,17 +4,26 @@ import AppKit
 struct XyzterminalApp: App {
     @State private var repoStore = RepoStore()
     @State private var profileStore = AgentProfileStore()
+    @State private var taskStoreRegistry = TaskStoreRegistry()
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
 
     var body: some Scene {
         WindowGroup {
             NavigationSplitView {
-                RepoSidebarView(repoStore: repoStore, profileStore: profileStore)
-                    .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
+                RepoSidebarView(
+                    repoStore: repoStore,
+                    profileStore: profileStore,
+                    taskStoreRegistry: taskStoreRegistry
+                )
+                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
             } detail: {
                 if let repo = repoStore.selectedRepo {
-                    WorkspaceView(repo: repo, profileStore: profileStore)
-                        .id(repo.id)
+                    WorkspaceView(
+                        repo: repo,
+                        profileStore: profileStore,
+                        taskStoreRegistry: taskStoreRegistry
+                    )
+                    .id(repo.id)
                 } else {
                     EmptyWorkspaceView(repoStore: repoStore)
                 }

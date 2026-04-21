@@ -140,6 +140,18 @@ Each milestone has a checklist. Tick items as completed across sessions.
 - [x] `PaneHeader` and `TaskPaneHeader` are draggable with `.movePane(...)` payloads; tap-to-activate and close button still work alongside the drag.
 - [x] All drop handlers (empty workspace, terminal pane, task pane) route through the dispatcher.
 
+### M9 — Named task lists per repo
+
+**Goal**: users create multiple named task lists per repo (e.g. "Bugs", "Improvements") and open each in its own pane. Dragging a specific list from the sidebar creates a pane bound to that list.
+
+- [ ] `TaskList` struct (id, name, items). `TaskStore` holds `[TaskList]` per repo. Persists to `.xyzterminal/tasks.json` as a list-of-lists (old flat-array format becomes unreadable — acceptable per no-backwards-compat rule).
+- [ ] `TaskStoreRegistry` shared across sidebar and workspaces, keyed by repo path, so changes in the sidebar show up live in open panes.
+- [ ] `PaneContent.tasks(listID:)` and `TilingDragPayload.Kind.newTaskPane(listID:)` carry the list identity.
+- [ ] `TaskPaneView` renders and mutates a specific list by id; header shows the list's name + counts. Missing-list pane shows an error state with Remove Pane.
+- [ ] Sidebar: under each expanded repo, below the worktrees, show a Task Lists section with draggable rows + "New Task List" action. Context menu offers Rename and Delete (confirm when list has tasks).
+- [ ] Remove the old global "Task List" drag source from the sidebar top.
+- [ ] Verify: create two lists, drag each into the canvas, add tasks in each, rename a list (panes reflect), delete a list (pane shows missing state).
+
 ### M7 — Polish
 
 **Goal**: make the day-to-day use feel sharp.

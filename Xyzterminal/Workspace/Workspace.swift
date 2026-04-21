@@ -24,11 +24,11 @@ final class Workspace {
 
     private var saveTask: Task<Void, Never>?
 
-    init(repo: RepoEntry, profileStore: AgentProfileStore) {
+    init(repo: RepoEntry, profileStore: AgentProfileStore, taskStore: TaskStore) {
         self.repo = repo
         self.profileStore = profileStore
         self.tiling = Tiling()
-        self.taskStore = TaskStore(repoPath: repo.path)
+        self.taskStore = taskStore
     }
 
     deinit {
@@ -131,9 +131,10 @@ final class Workspace {
             let content: PaneContent = .terminal(worktreeID: wid)
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
-        case .newTaskPane:
-            if let targetID { splitPane(paneID: targetID, edge: edge, content: .tasks) }
-            else { addPane(.tasks) }
+        case .newTaskPane(let listID):
+            let content: PaneContent = .tasks(listID: listID)
+            if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
+            else { addPane(content) }
         case .movePane(let sourceID):
             guard let targetID, sourceID != targetID else { return false }
             if edge == .center {

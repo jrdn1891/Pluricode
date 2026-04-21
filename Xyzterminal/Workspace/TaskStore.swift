@@ -15,9 +15,21 @@ struct TaskItem: Codable, Identifiable, Hashable {
     }
 }
 
+struct TaskList: Codable, Identifiable, Hashable {
+    let id: UUID
+    var name: String
+    var items: [TaskItem]
+
+    init(id: UUID = UUID(), name: String, items: [TaskItem] = []) {
+        self.id = id
+        self.name = name
+        self.items = items
+    }
+}
+
 @Observable
 final class TaskStore {
-    var tasks: [TaskItem] = []
+    var lists: [TaskList] = []
     let repoPath: URL
     private var saveTask: Task<Void, Never>?
 
@@ -37,8 +49,8 @@ final class TaskStore {
 
     func load() {
         guard let data = try? Data(contentsOf: tasksURL),
-              let decoded = try? JSONDecoder().decode([TaskItem].self, from: data) else { return }
-        tasks = decoded
+              let decoded = try? JSONDecoder().decode([TaskList].self, from: data) else { return }
+        lists = decoded
     }
 
     func save() {
@@ -46,7 +58,7 @@ final class TaskStore {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(tasks) else { return }
+        guard let data = try? encoder.encode(lists) else { return }
         try? data.write(to: url, options: .atomic)
     }
 
@@ -59,33 +71,77 @@ final class TaskStore {
         }
     }
 
-    func add(title: String) {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    func list(id: UUID) -> TaskList? {
+        lists.first { $0.id == id }
+    }
+
+    @discardableResult
+    func addList(name: String) -> UUID {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalName = trimmed.isEmpty ? "Untitled" : trimmed
+        let list = TaskList(name: finalName)
+        lists.append(list)
+        scheduleSave()
+        return list.id
+    }
+
+    func renameList(id: UUID, name: String) {
+        guard let idx = lists.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        tasks.insert(TaskItem(title: trimmed), at: 0)
+        lists[idx].name = trimmed
         scheduleSave()
     }
 
-    func toggle(id: UUID) {
-        guard let idx = tasks.firstIndex(where: { $0.id == id }) else { return }
-        tasks[idx].done.toggle()
+    func removeList(id: UUID) {
+        lists.removeAll { $0.id == id }
         scheduleSave()
     }
 
-    func updateTitle(id: UUID, title: String) {
-        guard let idx = tasks.firstIndex(where: { $0.id == id }) else { return }
+    func addTask(listID: UUID, title: String) {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        tasks[idx].title = trimmed
+        guard !trimmed.isEmpty,
+              let idx = lists.firstIndex(where: { $0.id == listID }) else { return }
+        lists[idx].items.insert(TaskItem(title: trimmed), at: 0)
         scheduleSave()
     }
 
-    func remove(id: UUID) {
-        tasks.removeAll { $0.id == id }
+    func toggleTask(listID: UUID, taskID: UUID) {
+        guard let listIdx = lists.firstIndex(where: { $0.id == listID }),
+              let taskIdx = lists[listIdx].items.firstIndex(where: { $0.id == taskID }) else { return }
+        lists[listIdx].items[taskIdx].done.toggle()
         scheduleSave()
     }
 
-    func clearCompleted() {
-        tasks.removeAll { $0.done }
+    func updateTaskTitle(listID: UUID, taskID: UUID, title: String) {
+        guard let listIdx = lists.firstIndex(where: { $0.id == listID }),
+              let taskIdx = lists[listIdx].items.firstIndex(where: { $0.id == taskID }) else { return }
+        lists[listIdx].items[taskIdx].title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         scheduleSave()
+    }
+
+    func removeTask(listID: UUID, taskID: UUID) {
+        guard let listIdx = lists.firstIndex(where: { $0.id == listID }) else { return }
+        lists[listIdx].items.removeAll { $0.id == taskID }
+        scheduleSave()
+    }
+
+    func clearCompleted(listID: UUID) {
+        guard let listIdx = lists.firstIndex(where: { $0.id == listID }) else { return }
+        lists[listIdx].items.removeAll { $0.done }
+        scheduleSave()
+    }
+}
+
+@Observable
+final class TaskStoreRegistry {
+    private var stores: [String: TaskStore] = [:]
+
+    func store(for repoPath: URL) -> TaskStore {
+        let key = repoPath.standardizedFileURL.path
+        if let existing = stores[key] { return existing }
+        let store = TaskStore(repoPath: repoPath)
+        stores[key] = store
+        return store
     }
 }

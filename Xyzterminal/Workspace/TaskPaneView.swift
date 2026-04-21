@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TaskPaneView: View {
     let paneID: UUID
+    let listID: UUID
     let store: TaskStore
     let focused: Bool
     let onActivate: () -> Void
@@ -9,53 +10,63 @@ struct TaskPaneView: View {
     @State private var draftText: String = ""
     @FocusState private var draftFocused: Bool
 
+    private var list: TaskList? {
+        store.list(id: listID)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            TaskPaneHeader(
-                paneID: paneID,
-                remainingCount: store.tasks.filter { !$0.done }.count,
-                totalCount: store.tasks.count,
-                focused: focused,
-                onActivate: onActivate,
-                onClearCompleted: { store.clearCompleted() },
-                onClose: onClose
-            )
+            if let list {
+                TaskPaneHeader(
+                    paneID: paneID,
+                    listName: list.name,
+                    remainingCount: list.items.filter { !$0.done }.count,
+                    totalCount: list.items.count,
+                    focused: focused,
+                    onActivate: onActivate,
+                    onClearCompleted: { store.clearCompleted(listID: listID) },
+                    onClose: onClose
+                )
 
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(store.tasks) { task in
-                        TaskRow(task: task, store: store)
-                        Divider().opacity(0.3)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(list.items) { task in
+                            TaskRow(listID: listID, task: task, store: store)
+                            Divider().opacity(0.3)
+                        }
                     }
                 }
-            }
-            .frame(maxHeight: .infinity)
+                .frame(maxHeight: .infinity)
 
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .foregroundStyle(.secondary)
-                TextField("Add task...", text: $draftText)
-                    .textFieldStyle(.plain)
-                    .focused($draftFocused)
-                    .onSubmit(commitDraft)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(Color.secondary.opacity(0.06))
-            .overlay(alignment: .top) {
-                Divider()
+                HStack(spacing: 8) {
+                    Image(systemName: "plus")
+                        .foregroundStyle(.secondary)
+                    TextField("Add task...", text: $draftText)
+                        .textFieldStyle(.plain)
+                        .focused($draftFocused)
+                        .onSubmit(commitDraft)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.secondary.opacity(0.06))
+                .overlay(alignment: .top) {
+                    Divider()
+                }
+            } else {
+                MissingTaskListBody(listID: listID, onRemove: onClose)
             }
         }
     }
 
     private func commitDraft() {
-        store.add(title: draftText)
+        store.addTask(listID: listID, title: draftText)
         draftText = ""
         draftFocused = true
     }
 }
 
 private struct TaskRow: View {
+    let listID: UUID
     let task: TaskItem
     let store: TaskStore
     @State private var hovering = false
@@ -63,7 +74,7 @@ private struct TaskRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Button(action: { store.toggle(id: task.id) }) {
+            Button(action: { store.toggleTask(listID: listID, taskID: task.id) }) {
                 Image(systemName: task.done ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(task.done ? Color.accentColor : .secondary)
                     .font(.system(size: 16))
@@ -88,7 +99,7 @@ private struct TaskRow: View {
             Spacer()
 
             if hovering {
-                Button(action: { store.remove(id: task.id) }) {
+                Button(action: { store.removeTask(listID: listID, taskID: task.id) }) {
                     Image(systemName: "xmark")
                         .foregroundStyle(.secondary)
                         .font(.system(size: 11, weight: .semibold))
@@ -105,13 +116,14 @@ private struct TaskRow: View {
 
     private func commitEdit() {
         guard let draft = editingTitle else { return }
-        store.updateTitle(id: task.id, title: draft)
+        store.updateTaskTitle(listID: listID, taskID: task.id, title: draft)
         editingTitle = nil
     }
 }
 
 private struct TaskPaneHeader: View {
     let paneID: UUID
+    let listName: String
     let remainingCount: Int
     let totalCount: Int
     let focused: Bool
@@ -124,7 +136,7 @@ private struct TaskPaneHeader: View {
             Image(systemName: "checklist")
                 .foregroundStyle(.secondary)
                 .font(.caption)
-            Text("Tasks")
+            Text(listName)
                 .font(.system(size: 12, weight: .medium))
             Text("\(remainingCount) open / \(totalCount)")
                 .font(.system(size: 11))
@@ -156,12 +168,34 @@ private struct TaskPaneHeader: View {
         .draggable(TilingDragPayload(kind: .movePane(paneID: paneID))) {
             HStack(spacing: 6) {
                 Image(systemName: "checklist")
-                Text("Tasks")
+                Text(listName)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
+    }
+}
+
+private struct MissingTaskListBody: View {
+    let listID: UUID
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 30))
+                .foregroundStyle(.orange)
+            Text("Task list not found")
+                .font(.headline)
+            Text("The list this pane points to has been deleted.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Remove Pane", role: .destructive, action: onRemove)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
     }
 }

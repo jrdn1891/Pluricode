@@ -3,21 +3,22 @@ import SwiftUI
 struct RepoSidebarView: View {
     let repoStore: RepoStore
     let profileStore: AgentProfileStore
+    let taskStoreRegistry: TaskStoreRegistry
     @State private var expanded: Set<UUID> = []
     @State private var worktrees: [UUID: [Worktree]] = [:]
     @State private var newWorktreeRepo: RepoEntry?
     @State private var deleteCandidate: DeleteCandidate?
     @State private var renameTarget: RenameTarget?
     @State private var configureTarget: RenameTarget?
+    @State private var newListRepo: RepoEntry?
+    @State private var renameListTarget: ListTarget?
+    @State private var deleteListCandidate: ListTarget?
 
     var body: some View {
         List(selection: Binding(
             get: { repoStore.selectedRepoID },
             set: { repoStore.selectedRepoID = $0; repoStore.save() }
         )) {
-            Section("Panes") {
-                TaskPaneDragSource()
-            }
             Section("Repositories") {
                 ForEach(repoStore.repos) { repo in
                     repoSection(repo)
@@ -41,12 +42,33 @@ struct RepoSidebarView: View {
         .sheet(item: $configureTarget) { target in
             ConfigureWorktreeSheet(target: target, profileStore: profileStore)
         }
+        .sheet(item: $newListRepo) { repo in
+            NewTaskListSheet(store: taskStoreRegistry.store(for: repo.path))
+        }
+        .sheet(item: $renameListTarget) { target in
+            RenameTaskListSheet(
+                store: taskStoreRegistry.store(for: target.repo.path),
+                list: target.list
+            )
+        }
         .alert(item: $deleteCandidate) { cand in
             Alert(
                 title: Text("Delete \(cand.worktree.displayName)?"),
                 message: Text("This runs `git worktree remove --force` and deletes the branch `\(cand.worktree.branch)`."),
                 primaryButton: .destructive(Text("Delete")) {
                     delete(cand)
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .alert(item: $deleteListCandidate) { cand in
+            Alert(
+                title: Text("Delete list \(cand.list.name)?"),
+                message: Text(cand.list.items.isEmpty
+                    ? "The list is empty. This cannot be undone."
+                    : "This will delete \(cand.list.items.count) task\(cand.list.items.count == 1 ? "" : "s")."),
+                primaryButton: .destructive(Text("Delete")) {
+                    taskStoreRegistry.store(for: cand.repo.path).removeList(id: cand.list.id)
                 },
                 secondaryButton: .cancel()
             )
@@ -68,8 +90,8 @@ struct RepoSidebarView: View {
             }
 
         if expanded.contains(repo.id) {
-            let list = worktrees[repo.id] ?? []
-            ForEach(list) { wt in
+            let worktreeList = worktrees[repo.id] ?? []
+            ForEach(worktreeList) { wt in
                 WorktreeRow(worktree: wt, profileStore: profileStore)
                     .padding(.leading, 20)
                     .contextMenu {
@@ -91,6 +113,29 @@ struct RepoSidebarView: View {
 
             Button(action: { newWorktreeRepo = repo }) {
                 Label("New Worktree", systemImage: "plus.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 20)
+            .padding(.vertical, 2)
+
+            let store = taskStoreRegistry.store(for: repo.path)
+            ForEach(store.lists) { list in
+                TaskListRow(list: list)
+                    .padding(.leading, 20)
+                    .contextMenu {
+                        Button("Rename...") {
+                            renameListTarget = ListTarget(repo: repo, list: list)
+                        }
+                        Divider()
+                        Button("Delete", role: .destructive) {
+                            deleteListCandidate = ListTarget(repo: repo, list: list)
+                        }
+                    }
+            }
+
+            Button(action: { newListRepo = repo }) {
+                Label("New Task List", systemImage: "plus.circle")
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -151,6 +196,12 @@ private struct RenameTarget: Identifiable {
     var id: String { "\(repo.id.uuidString):\(worktree.id)" }
 }
 
+private struct ListTarget: Identifiable {
+    let repo: RepoEntry
+    let list: TaskList
+    var id: String { "\(repo.id.uuidString):\(list.id.uuidString)" }
+}
+
 struct RepoRow: View {
     let repo: RepoEntry
     let isExpanded: Bool
@@ -194,31 +245,6 @@ struct RepoRow: View {
     }
 }
 
-struct TaskPaneDragSource: View {
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "checklist")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-            Text("Task List")
-                .font(.body)
-            Spacer()
-        }
-        .contentShape(Rectangle())
-        .padding(.vertical, 1)
-        .draggable(TilingDragPayload(kind: .newTaskPane)) {
-            HStack(spacing: 6) {
-                Image(systemName: "checklist")
-                Text("Task List")
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.accentColor.opacity(0.2))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
-    }
-}
-
 struct WorktreeRow: View {
     let worktree: Worktree
     let profileStore: AgentProfileStore
@@ -259,6 +285,38 @@ struct WorktreeRow: View {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.triangle.branch")
                 Text(worktree.displayName)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+}
+
+struct TaskListRow: View {
+    let list: TaskList
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checklist")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            Text(list.name)
+                .font(.body)
+            Spacer()
+            if list.items.count > 0 {
+                Text("\(list.items.filter { !$0.done }.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 1)
+        .draggable(TilingDragPayload(kind: .newTaskPane(listID: list.id))) {
+            HStack(spacing: 6) {
+                Image(systemName: "checklist")
+                Text(list.name)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -505,5 +563,73 @@ private struct RenameWorktreeSheet: View {
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_/.")
         let lowered = raw.lowercased().replacingOccurrences(of: " ", with: "-")
         return String(lowered.unicodeScalars.filter { allowed.contains($0) })
+    }
+}
+
+private struct NewTaskListSheet: View {
+    let store: TaskStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("New Task List")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Name").font(.caption).foregroundStyle(.secondary)
+                TextField("Bugs", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Create") {
+                    _ = store.addList(name: name)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 360)
+    }
+}
+
+private struct RenameTaskListSheet: View {
+    let store: TaskStore
+    let list: TaskList
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Rename Task List")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Name").font(.caption).foregroundStyle(.secondary)
+                TextField("Bugs", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Rename") {
+                    store.renameList(id: list.id, name: name)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 360)
+        .onAppear { name = list.name }
     }
 }
