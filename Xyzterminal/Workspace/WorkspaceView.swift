@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkspaceView: View {
     let repo: RepoEntry
+    let profileStore: AgentProfileStore
     @State private var workspace: Workspace?
 
     var body: some View {
@@ -14,7 +15,7 @@ struct WorkspaceView: View {
         }
         .onAppear {
             if workspace == nil {
-                let ws = Workspace(repo: repo)
+                let ws = Workspace(repo: repo, profileStore: profileStore)
                 ws.load()
                 workspace = ws
             }
@@ -96,6 +97,7 @@ private struct TerminalPaneBody: View {
             PaneHeader(
                 title: displayName,
                 branch: worktreeID,
+                profile: resolveProfile(),
                 onClose: { workspace.closePane(paneID: paneID) }
             )
             if let path = resolveWorktreePath() {
@@ -141,11 +143,19 @@ private struct TerminalPaneBody: View {
         guard let wm = WorktreeManager(repoRoot: workspace.repo.path) else { return nil }
         return wm.listManagedWorktrees().first { $0.branch == worktreeID }?.path
     }
+
+    private func resolveProfile() -> AgentProfile? {
+        guard let path = resolveWorktreePath() else { return nil }
+        let config = WorktreeConfig.load(at: path)
+        guard let id = config.agentProfileID else { return nil }
+        return workspace.profileStore.profile(id: id)
+    }
 }
 
 private struct PaneHeader: View {
     let title: String
     let branch: String
+    let profile: AgentProfile?
     let onClose: () -> Void
 
     var body: some View {
@@ -158,6 +168,14 @@ private struct PaneHeader: View {
             Text(branch)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+            if let profile {
+                Circle()
+                    .fill(profile.swiftUIColor)
+                    .frame(width: 8, height: 8)
+                Text(profile.name)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
             Button(action: onClose) {
                 Image(systemName: "xmark")

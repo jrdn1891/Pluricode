@@ -113,13 +113,12 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: profile and startup script move from terminal node → worktree. When a worktree opens in a pane, the agent auto-runs if a startup script is set.
 
-- [ ] Per-worktree config at `{worktree}/.xyzterminal/worktree.json` with `agentProfileID` and `startupScript`.
-- [ ] `WorktreeManager` load/save of the config.
-- [ ] Sidebar: right-click a worktree → Configure (sheet): pick an agent profile, edit startup script.
-- [ ] New Worktree sheet: include profile picker + startup script from the start.
-- [ ] When `TerminalSession` starts in a pane: if a profile exists, `ProfileInjector` writes CLAUDE.md. If a startup script exists, `scheduleStartupScript` runs it.
-- [ ] Pane header shows the profile swatch + name if assigned.
-- [ ] Verify: configure a worktree with Claude Code + startup script; open it in a pane; Claude Code auto-launches.
+- [x] `Worktree/WorktreeConfig.swift` holds agentProfileID + startupScript, loaded from `{worktree}/.xyzterminal/worktree.json`.
+- [x] `Agent/AgentProfileStore.swift` is global, UserDefaults-backed, seeded from `AgentProfile.defaults`. Injected from `XyzterminalApp` into the sidebar and workspace.
+- [x] Sidebar "Configure..." context menu on worktree rows opens a sheet with profile picker + startup script.
+- [x] New Worktree sheet now includes profile picker + startup script; saves the config alongside git worktree creation.
+- [x] `TerminalHost.startIfNeeded` loads the config, writes CLAUDE.md via `ProfileInjector`, and schedules the startup script.
+- [x] `WorktreeRow` and pane header show a color swatch + profile name when assigned.
 
 ### M6 — Task panes
 

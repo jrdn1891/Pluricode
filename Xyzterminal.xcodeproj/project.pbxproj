@@ -18,10 +18,12 @@
 		74457D2DE366B73DC7A15C7B /* RepoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53F1D0451E9B5EFF0BA15B1 /* RepoStore.swift */; };
 		75BCAF9654263365D4DC10BD /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 731627EE2D7DF61DFD02ADDE /* SwiftTerm */; };
 		7666026E194745D4FF68B0BD /* TerminalHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA34D13C14453D471A75A8BD /* TerminalHost.swift */; };
+		78C57035C1719895CAE50A59 /* AgentProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ED268ECF7DD59F0CBE0EC5C /* AgentProfileStore.swift */; };
 		796876B5EEE08B154090A53A /* WorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2150572CE6EEA9DF3537CEBD /* WorkspaceView.swift */; };
 		7C3F4526734E5D2CD133071B /* AgentDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CFDE6700E81D5C6B4455E4 /* AgentDefinition.swift */; };
 		819598C5ABB6655AF40AC8B0 /* XyzterminalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93E3027195DC0BEA489C7CB5 /* XyzterminalApp.swift */; };
 		B4D8CFC8DB2B1A4211DA1C80 /* Worktree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E1EC637C98D51034186555 /* Worktree.swift */; };
+		B8D92654BBEE065E05FF3702 /* WorktreeConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F93C3FCE4A44D4D3BF9C074 /* WorktreeConfig.swift */; };
 		CC14D0F279F5583D5667B0D4 /* TileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D8807F79D451D6669CB351 /* TileView.swift */; };
 		CD9D32DD5990399A0B439235 /* AgentProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9C9B62C0A82E76AD43A88F /* AgentProfile.swift */; };
 		D3774A137E5C81B828300A63 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB265D25F3219E4571B8447D /* main.swift */; };
@@ -38,10 +40,12 @@
 		3E9C9B62C0A82E76AD43A88F /* AgentProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfile.swift; sourceTree = "<group>"; };
 		50E1EC637C98D51034186555 /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
 		51FB01DA723BBB40D3DC9DEF /* WorktreeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeManager.swift; sourceTree = "<group>"; };
+		5ED268ECF7DD59F0CBE0EC5C /* AgentProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfileStore.swift; sourceTree = "<group>"; };
 		5F76534926A9A9F7A3B41892 /* SplitDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDivider.swift; sourceTree = "<group>"; };
 		636E45B2BF07B7864B35E7D7 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		659DDF23C27DB244C74B8FB1 /* Xyzterminal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Xyzterminal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		758E84811F94A5C7522D707C /* TileNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileNode.swift; sourceTree = "<group>"; };
+		7F93C3FCE4A44D4D3BF9C074 /* WorktreeConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeConfig.swift; sourceTree = "<group>"; };
 		88D413E0D0A7B412073F18F4 /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
 		93E3027195DC0BEA489C7CB5 /* XyzterminalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XyzterminalApp.swift; sourceTree = "<group>"; };
 		D3D8807F79D451D6669CB351 /* TileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileView.swift; sourceTree = "<group>"; };
@@ -78,6 +82,7 @@
 			isa = PBXGroup;
 			children = (
 				50E1EC637C98D51034186555 /* Worktree.swift */,
+				7F93C3FCE4A44D4D3BF9C074 /* WorktreeConfig.swift */,
 				51FB01DA723BBB40D3DC9DEF /* WorktreeManager.swift */,
 			);
 			path = Worktree;
@@ -141,6 +146,7 @@
 			children = (
 				23CFDE6700E81D5C6B4455E4 /* AgentDefinition.swift */,
 				3E9C9B62C0A82E76AD43A88F /* AgentProfile.swift */,
+				5ED268ECF7DD59F0CBE0EC5C /* AgentProfileStore.swift */,
 				1522F6957B93725AE97A8077 /* RoleInjector.swift */,
 			);
 			path = Agent;
@@ -240,6 +246,7 @@
 			files = (
 				7C3F4526734E5D2CD133071B /* AgentDefinition.swift in Sources */,
 				CD9D32DD5990399A0B439235 /* AgentProfile.swift in Sources */,
+				78C57035C1719895CAE50A59 /* AgentProfileStore.swift in Sources */,
 				207C692E80710428C5318E6B /* RepoSidebarView.swift in Sources */,
 				74457D2DE366B73DC7A15C7B /* RepoStore.swift in Sources */,
 				5CEEEFBDD7CADE7AB369CFC0 /* RoleInjector.swift in Sources */,
@@ -253,6 +260,7 @@
 				5E6E2222C66716774B9BA58E /* Workspace.swift in Sources */,
 				796876B5EEE08B154090A53A /* WorkspaceView.swift in Sources */,
 				B4D8CFC8DB2B1A4211DA1C80 /* Worktree.swift in Sources */,
+				B8D92654BBEE065E05FF3702 /* WorktreeConfig.swift in Sources */,
 				EEA5CB94D64EE82CAA321F1C /* WorktreeManager.swift in Sources */,
 				819598C5ABB6655AF40AC8B0 /* XyzterminalApp.swift in Sources */,
 				D3774A137E5C81B828300A63 /* main.swift in Sources */,

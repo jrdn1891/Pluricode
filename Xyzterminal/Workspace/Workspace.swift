@@ -4,13 +4,15 @@ import Observation
 @Observable
 final class Workspace {
     let repo: RepoEntry
+    let profileStore: AgentProfileStore
     let tiling: Tiling
     var terminalHosts: [UUID: TerminalHost] = [:]
 
     private var saveTask: Task<Void, Never>?
 
-    init(repo: RepoEntry) {
+    init(repo: RepoEntry, profileStore: AgentProfileStore) {
         self.repo = repo
+        self.profileStore = profileStore
         self.tiling = Tiling()
     }
 

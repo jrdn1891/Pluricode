@@ -2,11 +2,13 @@ import SwiftUI
 
 struct RepoSidebarView: View {
     let repoStore: RepoStore
+    let profileStore: AgentProfileStore
     @State private var expanded: Set<UUID> = []
     @State private var worktrees: [UUID: [Worktree]] = [:]
     @State private var newWorktreeRepo: RepoEntry?
     @State private var deleteCandidate: DeleteCandidate?
     @State private var renameTarget: RenameTarget?
+    @State private var configureTarget: RenameTarget?
 
     var body: some View {
         List(selection: Binding(
@@ -28,10 +30,13 @@ struct RepoSidebarView: View {
             .padding()
         }
         .sheet(item: $newWorktreeRepo) { repo in
-            NewWorktreeSheet(repo: repo) { refresh(repo) }
+            NewWorktreeSheet(repo: repo, profileStore: profileStore) { refresh(repo) }
         }
         .sheet(item: $renameTarget) { target in
             RenameWorktreeSheet(target: target) { refresh(target.repo) }
+        }
+        .sheet(item: $configureTarget) { target in
+            ConfigureWorktreeSheet(target: target, profileStore: profileStore)
         }
         .alert(item: $deleteCandidate) { cand in
             Alert(
@@ -62,9 +67,12 @@ struct RepoSidebarView: View {
         if expanded.contains(repo.id) {
             let list = worktrees[repo.id] ?? []
             ForEach(list) { wt in
-                WorktreeRow(worktree: wt)
+                WorktreeRow(worktree: wt, profileStore: profileStore)
                     .padding(.leading, 20)
                     .contextMenu {
+                        Button("Configure...") {
+                            configureTarget = RenameTarget(repo: repo, worktree: wt)
+                        }
                         Button("Rename...") {
                             renameTarget = RenameTarget(repo: repo, worktree: wt)
                         }
@@ -185,6 +193,13 @@ struct RepoRow: View {
 
 struct WorktreeRow: View {
     let worktree: Worktree
+    let profileStore: AgentProfileStore
+
+    private var assignedProfile: AgentProfile? {
+        let config = WorktreeConfig.load(at: worktree.path)
+        guard let id = config.agentProfileID else { return nil }
+        return profileStore.profile(id: id)
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -192,8 +207,18 @@ struct WorktreeRow: View {
                 .foregroundStyle(.secondary)
                 .font(.caption)
             VStack(alignment: .leading, spacing: 1) {
-                Text(worktree.displayName)
-                    .font(.body)
+                HStack(spacing: 4) {
+                    Text(worktree.displayName)
+                        .font(.body)
+                    if let profile = assignedProfile {
+                        Circle()
+                            .fill(profile.swiftUIColor)
+                            .frame(width: 8, height: 8)
+                        Text(profile.name)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Text(worktree.branch)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -215,12 +240,47 @@ struct WorktreeRow: View {
     }
 }
 
+private struct WorktreeConfigFields: View {
+    @Binding var agentProfileID: UUID?
+    @Binding var startupScript: String
+    let profileStore: AgentProfileStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Agent Profile").font(.caption).foregroundStyle(.secondary)
+                Picker("", selection: $agentProfileID) {
+                    Text("None").tag(UUID?.none)
+                    ForEach(profileStore.profiles) { profile in
+                        Text(profile.name).tag(UUID?.some(profile.id))
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Startup Script").font(.caption).foregroundStyle(.secondary)
+                TextField("claude --dangerously-skip-permissions", text: $startupScript, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...5)
+                Text("Runs in the pane's shell after it opens in this worktree.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
 private struct NewWorktreeSheet: View {
     let repo: RepoEntry
+    let profileStore: AgentProfileStore
     let onCreated: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
     @State private var baseBranch: String = ""
+    @State private var agentProfileID: UUID?
+    @State private var startupScript: String = ""
     @State private var error: String?
     @State private var isCreating = false
 
@@ -244,6 +304,14 @@ private struct NewWorktreeSheet: View {
                     .textFieldStyle(.roundedBorder)
             }
 
+            Divider()
+
+            WorktreeConfigFields(
+                agentProfileID: $agentProfileID,
+                startupScript: $startupScript,
+                profileStore: profileStore
+            )
+
             if let error {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
@@ -258,7 +326,7 @@ private struct NewWorktreeSheet: View {
             }
         }
         .padding(24)
-        .frame(width: 420)
+        .frame(width: 460)
         .onAppear {
             if let wm = WorktreeManager(repoRoot: repo.path) {
                 baseBranch = wm.defaultBranch()
@@ -276,7 +344,15 @@ private struct NewWorktreeSheet: View {
         isCreating = true
         error = nil
         do {
-            _ = try wm.createWorktree(name: cleanName, baseBranch: baseBranch.isEmpty ? wm.defaultBranch() : baseBranch)
+            let path = try wm.createWorktree(
+                name: cleanName,
+                baseBranch: baseBranch.isEmpty ? wm.defaultBranch() : baseBranch
+            )
+            let config = WorktreeConfig(
+                agentProfileID: agentProfileID,
+                startupScript: startupScript.isEmpty ? nil : startupScript
+            )
+            config.save(at: path.path)
             onCreated()
             dismiss()
         } catch let WorktreeError.createFailed(message) {
@@ -292,6 +368,51 @@ private struct NewWorktreeSheet: View {
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_/.")
         let lowered = raw.lowercased().replacingOccurrences(of: " ", with: "-")
         return String(lowered.unicodeScalars.filter { allowed.contains($0) })
+    }
+}
+
+private struct ConfigureWorktreeSheet: View {
+    let target: RenameTarget
+    let profileStore: AgentProfileStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var agentProfileID: UUID?
+    @State private var startupScript: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Configure \(target.worktree.displayName)")
+                .font(.headline)
+
+            WorktreeConfigFields(
+                agentProfileID: $agentProfileID,
+                startupScript: $startupScript,
+                profileStore: profileStore
+            )
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Save") { save() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 460)
+        .onAppear {
+            let config = WorktreeConfig.load(at: target.worktree.path)
+            agentProfileID = config.agentProfileID
+            startupScript = config.startupScript ?? ""
+        }
+    }
+
+    private func save() {
+        let config = WorktreeConfig(
+            agentProfileID: agentProfileID,
+            startupScript: startupScript.isEmpty ? nil : startupScript
+        )
+        config.save(at: target.worktree.path)
+        dismiss()
     }
 }
 
