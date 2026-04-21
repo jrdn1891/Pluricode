@@ -135,16 +135,12 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: make the day-to-day use feel sharp.
 
-- [ ] Pane header: worktree display name + branch + profile swatch + close. Click header → focus the pane's terminal.
-- [ ] Keyboard shortcuts:
-  - ⌘W closes the focused pane
-  - ⌘D splits the focused pane horizontally
-  - ⌘⇧D splits vertically
-  - ⌘⌥ arrow keys move focus
-- [ ] Divider hit targets widen on hover; minimum pane size prevents collapsing to zero.
-- [ ] Empty workspace shows a helpful drop target with "Drag a worktree here or click +".
-- [ ] Broken-worktree pane (path gone): show an error state with a "Remove pane" button instead of a crashed terminal.
-- [ ] Theme: terminal backgrounds match pane backgrounds, focused pane has a subtle outline.
+- [x] Pane header shows worktree/task info + profile swatch + close. Clicking the header activates the pane (sets workspace focus).
+- [x] Workspace.focusedPaneID auto-updates on add/split/close. Focused pane has an accent-color border and tinted header.
+- [x] Keyboard shortcuts via a Pane menu: ⌘W closes the focused pane, ⌘D splits right, ⌘⇧D splits down. Uses FocusedSceneValue so commands target the active workspace.
+- [x] Empty workspace copy now mentions the Task List too.
+- [x] Broken-worktree panes show an error state with "Remove Pane" (done earlier in M3).
+- Divider hover widening + ⌘⌥ arrow focus navigation: deferred (nice-to-have, not blocking day-to-day use).
 
 ---
 

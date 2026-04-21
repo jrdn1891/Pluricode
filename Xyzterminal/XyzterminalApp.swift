@@ -38,6 +38,35 @@ struct XyzterminalApp: App {
             }
         }
         .defaultSize(width: 1200, height: 800)
+        .commands {
+            CommandMenu("Pane") {
+                PaneCommands()
+            }
+        }
+    }
+}
+
+struct PaneCommands: View {
+    @FocusedValue(\.workspace) var workspace
+
+    var body: some View {
+        Button("Close Pane") {
+            workspace?.closeFocusedPane()
+        }
+        .keyboardShortcut("w", modifiers: .command)
+        .disabled(workspace?.focusedPaneID == nil)
+
+        Button("Split Right") {
+            workspace?.splitFocusedPane(direction: .horizontal)
+        }
+        .keyboardShortcut("d", modifiers: .command)
+        .disabled(workspace?.focusedPaneID == nil)
+
+        Button("Split Down") {
+            workspace?.splitFocusedPane(direction: .vertical)
+        }
+        .keyboardShortcut("d", modifiers: [.command, .shift])
+        .disabled(workspace?.focusedPaneID == nil)
     }
 }
 

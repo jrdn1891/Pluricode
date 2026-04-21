@@ -9,6 +9,7 @@ struct WorkspaceView: View {
         Group {
             if let workspace {
                 WorkspaceBody(workspace: workspace)
+                    .focusedSceneValue(\.workspace, workspace)
             } else {
                 Color.clear
             }
@@ -53,9 +54,11 @@ private struct EmptyWorkspace: View {
             Text("Drag a worktree here")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-            Text("Expand a repository in the sidebar to find its worktrees.")
+            Text("Or drag the Task List from the sidebar to jot down quick notes.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
@@ -79,7 +82,8 @@ private struct WorkspacePane: View {
     let workspace: Workspace
 
     var body: some View {
-        PaneFrame {
+        let focused = workspace.focusedPaneID == pane.id
+        PaneFrame(focused: focused) {
             switch pane.content {
             case .terminal(let worktreeID):
                 TerminalPaneBody(paneID: pane.id, worktreeID: worktreeID, workspace: workspace)
@@ -91,6 +95,7 @@ private struct WorkspacePane: View {
 }
 
 private struct PaneFrame<Content: View>: View {
+    let focused: Bool
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -98,7 +103,10 @@ private struct PaneFrame<Content: View>: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay {
                 RoundedRectangle(cornerRadius: 4)
-                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                    .stroke(
+                        focused ? Color.accentColor : Color.secondary.opacity(0.2),
+                        lineWidth: focused ? 2 : 1
+                    )
                     .allowsHitTesting(false)
             }
     }
@@ -113,6 +121,8 @@ private struct TaskPaneBody: View {
         GeometryReader { geo in
             TaskPaneView(
                 store: workspace.taskStore,
+                focused: workspace.focusedPaneID == paneID,
+                onActivate: { workspace.setFocus(paneID: paneID) },
                 onClose: { workspace.closePane(paneID: paneID) }
             )
             .frame(width: geo.size.width, height: geo.size.height)
@@ -145,6 +155,8 @@ private struct TerminalPaneBody: View {
                 title: displayName,
                 branch: worktreeID,
                 profile: resolveProfile(),
+                focused: workspace.focusedPaneID == paneID,
+                onActivate: { workspace.setFocus(paneID: paneID) },
                 onClose: { workspace.closePane(paneID: paneID) }
             )
             if let path = resolveWorktreePath() {
@@ -194,6 +206,8 @@ private struct PaneHeader: View {
     let title: String
     let branch: String
     let profile: AgentProfile?
+    let focused: Bool
+    let onActivate: () -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -224,7 +238,9 @@ private struct PaneHeader: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color.secondary.opacity(0.1))
+        .background(focused ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onActivate)
     }
 }
 

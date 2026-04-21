@@ -1,5 +1,17 @@
 import Foundation
 import Observation
+import SwiftUI
+
+struct FocusedWorkspaceKey: FocusedValueKey {
+    typealias Value = Workspace
+}
+
+extension FocusedValues {
+    var workspace: Workspace? {
+        get { self[FocusedWorkspaceKey.self] }
+        set { self[FocusedWorkspaceKey.self] = newValue }
+    }
+}
 
 @Observable
 final class Workspace {
@@ -8,6 +20,7 @@ final class Workspace {
     let tiling: Tiling
     let taskStore: TaskStore
     var terminalHosts: [UUID: TerminalHost] = [:]
+    var focusedPaneID: UUID?
 
     private var saveTask: Task<Void, Never>?
 
@@ -66,12 +79,14 @@ final class Workspace {
     }
 
     func addPane(_ content: PaneContent) {
-        _ = tiling.addPane(content)
+        let id = tiling.addPane(content)
+        focusedPaneID = id
         scheduleSave()
     }
 
     func splitPane(paneID: UUID, edge: TileEdge, content: PaneContent) {
-        _ = tiling.split(paneID: paneID, edge: edge, newContent: content)
+        let id = tiling.split(paneID: paneID, edge: edge, newContent: content)
+        focusedPaneID = id
         scheduleSave()
     }
 
@@ -81,12 +96,45 @@ final class Workspace {
             host.teardown()
         }
         tiling.remove(paneID: paneID)
+        if focusedPaneID == paneID { focusedPaneID = nil }
         scheduleSave()
     }
 
     func setWeights(splitID: UUID, weights: [Float]) {
         tiling.setWeights(splitID: splitID, weights: weights)
         scheduleSave()
+    }
+
+    func setFocus(paneID: UUID?) {
+        focusedPaneID = paneID
+    }
+
+    func closeFocusedPane() {
+        guard let id = focusedPaneID else { return }
+        closePane(paneID: id)
+    }
+
+    func splitFocusedPane(direction: TileDirection) {
+        guard let id = focusedPaneID, let pane = pane(id: id) else { return }
+        let edge: TileEdge = direction == .horizontal ? .right : .bottom
+        splitPane(paneID: id, edge: edge, content: pane.content)
+    }
+
+    func pane(id: UUID) -> Pane? {
+        Self.findPane(id: id, in: tiling.root)
+    }
+
+    private static func findPane(id: UUID, in node: TileNode?) -> Pane? {
+        guard let node else { return nil }
+        switch node {
+        case .pane(let p):
+            return p.id == id ? p : nil
+        case .split(let s):
+            for child in s.children {
+                if let found = findPane(id: id, in: child) { return found }
+            }
+            return nil
+        }
     }
 }
 
