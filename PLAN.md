@@ -131,6 +131,15 @@ Each milestone has a checklist. Tick items as completed across sessions.
 - [x] Sidebar `Panes` section with a draggable "Task List" row (`.newTaskPane`).
 - [x] Multiple task panes share the same repo-scoped list (expected for M6).
 
+### M8 — Rearrange panes
+
+**Goal**: drag existing panes to new positions within the canvas. Sessions survive the move.
+
+- [x] `Tiling.movePane(sourceID:to:adjacentTo:)` and `Tiling.swapPanes(a:b:)`. Move preserves the Pane struct (id + content) so TerminalHost sessions keep running.
+- [x] `TilingDragPayload.Kind.movePane(paneID:)` and a single `Workspace.acceptDrop(payload:on:edge:)` dispatcher that handles all kinds. Center drop on another pane swaps.
+- [x] `PaneHeader` and `TaskPaneHeader` are draggable with `.movePane(...)` payloads; tap-to-activate and close button still work alongside the drag.
+- [x] All drop handlers (empty workspace, terminal pane, task pane) route through the dispatcher.
+
 ### M7 — Polish
 
 **Goal**: make the day-to-day use feel sharp.

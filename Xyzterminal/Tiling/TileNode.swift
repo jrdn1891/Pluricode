@@ -46,15 +46,9 @@ struct TilingDragPayload: Codable, Transferable, Hashable {
     enum Kind: Codable, Hashable {
         case newTerminal(worktreeID: String)
         case newTaskPane
+        case movePane(paneID: UUID)
     }
     let kind: Kind
-
-    var paneContent: PaneContent {
-        switch kind {
-        case .newTerminal(let wid): .terminal(worktreeID: wid)
-        case .newTaskPane: .tasks
-        }
-    }
 
     static var transferRepresentation: some TransferRepresentation {
         CodableRepresentation(contentType: .plainText)
@@ -131,6 +125,24 @@ final class Tiling {
     func setWeights(splitID: UUID, weights: [Float]) {
         guard let current = root else { return }
         root = Self.setWeights(splitID: splitID, weights: weights, in: current)
+    }
+
+    func movePane(sourceID: UUID, to edge: TileEdge, adjacentTo targetID: UUID) {
+        guard sourceID != targetID, edge != .center, let current = root else { return }
+        guard let source = Self.findPaneStruct(id: sourceID, in: current) else { return }
+        guard let afterRemoval = Self.remove(paneID: sourceID, from: current) else {
+            root = .pane(source)
+            return
+        }
+        root = Self.insertSibling(source, at: edge, adjacentTo: targetID, in: afterRemoval)
+    }
+
+    func swapPanes(a: UUID, b: UUID) {
+        guard a != b, let current = root else { return }
+        guard let paneA = Self.findPaneStruct(id: a, in: current),
+              let paneB = Self.findPaneStruct(id: b, in: current) else { return }
+        let step1 = Self.replace(paneID: a, with: paneB, in: current)
+        root = Self.replace(paneID: b, with: paneA, in: step1)
     }
 
     var panes: [Pane] {
@@ -221,5 +233,17 @@ extension Tiling {
     static func isPane(_ node: TileNode, id: UUID) -> Bool {
         if case .pane(let p) = node, p.id == id { return true }
         return false
+    }
+
+    static func findPaneStruct(id: UUID, in node: TileNode) -> Pane? {
+        switch node {
+        case .pane(let p):
+            return p.id == id ? p : nil
+        case .split(let s):
+            for child in s.children {
+                if let found = findPaneStruct(id: id, in: child) { return found }
+            }
+            return nil
+        }
     }
 }

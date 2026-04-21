@@ -71,8 +71,7 @@ private struct EmptyWorkspace: View {
         }
         .dropDestination(for: TilingDragPayload.self) { items, _ in
             guard let payload = items.first else { return false }
-            workspace.addPane(payload.paneContent)
-            return true
+            return workspace.acceptDrop(payload: payload, on: nil, edge: .center)
         } isTargeted: { isTargeted = $0 }
     }
 }
@@ -120,6 +119,7 @@ private struct TaskPaneBody: View {
     var body: some View {
         GeometryReader { geo in
             TaskPaneView(
+                paneID: paneID,
                 store: workspace.taskStore,
                 focused: workspace.focusedPaneID == paneID,
                 onActivate: { workspace.setFocus(paneID: paneID) },
@@ -136,8 +136,7 @@ private struct TaskPaneBody: View {
             .dropDestination(for: TilingDragPayload.self) { items, location in
                 guard let payload = items.first else { return false }
                 let edge = TileEdge.zone(for: location, in: geo.size)
-                workspace.splitPane(paneID: paneID, edge: edge, content: payload.paneContent)
-                return true
+                return workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
             } isTargeted: { isTargeted = $0 }
         }
     }
@@ -152,6 +151,7 @@ private struct TerminalPaneBody: View {
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader(
+                paneID: paneID,
                 title: displayName,
                 branch: worktreeID,
                 profile: resolveProfile(),
@@ -172,8 +172,7 @@ private struct TerminalPaneBody: View {
                         .dropDestination(for: TilingDragPayload.self) { items, location in
                             guard let payload = items.first else { return false }
                             let edge = TileEdge.zone(for: location, in: geo.size)
-                            workspace.splitPane(paneID: paneID, edge: edge, content: payload.paneContent)
-                            return true
+                            return workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
                         } isTargeted: { isTargeted = $0 }
                 }
             } else {
@@ -203,6 +202,7 @@ private struct TerminalPaneBody: View {
 }
 
 private struct PaneHeader: View {
+    let paneID: UUID
     let title: String
     let branch: String
     let profile: AgentProfile?
@@ -241,6 +241,16 @@ private struct PaneHeader: View {
         .background(focused ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
         .contentShape(Rectangle())
         .onTapGesture(perform: onActivate)
+        .draggable(TilingDragPayload(kind: .movePane(paneID: paneID))) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.branch")
+                Text(title)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
     }
 }
 

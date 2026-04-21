@@ -124,6 +124,29 @@ final class Workspace {
         Self.findPane(id: id, in: tiling.root)
     }
 
+    @discardableResult
+    func acceptDrop(payload: TilingDragPayload, on targetID: UUID?, edge: TileEdge) -> Bool {
+        switch payload.kind {
+        case .newTerminal(let wid):
+            let content: PaneContent = .terminal(worktreeID: wid)
+            if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
+            else { addPane(content) }
+        case .newTaskPane:
+            if let targetID { splitPane(paneID: targetID, edge: edge, content: .tasks) }
+            else { addPane(.tasks) }
+        case .movePane(let sourceID):
+            guard let targetID, sourceID != targetID else { return false }
+            if edge == .center {
+                tiling.swapPanes(a: sourceID, b: targetID)
+            } else {
+                tiling.movePane(sourceID: sourceID, to: edge, adjacentTo: targetID)
+            }
+            focusedPaneID = sourceID
+            scheduleSave()
+        }
+        return true
+    }
+
     private static func findPane(id: UUID, in node: TileNode?) -> Pane? {
         guard let node else { return nil }
         switch node {

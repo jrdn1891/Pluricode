@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct TaskPaneView: View {
+    let paneID: UUID
     let store: TaskStore
     let focused: Bool
     let onActivate: () -> Void
@@ -11,6 +12,7 @@ struct TaskPaneView: View {
     var body: some View {
         VStack(spacing: 0) {
             TaskPaneHeader(
+                paneID: paneID,
                 remainingCount: store.tasks.filter { !$0.done }.count,
                 totalCount: store.tasks.count,
                 focused: focused,
@@ -109,6 +111,7 @@ private struct TaskRow: View {
 }
 
 private struct TaskPaneHeader: View {
+    let paneID: UUID
     let remainingCount: Int
     let totalCount: Int
     let focused: Bool
@@ -150,5 +153,15 @@ private struct TaskPaneHeader: View {
         .background(focused ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
         .contentShape(Rectangle())
         .onTapGesture(perform: onActivate)
+        .draggable(TilingDragPayload(kind: .movePane(paneID: paneID))) {
+            HStack(spacing: 6) {
+                Image(systemName: "checklist")
+                Text("Tasks")
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
     }
 }
