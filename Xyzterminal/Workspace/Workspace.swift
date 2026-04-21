@@ -6,6 +6,7 @@ final class Workspace {
     let repo: RepoEntry
     let profileStore: AgentProfileStore
     let tiling: Tiling
+    let taskStore: TaskStore
     var terminalHosts: [UUID: TerminalHost] = [:]
 
     private var saveTask: Task<Void, Never>?
@@ -14,6 +15,7 @@ final class Workspace {
         self.repo = repo
         self.profileStore = profileStore
         self.tiling = Tiling()
+        self.taskStore = TaskStore(repoPath: repo.path)
     }
 
     deinit {
@@ -63,13 +65,13 @@ final class Workspace {
         }
     }
 
-    func addTerminal(worktreeID: String) {
-        _ = tiling.addPane(.terminal(worktreeID: worktreeID))
+    func addPane(_ content: PaneContent) {
+        _ = tiling.addPane(content)
         scheduleSave()
     }
 
-    func splitTerminal(paneID: UUID, edge: TileEdge, worktreeID: String) {
-        _ = tiling.split(paneID: paneID, edge: edge, newContent: .terminal(worktreeID: worktreeID))
+    func splitPane(paneID: UUID, edge: TileEdge, content: PaneContent) {
+        _ = tiling.split(paneID: paneID, edge: edge, newContent: content)
         scheduleSave()
     }
 

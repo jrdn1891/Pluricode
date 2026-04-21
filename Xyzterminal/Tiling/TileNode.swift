@@ -45,8 +45,16 @@ enum TileEdge {
 struct TilingDragPayload: Codable, Transferable, Hashable {
     enum Kind: Codable, Hashable {
         case newTerminal(worktreeID: String)
+        case newTaskPane
     }
     let kind: Kind
+
+    var paneContent: PaneContent {
+        switch kind {
+        case .newTerminal(let wid): .terminal(worktreeID: wid)
+        case .newTaskPane: .tasks
+        }
+    }
 
     static var transferRepresentation: some TransferRepresentation {
         CodableRepresentation(contentType: .plainText)
@@ -60,6 +68,7 @@ struct Pane: Identifiable, Hashable, Codable {
 
 enum PaneContent: Hashable, Codable {
     case terminal(worktreeID: String)
+    case tasks
 }
 
 struct Split: Identifiable, Hashable, Codable {

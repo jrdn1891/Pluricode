@@ -67,8 +67,8 @@ private struct EmptyWorkspace: View {
                 .padding(32)
         }
         .dropDestination(for: TilingDragPayload.self) { items, _ in
-            guard let payload = items.first, case .newTerminal(let wid) = payload.kind else { return false }
-            workspace.addTerminal(worktreeID: wid)
+            guard let payload = items.first else { return false }
+            workspace.addPane(payload.paneContent)
             return true
         } isTargeted: { isTargeted = $0 }
     }
@@ -79,9 +79,56 @@ private struct WorkspacePane: View {
     let workspace: Workspace
 
     var body: some View {
-        switch pane.content {
-        case .terminal(let worktreeID):
-            TerminalPaneBody(paneID: pane.id, worktreeID: worktreeID, workspace: workspace)
+        PaneFrame {
+            switch pane.content {
+            case .terminal(let worktreeID):
+                TerminalPaneBody(paneID: pane.id, worktreeID: worktreeID, workspace: workspace)
+            case .tasks:
+                TaskPaneBody(paneID: pane.id, workspace: workspace)
+            }
+        }
+    }
+}
+
+private struct PaneFrame<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay {
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+    }
+}
+
+private struct TaskPaneBody: View {
+    let paneID: UUID
+    let workspace: Workspace
+    @State private var isTargeted = false
+
+    var body: some View {
+        GeometryReader { geo in
+            TaskPaneView(
+                store: workspace.taskStore,
+                onClose: { workspace.closePane(paneID: paneID) }
+            )
+            .frame(width: geo.size.width, height: geo.size.height)
+            .overlay {
+                if isTargeted {
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.accentColor, lineWidth: 3)
+                        .allowsHitTesting(false)
+                }
+            }
+            .dropDestination(for: TilingDragPayload.self) { items, location in
+                guard let payload = items.first else { return false }
+                let edge = TileEdge.zone(for: location, in: geo.size)
+                workspace.splitPane(paneID: paneID, edge: edge, content: payload.paneContent)
+                return true
+            } isTargeted: { isTargeted = $0 }
         }
     }
 }
@@ -112,12 +159,9 @@ private struct TerminalPaneBody: View {
                         }
                         .dropDestination(for: TilingDragPayload.self) { items, location in
                             guard let payload = items.first else { return false }
-                            if case .newTerminal(let wid) = payload.kind {
-                                let edge = TileEdge.zone(for: location, in: geo.size)
-                                workspace.splitTerminal(paneID: paneID, edge: edge, worktreeID: wid)
-                                return true
-                            }
-                            return false
+                            let edge = TileEdge.zone(for: location, in: geo.size)
+                            workspace.splitPane(paneID: paneID, edge: edge, content: payload.paneContent)
+                            return true
                         } isTargeted: { isTargeted = $0 }
                 }
             } else {
@@ -126,12 +170,6 @@ private struct TerminalPaneBody: View {
                     onRemove: { workspace.closePane(paneID: paneID) }
                 )
             }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 4))
-        .overlay {
-            RoundedRectangle(cornerRadius: 4)
-                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                .allowsHitTesting(false)
         }
     }
 

@@ -124,12 +124,12 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: a pane can be a task list instead of a terminal. Users jot down quick todos, bugs, follow-ups, and tick them off. Scoped per-repo. Not wired to agents.
 
-- [ ] `TaskItem` model + persistence at `.xyzterminal/tasks.json`.
-- [ ] `PaneContent.tasks` variant.
-- [ ] `TaskPaneView`: list of items with inline add (Enter to commit), tick to complete, swipe or delete key to remove. Strikethrough for done. Optional "clear completed" menu item.
-- [ ] Sidebar / pane header: "+" menu → "New Terminal Pane" / "New Task Pane". Dropping a task pane anywhere lands it via the same drop zone system.
-- [ ] Multiple task panes allowed (so two can sit side-by-side, e.g. "Now" vs "Backlog"). For now they share the same underlying list. Filtering per-pane: deferred.
-- [ ] Verify: add tasks, tick them, restart, state persists.
+- [x] `Workspace/TaskStore.swift`: `TaskItem` (id, title, done, createdAt) + observable `TaskStore` persisting `.xyzterminal/tasks.json` debounced.
+- [x] `PaneContent.tasks` variant; `TilingDragPayload.Kind.newTaskPane` maps via `paneContent` helper.
+- [x] `Workspace.addPane`/`splitPane` generalized over `PaneContent` so both kinds flow through one path.
+- [x] `TaskPaneView`: header with open/total counts + clear-completed menu + close, list with checkbox, strikethrough, hover-delete, double-click to rename, bottom "Add task..." field.
+- [x] Sidebar `Panes` section with a draggable "Task List" row (`.newTaskPane`).
+- [x] Multiple task panes share the same repo-scoped list (expected for M6).
 
 ### M7 — Polish
 

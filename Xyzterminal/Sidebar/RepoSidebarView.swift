@@ -15,6 +15,9 @@ struct RepoSidebarView: View {
             get: { repoStore.selectedRepoID },
             set: { repoStore.selectedRepoID = $0; repoStore.save() }
         )) {
+            Section("Panes") {
+                TaskPaneDragSource()
+            }
             Section("Repositories") {
                 ForEach(repoStore.repos) { repo in
                     repoSection(repo)
@@ -188,6 +191,31 @@ struct RepoRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+}
+
+struct TaskPaneDragSource: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checklist")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            Text("Task List")
+                .font(.body)
+            Spacer()
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 1)
+        .draggable(TilingDragPayload(kind: .newTaskPane)) {
+            HStack(spacing: 6) {
+                Image(systemName: "checklist")
+                Text("Task List")
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
     }
 }
 
