@@ -4,7 +4,6 @@ import AppKit
 struct XyzterminalApp: App {
     @State private var repoStore = RepoStore()
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
-    @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
         WindowGroup {
@@ -13,7 +12,7 @@ struct XyzterminalApp: App {
                     .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
             } detail: {
                 if let repo = repoStore.selectedRepo {
-                    CanvasHostView(repoEntry: repo)
+                    WorkspaceView(repo: repo)
                         .id(repo.id)
                 } else {
                     EmptyCanvasView(repoStore: repoStore)
@@ -39,19 +38,6 @@ struct XyzterminalApp: App {
             }
         }
         .defaultSize(width: 1200, height: 800)
-        .commands {
-            CommandGroup(after: .windowArrangement) {
-                Button("Open Tiling Demo") {
-                    openWindow(id: "tiling-demo")
-                }
-                .keyboardShortcut("T", modifiers: [.command, .shift])
-            }
-        }
-
-        Window("Tiling Demo", id: "tiling-demo") {
-            TileDemoView()
-        }
-        .defaultSize(width: 1100, height: 700)
     }
 
     private func migrateLastProjectPath() {

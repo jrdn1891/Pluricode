@@ -19,14 +19,17 @@
 		35552AA3C3825F2050CBCEB2 /* MCPToolHandlers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3A160A30691CEF3A14B5074 /* MCPToolHandlers.swift */; };
 		37C5FB8E85289071F0E2FAAB /* SectionLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12249E11B9FCE569380A1B5E /* SectionLayout.swift */; };
 		390A4CD0ACA777C3A7205ADF /* EdgeTessellator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02201F0C75A17562D48C27AB /* EdgeTessellator.swift */; };
+		398197DDA5C1480CE91F0C4A /* TerminalPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C72607C9B7D825688EAEBF3 /* TerminalPaneView.swift */; };
 		3E50581F156D10FD5BF31FC5 /* MinimapToggleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DB0304D134BD660BAE954FA /* MinimapToggleButton.swift */; };
 		4C8709DE55D951E3B1DDA0A9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D87F8A583A9EB1C5FD4461E4 /* Assets.xcassets */; };
 		5CEEEFBDD7CADE7AB369CFC0 /* RoleInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1522F6957B93725AE97A8077 /* RoleInjector.swift */; };
 		5D57A443646FF8535D3E13EB /* CanvasNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4392787B24142856160FC11E /* CanvasNode.swift */; };
+		5E6E2222C66716774B9BA58E /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF5B06FA2B675DA6DA254883 /* Workspace.swift */; };
 		6287387E3489E937477D1901 /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D413E0D0A7B412073F18F4 /* TerminalSession.swift */; };
-		6C4D33B3CA43FA5A74EDC246 /* TileDemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3CF20F6EF5E9F13838510D6 /* TileDemoView.swift */; };
 		74457D2DE366B73DC7A15C7B /* RepoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53F1D0451E9B5EFF0BA15B1 /* RepoStore.swift */; };
 		75BCAF9654263365D4DC10BD /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 731627EE2D7DF61DFD02ADDE /* SwiftTerm */; };
+		7666026E194745D4FF68B0BD /* TerminalHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA34D13C14453D471A75A8BD /* TerminalHost.swift */; };
+		796876B5EEE08B154090A53A /* WorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2150572CE6EEA9DF3537CEBD /* WorkspaceView.swift */; };
 		7C3F4526734E5D2CD133071B /* AgentDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CFDE6700E81D5C6B4455E4 /* AgentDefinition.swift */; };
 		819598C5ABB6655AF40AC8B0 /* XyzterminalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93E3027195DC0BEA489C7CB5 /* XyzterminalApp.swift */; };
 		837A40514EB2A637A85E5CA8 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 86480A7DA3F880A425807B62 /* Shaders.metal */; };
@@ -37,7 +40,6 @@
 		AA740045B2164B17892E9D50 /* EdgeActionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7DC40DC59C77CEDD0917FEC /* EdgeActionOverlay.swift */; };
 		B104974741D566AF819C2D5E /* WorkflowEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9689E33AFEE24585170DB04 /* WorkflowEngine.swift */; };
 		B4D8CFC8DB2B1A4211DA1C80 /* Worktree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E1EC637C98D51034186555 /* Worktree.swift */; };
-		B63EFC79059CB294D4BB7AD4 /* DropOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D5D21B0E360099F4DA7DCBE /* DropOverlay.swift */; };
 		C377F10C1AAF268D031C7FE5 /* CanvasRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 353ACE31292C9B8FC443FA0D /* CanvasRenderer.swift */; };
 		C4EB1CFBAA6D3556A2ED14EE /* WiringAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10C8A8096FCB0BC174039925 /* WiringAction.swift */; };
 		CC14D0F279F5583D5667B0D4 /* TileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D8807F79D451D6669CB351 /* TileView.swift */; };
@@ -55,7 +57,9 @@
 		10C8A8096FCB0BC174039925 /* WiringAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WiringAction.swift; sourceTree = "<group>"; };
 		12249E11B9FCE569380A1B5E /* SectionLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionLayout.swift; sourceTree = "<group>"; };
 		1522F6957B93725AE97A8077 /* RoleInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleInjector.swift; sourceTree = "<group>"; };
+		1C72607C9B7D825688EAEBF3 /* TerminalPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPaneView.swift; sourceTree = "<group>"; };
 		1E01E2B498EEB596A16D650F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2150572CE6EEA9DF3537CEBD /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
 		23CFDE6700E81D5C6B4455E4 /* AgentDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDefinition.swift; sourceTree = "<group>"; };
 		27D4A12EEDA1B0D649AF0F2B /* CanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasView.swift; sourceTree = "<group>"; };
 		2CCFED7E3CEC873724BCA51D /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
@@ -67,7 +71,6 @@
 		4C69E6FCFD7948F8532745AC /* TerminalConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalConfigSheet.swift; sourceTree = "<group>"; };
 		50E1EC637C98D51034186555 /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
 		51FB01DA723BBB40D3DC9DEF /* WorktreeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeManager.swift; sourceTree = "<group>"; };
-		5D5D21B0E360099F4DA7DCBE /* DropOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropOverlay.swift; sourceTree = "<group>"; };
 		5F76534926A9A9F7A3B41892 /* SplitDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDivider.swift; sourceTree = "<group>"; };
 		636E45B2BF07B7864B35E7D7 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		659DDF23C27DB244C74B8FB1 /* Xyzterminal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Xyzterminal.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -84,12 +87,13 @@
 		A7DC40DC59C77CEDD0917FEC /* EdgeActionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeActionOverlay.swift; sourceTree = "<group>"; };
 		ACBBCA8344A5D6C7560450FC /* Xyzterminal-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Xyzterminal-Bridging-Header.h"; sourceTree = "<group>"; };
 		D14D7FB38C4353BA4DFE0F6D /* CanvasDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasDocument.swift; sourceTree = "<group>"; };
-		D3CF20F6EF5E9F13838510D6 /* TileDemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileDemoView.swift; sourceTree = "<group>"; };
 		D3D8807F79D451D6669CB351 /* TileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileView.swift; sourceTree = "<group>"; };
 		D7DBE7DB259BC8D3612E88D7 /* RepoSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoSidebarView.swift; sourceTree = "<group>"; };
 		D87F8A583A9EB1C5FD4461E4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		DA34D13C14453D471A75A8BD /* TerminalHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalHost.swift; sourceTree = "<group>"; };
 		DB265D25F3219E4571B8447D /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		DE2C911F2D94AFB2D79B4566 /* ShaderTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ShaderTypes.h; sourceTree = "<group>"; };
+		DF5B06FA2B675DA6DA254883 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
 		E53F1D0451E9B5EFF0BA15B1 /* RepoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoStore.swift; sourceTree = "<group>"; };
 		E7106615CDC2B36FE1BE6436 /* Xyzterminal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Xyzterminal.entitlements; sourceTree = "<group>"; };
 		F31288F66C2AA3D52A531EB5 /* NodeLabelOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeLabelOverlay.swift; sourceTree = "<group>"; };
@@ -145,6 +149,17 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		324C4D7DB9241F7B03B47DE5 /* Workspace */ = {
+			isa = PBXGroup;
+			children = (
+				DA34D13C14453D471A75A8BD /* TerminalHost.swift */,
+				1C72607C9B7D825688EAEBF3 /* TerminalPaneView.swift */,
+				DF5B06FA2B675DA6DA254883 /* Workspace.swift */,
+				2150572CE6EEA9DF3537CEBD /* WorkspaceView.swift */,
+			);
+			path = Workspace;
+			sourceTree = "<group>";
+		};
 		50B2AC34A1788A28A10AF7EA /* Terminal */ = {
 			isa = PBXGroup;
 			children = (
@@ -168,9 +183,7 @@
 		87A3092979ED97CE83FF9559 /* Tiling */ = {
 			isa = PBXGroup;
 			children = (
-				5D5D21B0E360099F4DA7DCBE /* DropOverlay.swift */,
 				5F76534926A9A9F7A3B41892 /* SplitDivider.swift */,
-				D3CF20F6EF5E9F13838510D6 /* TileDemoView.swift */,
 				758E84811F94A5C7522D707C /* TileNode.swift */,
 				D3D8807F79D451D6669CB351 /* TileView.swift */,
 			);
@@ -244,6 +257,7 @@
 				50B2AC34A1788A28A10AF7EA /* Terminal */,
 				87A3092979ED97CE83FF9559 /* Tiling */,
 				CA5334DCA4B6115B51826C72 /* Wiring */,
+				324C4D7DB9241F7B03B47DE5 /* Workspace */,
 				011495FBCC7C652430732943 /* Worktree */,
 			);
 			path = Xyzterminal;
@@ -329,7 +343,6 @@
 				5D57A443646FF8535D3E13EB /* CanvasNode.swift in Sources */,
 				C377F10C1AAF268D031C7FE5 /* CanvasRenderer.swift in Sources */,
 				326C77A2A25CC6040182E319 /* CanvasView.swift in Sources */,
-				B63EFC79059CB294D4BB7AD4 /* DropOverlay.swift in Sources */,
 				AA740045B2164B17892E9D50 /* EdgeActionOverlay.swift in Sources */,
 				390A4CD0ACA777C3A7205ADF /* EdgeTessellator.swift in Sources */,
 				9F8D46073423448C83E1E607 /* HitTesting.swift in Sources */,
@@ -348,14 +361,17 @@
 				1359D40DF1BB142B6F3ED4CA /* SplitDivider.swift in Sources */,
 				DBE8CD8B5B15EB8037813D8F /* TaskCardEditor.swift in Sources */,
 				EBFC9E9C1BA014DA22FA01C4 /* TerminalConfigSheet.swift in Sources */,
+				7666026E194745D4FF68B0BD /* TerminalHost.swift in Sources */,
 				134DDA5C01E4AAEA4D7EC835 /* TerminalManager.swift in Sources */,
+				398197DDA5C1480CE91F0C4A /* TerminalPaneView.swift in Sources */,
 				6287387E3489E937477D1901 /* TerminalSession.swift in Sources */,
 				2A2AF656DE9A9967FD711A2A /* Theme.swift in Sources */,
-				6C4D33B3CA43FA5A74EDC246 /* TileDemoView.swift in Sources */,
 				EF064F2F95F6BE2AA0D28F4D /* TileNode.swift in Sources */,
 				CC14D0F279F5583D5667B0D4 /* TileView.swift in Sources */,
 				C4EB1CFBAA6D3556A2ED14EE /* WiringAction.swift in Sources */,
 				B104974741D566AF819C2D5E /* WorkflowEngine.swift in Sources */,
+				5E6E2222C66716774B9BA58E /* Workspace.swift in Sources */,
+				796876B5EEE08B154090A53A /* WorkspaceView.swift in Sources */,
 				B4D8CFC8DB2B1A4211DA1C80 /* Worktree.swift in Sources */,
 				EEA5CB94D64EE82CAA321F1C /* WorktreeManager.swift in Sources */,
 				819598C5ABB6655AF40AC8B0 /* XyzterminalApp.swift in Sources */,

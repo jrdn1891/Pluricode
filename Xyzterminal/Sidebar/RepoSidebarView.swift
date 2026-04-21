@@ -198,8 +198,20 @@ struct WorktreeRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Spacer()
         }
+        .contentShape(Rectangle())
         .padding(.vertical, 1)
+        .draggable(TilingDragPayload(kind: .newTerminal(worktreeID: worktree.branch))) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.branch")
+                Text(worktree.displayName)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
     }
 }
 

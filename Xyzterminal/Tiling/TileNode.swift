@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import CoreGraphics
+import CoreTransferable
 
 enum TileDirection: String, Codable {
     case horizontal
@@ -23,25 +25,51 @@ enum TileEdge {
         case .bottom, .right, .center: false
         }
     }
+
+    static func zone(for point: CGPoint, in size: CGSize) -> TileEdge {
+        guard size.width > 0, size.height > 0 else { return .center }
+        let leftFrac = point.x / size.width
+        let rightFrac = 1 - leftFrac
+        let topFrac = point.y / size.height
+        let bottomFrac = 1 - topFrac
+        let threshold: CGFloat = 0.25
+        let minVal = min(leftFrac, rightFrac, topFrac, bottomFrac)
+        guard minVal < threshold else { return .center }
+        if minVal == leftFrac { return .left }
+        if minVal == rightFrac { return .right }
+        if minVal == topFrac { return .top }
+        return .bottom
+    }
 }
 
-struct Pane: Identifiable, Hashable {
+struct TilingDragPayload: Codable, Transferable, Hashable {
+    enum Kind: Codable, Hashable {
+        case newTerminal(worktreeID: String)
+    }
+    let kind: Kind
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .plainText)
+    }
+}
+
+struct Pane: Identifiable, Hashable, Codable {
     let id: UUID
     var content: PaneContent
 }
 
-enum PaneContent: Hashable {
-    case placeholder(label: String)
+enum PaneContent: Hashable, Codable {
+    case terminal(worktreeID: String)
 }
 
-struct Split: Identifiable, Hashable {
+struct Split: Identifiable, Hashable, Codable {
     let id: UUID
     var direction: TileDirection
     var children: [TileNode]
     var weights: [Float]
 }
 
-indirect enum TileNode: Identifiable, Hashable {
+indirect enum TileNode: Identifiable, Hashable, Codable {
     case pane(Pane)
     case split(Split)
 
