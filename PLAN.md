@@ -79,13 +79,12 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: build the recursive split view with colored placeholder panes so we can iterate on geometry and interactions independently.
 
-- [ ] `Tiling/TileNode.swift`: the enum + helpers (`insert`, `remove`, `resize`, `findPane`).
-- [ ] `Tiling/TileView.swift`: SwiftUI recursive view. Uses `GeometryReader` + `HStack`/`VStack` driven by weights.
-- [ ] `Tiling/SplitDivider.swift`: draggable divider that adjusts neighbor weights; min pane size enforced.
-- [ ] `Tiling/DropOverlay.swift`: per-pane hit regions — top/bottom/left/right quadrants split, center replaces.
-- [ ] `Tiling/TileDemoView.swift` (throwaway): standalone window showing the tiling engine with placeholder panes (colored rectangles with labels), a toolbar to add/remove panes, and drag-to-split between them. Deleted in M3.
-- [ ] Collapse rule: when a split has one remaining child, it replaces the split in its parent. When the root is empty, workspace is empty.
-- [ ] Keyboard: arrow keys move focus across panes. Deferred if tricky.
+- [x] `Tiling/TileNode.swift`: enum + `Tiling` observable class with `addPane`, `split`, `remove`, `setWeights`. Collapse rule implemented: single-child splits collapse into their parent.
+- [x] `Tiling/TileView.swift`: recursive SwiftUI view. GeometryReader-driven HStack/VStack, children sized by weights.
+- [x] `Tiling/SplitDivider.swift`: draggable divider; uses cursor resize icons; enforces 0.08 minimum fraction per neighbor.
+- [x] `Tiling/DropOverlay.swift`: per-pane hit regions (top/bottom/left/right/center) computed from drop location; `TilingDragPayload` Transferable for sources; visual zone indicator when targeted.
+- [x] `Tiling/TileDemoView.swift` (throwaway): demo window with draggable placeholder templates in a sidebar; drag onto the empty canvas or onto any existing pane. Opened via `Window > Open Tiling Demo` (⌘⇧T).
+- [ ] Keyboard: arrow keys move focus across panes. Deferred to M7.
 - [ ] Verify visually: 1/2/3/4/5 panes lay out and resize cleanly; drag-to-split feels right.
 
 ### M3 — Terminal panes + Workspace persistence
