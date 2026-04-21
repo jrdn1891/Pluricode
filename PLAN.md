@@ -1,303 +1,163 @@
-# Reactive Workflow Engine — Implementation Plan
+# V2 Plan — Tiled Terminal Workspaces
 
-## Context
+## The pivot
 
-Xyzterminal's core value proposition is combining task tracking with visual workflow building — chaining agents together so a task flows from agent to agent automatically. Today the canvas is manual: the user drags tasks onto terminals one at a time, and nothing reacts when a task completes. The system needs to become a live execution graph where edges are triggers, task completion drives dispatch, agents are configurable entities, and conditional routing enables review loops.
+V1 was a freeform infinite Metal canvas where terminals, task cards, and sections lived as nodes, wired together with bezier edges to form visual workflows. That model is out.
 
----
+V2 is a **tiled terminal workspace**, one per repo. The detail view is a recursively splittable pane layout — tmux/i3 style, no floating windows, no z-order, no overlap. Worktrees are first-class entities listed under each repo in the sidebar. Users open a worktree in a pane; the tiling engine handles the rest.
 
-## Milestone 1: Extract WorkflowEngine from UI
+Goal: observe and manage multiple terminals running in parallel, each scoped to its own worktree.
 
-**Goal**: Move task assignment logic out of the input handler (UI layer) into a shared `WorkflowEngine` that both UI gestures and MCP callbacks can invoke. Pure refactor, no behavior change.
+## End state
 
-**Why first**: Every subsequent milestone needs a central place to assign tasks and send prompts. Right now that logic is buried in `CanvasInputHandler` which MCP handlers can't reach.
+- **Sidebar**: two-level tree. Repos → Worktrees. Create/rename/delete worktrees here. Worktrees are drag sources.
+- **Detail**: a `WorkspaceView` rendering a recursive `TileNode`. Dividers resize freely. Panes hold either a terminal bound to a worktree, or a task list scoped to the repo.
+- **Drop zones**: dropping a worktree on a pane's edge splits that pane; dropping on the center replaces the pane.
+- **Pure tiling**. No tabs. Same worktree may appear in multiple panes (two sessions in the same directory — that's fine).
+- **Agent profile** is a property of the worktree, not the pane. Opening it anywhere respawns the right agent.
+- **Startup script** auto-runs when a worktree opens in a pane.
+- **Task panes**: repo-scoped task lists for the user's own follow-ups, bugs, notes. Not wired into agents.
+- **No edges**, no task cards on a canvas, no sections, no workflow engine, no minimap, no Metal rendering.
 
-### Changes
-
-**New file**: `Xyzterminal/Wiring/WorkflowEngine.swift`
-- `static func assign(taskID:terminalID:document:sessions:)` — moved from `CanvasInputHandler.assignTask` (line 265)
-- `static func buildPrompt(taskData:taskID:terminalID:document:)` — moved from `CanvasInputHandler.buildAssignmentPrompt` (line 290)
-- Keep the existing logic intact: blocker check, edge cleanup, edge creation, status transition, prompt generation, stdin send
-
-**Modified**: `Xyzterminal/Canvas/CanvasInputHandler.swift`
-- `assignTask` becomes a thin delegate: calls `WorkflowEngine.assign(...)` passing `terminalManager?.sessions`
-- Remove `buildAssignmentPrompt` (now lives in WorkflowEngine)
-
-**Modified**: `Xyzterminal/Wiring/WiringAction.swift`
-- No functional change, but `WiringAction` and `WorkflowEngine` now live side-by-side in `Wiring/`
-
-**Fix**: `inferEdgeType` at `CanvasInputHandler.swift:552` — the `(.terminal, .taskCard)` case currently returns `.assignedTo` which is semantically backwards (the terminal isn't "assigned to" the task). Change to `.blocks` or introduce a guard that prevents drawing edges from terminals to tasks (they have no meaning in the workflow model).
-
-### Verification
-- Drag a task onto a terminal — same behavior as before (prompt sent, status transitions)
-- Select edge + Enter — handoff still works via WiringAction
-- MCP `update_task` — still works (no change yet to MCPToolHandlers)
-
----
-
-## Milestone 2: Reactive Dispatch on Task Completion
-
-**Goal**: When an agent marks a task `done` via MCP, the system walks downstream edges and auto-assigns the next unblocked task to its wired terminal. This is the core of chaining.
-
-### Changes
-
-**Modified**: `Xyzterminal/Wiring/WorkflowEngine.swift`
-- Add `static func dispatchDownstream(completedTaskID:document:sessions:)`
-  1. Find all outgoing `blocks` edges where `sourceID == completedTaskID`
-  2. For each target task: call `document.unresolvedBlockers(for: targetID)`
-  3. If empty (all blockers resolved): find an `assignedTo` edge from that target task to a terminal
-  4. If found: call `WorkflowEngine.assign(taskID:terminalID:document:sessions:)`
-  5. If no pre-wired terminal: transition task to `.ready` (signals it's available for manual assignment)
-
-**Modified**: `Xyzterminal/MCP/MCPToolHandlers.swift`
-- In `updateTask` (line 41): after setting status to `done`, call `WorkflowEngine.dispatchDownstream`
-- Pass `sessions` through (already available via the `handle` signature)
-
-**Modified**: `Xyzterminal/Wiring/WorkflowEngine.swift` — `buildPrompt`
-- Gather `result` field from all completed predecessor tasks (walk incoming `blocks` edges where source task is `done`)
-- Add a "## Predecessor Results" section to the prompt with each predecessor's title and result
-- This is how Agent B sees what Agent A produced
-
-### User-facing behavior
-- User draws: Task A `blocks` Task B, Task B `assignedTo` Terminal 2
-- User assigns Task A to Terminal 1 (drag)
-- Agent in Terminal 1 finishes, calls `update_task(status: "done", summary: "...")`
-- System auto-assigns Task B to Terminal 2 with Agent 1's result in the prompt
-- Chain continues
-
-### Verification
-- Set up a two-task chain: A blocks B, B assigned to a terminal
-- Assign A manually, let the agent complete it via MCP
-- Verify B auto-starts with A's result in the prompt
-- Verify a task with multiple blockers only dispatches when ALL are done
-
----
-
-## Milestone 3: Configurable Agent Profiles
-
-**Goal**: Replace the rigid `Role` enum with user-configurable agent profiles. Users create profiles (e.g., "Task Reviewer", "Implementation Engineer", "Code Reviewer") and assign them to terminals. Profiles define the agent's instructions, which get injected into the worktree.
-
-**Why**: The current 4 hardcoded roles (architect/coder/reviewer/tester) can't express workflow-specific behaviors like "check if this task description is complete before passing it to implementation." Configurable profiles let users design agent behaviors that match their workflow.
-
-### Data model changes
-
-**New file**: `Xyzterminal/Agent/AgentProfile.swift`
-```
-struct AgentProfile: Identifiable, Codable {
-    let id: UUID
-    var name: String              // "Task Reviewer", "Backend Coder", etc.
-    var instructions: String      // Injected as CLAUDE.md content
-    var agentDefinition: String   // "Claude Code" or "Codex" — which binary to run
-    var color: SIMD4<Float>       // Visual identifier on canvas
-}
-```
-
-**Modified**: `Xyzterminal/Model/CanvasDocument.swift`
-- Add `var agentProfiles: [UUID: AgentProfile]` — document-level storage
-- Seed with default profiles matching the old roles on first load (architect, coder, reviewer, tester)
-
-**Modified**: `Xyzterminal/Model/CanvasNode.swift`
-- `TerminalNodeData`: replace `role: Role?` with `profileID: UUID?`
-- Remove the `Role` enum entirely
-- Keep `agentName` as a computed property derived from the profile's `agentDefinition`
-
-**Modified**: `Xyzterminal/Model/Persistence.swift`
-- `CanvasSnapshot`: add `agentProfiles: [AgentProfile]`
-- Migration: on load, if old `role` field exists and no profiles, create default profiles and map
-
-**Modified**: `Xyzterminal/Agent/RoleInjector.swift`
-- Rename to `ProfileInjector`
-- `inject(profile:method:worktreePath:)` — writes `profile.instructions` to CLAUDE.md
-- No more hardcoded role content
-
-**Modified**: `Xyzterminal/Terminal/TerminalManager.swift`
-- `sync`: look up profile from `document.agentProfiles[data.profileID]` instead of `data.role`
-- Pass profile to `ProfileInjector.inject`
-
-### UI changes
-
-**Modified**: `Xyzterminal/Canvas/TerminalConfigSheet.swift`
-- Profile picker: dropdown of existing profiles
-- "New Profile" button: opens inline editor for name + instructions
-- Shows the profile color as a swatch
-- Agent definition picker (Claude Code / Codex)
-
-**Modified**: `Xyzterminal/Canvas/CanvasRenderer.swift`
-- Terminal node title bar tinted with profile color
-- Profile name displayed in the node label overlay
-
-### Verification
-- Create a custom profile "Task Quality Checker" with instructions
-- Assign it to a terminal
-- Verify CLAUDE.md in the worktree contains the custom instructions
-- Verify the terminal renders with the profile name and color
-- Verify old canvases load correctly (migration from Role to profileID)
-
----
-
-## Milestone 4: Terminal Status via MCP + Availability
-
-**Goal**: Agents can report their own status (idle/working) via MCP. The dispatch system uses this to prefer idle terminals when auto-assigning.
-
-### Changes
-
-**Modified**: `Xyzterminal/MCP/MCPToolHandlers.swift`
-- Add `update_terminal_status` tool
-- Accepts `status: "idle" | "working" | "waiting" | "error"`
-- Updates `TerminalNodeData.status` on the calling node
-- Validates the nodeID matches a terminal node
-
-**Modified**: `Xyzterminal/Wiring/WorkflowEngine.swift`
-- `dispatchDownstream`: when looking for a terminal to assign to, check `TerminalNodeData.status`
-- If the wired terminal is busy (working), queue the task as `.ready` instead of force-assigning
-- Add `static func dispatchReady(document:sessions:)` — scans for `.ready` tasks with idle wired terminals and assigns them
-- Call `dispatchReady` when a terminal transitions to `.idle`
-
-**Modified**: `Xyzterminal/MCP/MCPToolHandlers.swift`
-- After `update_terminal_status` sets idle, call `WorkflowEngine.dispatchReady`
-
-### Verification
-- Agent calls `update_terminal_status(status: "idle")` after completing work
-- A queued `.ready` task auto-assigns to the now-idle terminal
-- A task whose wired terminal is busy stays `.ready` until the terminal is free
-
----
-
-## Milestone 5: Conditional Routing and Review Loops
-
-**Goal**: Agents produce structured outcomes. Edges carry conditions. The system routes tasks to different downstream paths based on outcomes. This enables the review loop pattern: review agent → [approved: implementation] or [needs_info: flag for human].
-
-### Data model changes
-
-**Modified**: `Xyzterminal/Model/CanvasNode.swift`
-- `TaskCardData`: add `var outcome: String = ""` — free-form string set by the agent (e.g., "approved", "needs_changes", "needs_human_review")
-
-**Modified**: `Xyzterminal/Model/CanvasDocument.swift`
-- `Edge`: add `var condition: String?` — if set, this edge only fires when the source task's outcome matches
-- `EdgeType`: add `.flowsTo` case — explicit sequential flow (distinct from `.blocks` which is a dependency gate)
-
-**Modified**: `Xyzterminal/MCP/MCPToolHandlers.swift`
-- `update_task`: accept optional `outcome` parameter
-- Agent calls: `update_task(status: "done", outcome: "approved", summary: "...")`
-
-**Modified**: `Xyzterminal/Wiring/WorkflowEngine.swift`
-- `dispatchDownstream`: walk both `blocks` and `flowsTo` edges
-- For edges with a `condition`: only follow if `completedTask.outcome == edge.condition`
-- For edges without a condition: always follow (backwards compatible)
-- Special outcome `"needs_human_review"`: transition target task to a new `.flagged` status instead of auto-assigning; don't dispatch further
-
-**Modified**: `Xyzterminal/Model/CanvasNode.swift`
-- `TaskCardData.Status`: add `.flagged` case — task needs human attention before proceeding
-
-### UI changes
-
-**Modified**: `Xyzterminal/Canvas/EdgeActionOverlay.swift` (or equivalent)
-- When an edge is selected, show a condition field where the user can type the matching outcome
-- Display the condition as a label on the edge
-
-**Modified**: `Xyzterminal/Canvas/CanvasRenderer.swift`
-- Render condition labels on edges (small text near the midpoint of the bezier)
-- Render `.flagged` tasks with a distinct visual (amber/warning color)
-
-### The review loop pattern
-```
-[Task A: "Implement login"] 
-    → (flowsTo) [Task B: "Review implementation"] assigned to Review Agent
-        → (flowsTo, condition: "approved") [Task C: "Write tests"] assigned to Test Agent
-        → (flowsTo, condition: "needs_changes") [Task A] ← cycle back to implementation
-        → (flowsTo, condition: "needs_human_review") [Task A] ← flagged, workflow pauses
-```
-
-- The review agent finishes with `outcome: "approved"` → Task C auto-assigns
-- The review agent finishes with `outcome: "needs_changes"` → Task A re-enters inProgress on its terminal
-- The review agent finishes with `outcome: "needs_human_review"` → Task A gets flagged, user intervenes
-
-### Verification
-- Build a review loop on the canvas with conditional edges
-- Assign the first task, let it chain through
-- Verify "approved" follows the right path
-- Verify "needs_changes" cycles back
-- Verify "needs_human_review" flags and pauses
-- Verify unconditional edges still work (backwards compatible)
-
----
-
-## Milestone 6: Workflow-Level Prompt Context
-
-**Goal**: When a task is assigned, the agent receives not just the task details but its full position in the workflow DAG — what came before, what comes after, and what the overall pipeline looks like.
-
-### Changes
-
-**Modified**: `Xyzterminal/Wiring/WorkflowEngine.swift` — `buildPrompt`
-- Add a "## Workflow Context" section to the generated prompt
-- Walk the DAG to build a textual representation:
-  ```
-  ## Workflow Context
-  You are step 3 of 5 in this pipeline:
-  1. [done] "Design API schema" → approved
-  2. [done] "Review API design" → approved  
-  3. [in progress] "Implement API endpoints" ← you are here
-  4. [ready] "Review implementation"
-  5. [draft] "Write integration tests"
-  ```
-- Include the overall goal if derivable (title of the first task in the chain)
-- Include what downstream tasks expect: "After you complete this, your work will be reviewed by a Code Reviewer agent"
-
-**Modified**: `Xyzterminal/Wiring/WorkflowEngine.swift` — `buildPrompt`
-- Add MCP tool documentation to the prompt so the agent knows about `outcome`:
-  ```
-  When finished, call update_task with:
-  - task_id: <id>
-  - status: "done" or "failed"  
-  - outcome: one of "approved", "needs_changes", "needs_human_review" (if this is a review task)
-  - summary: brief description of what you did
-  ```
-
-### Verification
-- Assign a task in the middle of a 4-task chain
-- Check the terminal stdin for the workflow context section
-- Verify it shows predecessor results and downstream expectations
-
----
-
-## File Change Summary
-
-| File | M1 | M2 | M3 | M4 | M5 | M6 |
-|---|---|---|---|---|---|---|
-| **new** `Wiring/WorkflowEngine.swift` | create | modify | | modify | modify | modify |
-| **new** `Agent/AgentProfile.swift` | | | create | | | |
-| `Canvas/CanvasInputHandler.swift` | modify | | | | | |
-| `MCP/MCPToolHandlers.swift` | | modify | | modify | modify | |
-| `Model/CanvasNode.swift` | | | modify | | modify | |
-| `Model/CanvasDocument.swift` | | | modify | | modify | |
-| `Model/Persistence.swift` | | | modify | | | |
-| `Agent/RoleInjector.swift` | | | rename+modify | | | |
-| `Terminal/TerminalManager.swift` | | | modify | | | |
-| `Canvas/TerminalConfigSheet.swift` | | | modify | | | |
-| `Canvas/CanvasRenderer.swift` | | | modify | | modify | |
-| `Canvas/EdgeActionOverlay.swift` | | | | | modify | |
-| `Wiring/WiringAction.swift` | — | — | — | — | — | — |
-
----
-
-## Dependency Graph
+## Data model
 
 ```
-M1 (extract) ──→ M2 (reactive dispatch) ──→ M4 (terminal status)
-                       │                          │
-                       ├──→ M6 (workflow context)  │
-                       │                          │
-M3 (agent profiles) ───┴──→ M5 (conditional routing) ←─┘
+Worktree                                 // one per managed worktree under a repo
+  id            = branch name            // stable identifier; derives path via git
+  displayName   = branch with xyz- prefix stripped
+  path          = from git worktree list
+  branch        = from git
+  head          = from git
+  agentProfileID: UUID?                  // sidecar, M5
+  startupScript: String?                 // sidecar, M5
+
+TileNode
+  .pane(PaneContent)
+  .split(Split)
+
+PaneContent
+  .terminal(worktreeID: String)          // branch name
+  .tasks                                 // repo-scoped task list, no state here
+
+Split
+  direction: .horizontal | .vertical
+  children: [TileNode]
+  weights:  [Float]                      // sum to 1.0
+
+Workspace                                // one per repo, persisted to .xyzterminal/workspace.json
+  root: TileNode?                        // nil = empty canvas
+
+TaskItem                                 // repo-scoped, persisted to .xyzterminal/tasks.json
+  id: UUID
+  title: String
+  done: Bool
+  createdAt: Date
 ```
 
-M1 and M3 are independent and could be done in parallel. M2 requires M1. M5 requires M2 and benefits from M3. M4 and M6 require M2.
+**What we do NOT store**: paths, branches, heads (all derived from `git worktree list`). Worktree records are not persisted separately — the list is the filesystem. Display names are the branch suffix. Per-worktree config (agent profile, startup script) lives in `{worktree}/.xyzterminal/worktree.json`.
 
-Recommended order: **M1 → M2 → M3 → M4 → M5 → M6**
+---
 
-Each milestone is self-contained and delivers incremental value:
-- After M1: cleaner architecture, same behavior
-- After M2: basic chaining works end-to-end
-- After M3: users can define custom agent behaviors
-- After M4: smarter dispatch, agents self-report availability
-- After M5: review loops, conditional branching, human-in-the-loop
-- After M6: agents understand their role in the bigger picture
+## Milestones
+
+Each milestone has a checklist. Tick items as completed across sessions.
+
+### M1 — Worktrees as first-class in the sidebar
+
+**Goal**: sidebar shows Repos → Worktrees. Users create, rename, delete worktrees explicitly. No canvas changes yet. Old canvas continues to work; this is purely additive.
+
+- [x] Extend `WorktreeManager` with a `listManagedWorktrees()` that filters `git worktree list` to ones under `{repo}/.xyzterminal/worktrees/`, returning `[Worktree]` with display name derived from the branch.
+- [x] Add `Worktree` struct (Identifiable by branch name) in `Worktree/Worktree.swift`.
+- [x] `RepoSidebarView`: replace flat repo list with a `DisclosureGroup` per repo; expanded state shows the managed worktrees underneath.
+- [x] "New Worktree" row under each repo opens an inline sheet: name input + base branch picker (defaults to repo's default branch).
+- [x] Context menu on a worktree row: Show in Finder, Delete (confirm dialog, runs `git worktree remove --force`).
+- [x] Rename worktree: double-click row → inline edit; calls `git branch -m xyz-old xyz-new` and `git worktree move` if needed.
+- [x] Selecting a worktree row does not open anything yet — wire-up happens in M3.
+- [x] Build and run: create/list/delete worktrees from the sidebar; old canvas still functions.
+
+### M2 — Tiling layout engine (no terminals)
+
+**Goal**: build the recursive split view with colored placeholder panes so we can iterate on geometry and interactions independently.
+
+- [ ] `Tiling/TileNode.swift`: the enum + helpers (`insert`, `remove`, `resize`, `findPane`).
+- [ ] `Tiling/TileView.swift`: SwiftUI recursive view. Uses `GeometryReader` + `HStack`/`VStack` driven by weights.
+- [ ] `Tiling/SplitDivider.swift`: draggable divider that adjusts neighbor weights; min pane size enforced.
+- [ ] `Tiling/DropOverlay.swift`: per-pane hit regions — top/bottom/left/right quadrants split, center replaces.
+- [ ] `Tiling/TileDemoView.swift` (throwaway): standalone window showing the tiling engine with placeholder panes (colored rectangles with labels), a toolbar to add/remove panes, and drag-to-split between them. Deleted in M3.
+- [ ] Collapse rule: when a split has one remaining child, it replaces the split in its parent. When the root is empty, workspace is empty.
+- [ ] Keyboard: arrow keys move focus across panes. Deferred if tricky.
+- [ ] Verify visually: 1/2/3/4/5 panes lay out and resize cleanly; drag-to-split feels right.
+
+### M3 — Terminal panes + Workspace persistence
+
+**Goal**: wire the tiling engine to real terminals. Swap `CanvasHostView` for `WorkspaceView`. Old canvas still compiles but is no longer the detail view.
+
+- [ ] `Workspace/Workspace.swift`: the model holding the root `TileNode`, with observable mutations.
+- [ ] `Workspace/WorkspaceStore.swift`: load/save `.xyzterminal/workspace.json` per repo, debounced.
+- [ ] Swap `TileNode.pane(.terminal(worktreeID:))` content for a `TerminalPaneView` backed by a `TerminalSession`. Reuse `TerminalManager` — rekey sessions by `paneID` (not `nodeID`).
+- [ ] Same worktree may appear in multiple panes; each pane gets its own session, its own PTY.
+- [ ] `WorkspaceView`: replaces `CanvasHostView` as the detail view in `XyzterminalApp`. Renders the root tile + a drop target for the empty state.
+- [ ] Dragging a worktree from the sidebar into a pane's drop zone adds a new terminal pane.
+- [ ] Pane header: worktree display name, branch, a close button. Closing removes the pane and collapses its parent split.
+- [ ] Verify: open a repo, drag worktree A, drag worktree B alongside, resize divider, close one, app restart restores layout.
+
+### M4 — Delete the canvas
+
+**Goal**: remove all dead code and legacy model concepts in one commit. App is now exclusively tiled.
+
+- [ ] Delete `Canvas/` entirely (Metal view, input handler, renderer, camera, hit testing, edge tessellator, overlays, section editor, task card editor, terminal config sheet, shaders).
+- [ ] Delete `Wiring/` (WorkflowEngine, WiringAction).
+- [ ] Delete `SectionLayout.swift`.
+- [ ] Strip `CanvasDocument` down to what `Workspace` needs — or just rename `CanvasDocument` → `Workspace` and absorb remaining state. Remove nodes, edges, selection, camera, section helpers, inline editing, pending terminal deletions.
+- [ ] Remove from `CanvasNode.swift`: `TaskCardData`, `SectionData`, `NodeKind.taskCard`, `NodeKind.section`. If nothing remains, delete the file and fold `TerminalNodeData` into `Workspace/Pane.swift` (or its replacement).
+- [ ] Persistence: replace `canvas.json` with `workspace.json`. Delete legacy snapshot struct.
+- [ ] Remove toolbar buttons for Task Card, Section, Snap.
+- [ ] Verify: project builds, launches, tiling works, no warnings.
+
+### M5 — Agent profiles on worktrees + startup script auto-run
+
+**Goal**: profile and startup script move from terminal node → worktree. When a worktree opens in a pane, the agent auto-runs if a startup script is set.
+
+- [ ] Per-worktree config at `{worktree}/.xyzterminal/worktree.json` with `agentProfileID` and `startupScript`.
+- [ ] `WorktreeManager` load/save of the config.
+- [ ] Sidebar: right-click a worktree → Configure (sheet): pick an agent profile, edit startup script.
+- [ ] New Worktree sheet: include profile picker + startup script from the start.
+- [ ] When `TerminalSession` starts in a pane: if a profile exists, `ProfileInjector` writes CLAUDE.md. If a startup script exists, `scheduleStartupScript` runs it.
+- [ ] Pane header shows the profile swatch + name if assigned.
+- [ ] Verify: configure a worktree with Claude Code + startup script; open it in a pane; Claude Code auto-launches.
+
+### M6 — Task panes
+
+**Goal**: a pane can be a task list instead of a terminal. Users jot down quick todos, bugs, follow-ups, and tick them off. Scoped per-repo. Not wired to agents.
+
+- [ ] `TaskItem` model + persistence at `.xyzterminal/tasks.json`.
+- [ ] `PaneContent.tasks` variant.
+- [ ] `TaskPaneView`: list of items with inline add (Enter to commit), tick to complete, swipe or delete key to remove. Strikethrough for done. Optional "clear completed" menu item.
+- [ ] Sidebar / pane header: "+" menu → "New Terminal Pane" / "New Task Pane". Dropping a task pane anywhere lands it via the same drop zone system.
+- [ ] Multiple task panes allowed (so two can sit side-by-side, e.g. "Now" vs "Backlog"). For now they share the same underlying list. Filtering per-pane: deferred.
+- [ ] Verify: add tasks, tick them, restart, state persists.
+
+### M7 — Polish
+
+**Goal**: make the day-to-day use feel sharp.
+
+- [ ] Pane header: worktree display name + branch + profile swatch + close. Click header → focus the pane's terminal.
+- [ ] Keyboard shortcuts:
+  - ⌘W closes the focused pane
+  - ⌘D splits the focused pane horizontally
+  - ⌘⇧D splits vertically
+  - ⌘⌥ arrow keys move focus
+- [ ] Divider hit targets widen on hover; minimum pane size prevents collapsing to zero.
+- [ ] Empty workspace shows a helpful drop target with "Drag a worktree here or click +".
+- [ ] Broken-worktree pane (path gone): show an error state with a "Remove pane" button instead of a crashed terminal.
+- [ ] Theme: terminal backgrounds match pane backgrounds, focused pane has a subtle outline.
+
+---
+
+## Ordering
+
+M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last.
+
+## Open decisions
+
+- Should task panes have multiple lists per repo (so separate "Now" / "Backlog" panes can show different slices), or a single shared list? Deferring — start with single shared list in M6; revisit if it feels cramped.
