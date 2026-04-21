@@ -15,7 +15,7 @@ struct XyzterminalApp: App {
                     WorkspaceView(repo: repo)
                         .id(repo.id)
                 } else {
-                    EmptyCanvasView(repoStore: repoStore)
+                    EmptyWorkspaceView(repoStore: repoStore)
                 }
             }
             .toolbar {
@@ -31,7 +31,6 @@ struct XyzterminalApp: App {
             }
             .onAppear {
                 (AppearanceMode(rawValue: appearanceModeRaw) ?? .system).apply()
-                migrateLastProjectPath()
             }
             .onChange(of: appearanceModeRaw) { _, newValue in
                 (AppearanceMode(rawValue: newValue) ?? .system).apply()
@@ -39,59 +38,9 @@ struct XyzterminalApp: App {
         }
         .defaultSize(width: 1200, height: 800)
     }
-
-    private func migrateLastProjectPath() {
-        guard repoStore.repos.isEmpty,
-              let last = Persistence.lastProjectPath,
-              FileManager.default.fileExists(atPath: last.path) else { return }
-        repoStore.addRepo(last)
-        UserDefaults.standard.removeObject(forKey: "lastProjectPath")
-    }
 }
 
-struct CanvasHostView: View {
-    let repoEntry: RepoEntry
-    @State private var document = CanvasDocument()
-
-    var body: some View {
-        CanvasContainerView(document: document)
-            .toolbar {
-                ToolbarItemGroup {
-                    Button(action: {
-                        let id = document.addNode(kind: .taskCard(TaskCardData(title: "")))
-                        document.onStartInlineEdit?(id)
-                    }) {
-                        Label("Task Card", systemImage: "square.text.square")
-                    }
-                    Button(action: { document.addNode(kind: .section(SectionData())) }) {
-                        Label("Section", systemImage: "rectangle.3.group")
-                    }
-                    Button(action: { document.showTerminalConfig = true }) {
-                        Label("Terminal", systemImage: "terminal")
-                    }
-                    Divider()
-                    Toggle(isOn: Binding(
-                        get: { document.snapToGrid },
-                        set: { document.snapToGrid = $0 }
-                    )) {
-                        Label("Snap", systemImage: "grid")
-                    }
-                }
-            }
-            .onAppear { openProject(repoEntry.path) }
-    }
-
-    private func openProject(_ url: URL) {
-        document.projectPath = url
-        Persistence.load(into: document)
-
-        let server = MCPServer(document: document)
-        server.start()
-        document.mcpServer = server
-    }
-}
-
-struct EmptyCanvasView: View {
+struct EmptyWorkspaceView: View {
     let repoStore: RepoStore
 
     var body: some View {

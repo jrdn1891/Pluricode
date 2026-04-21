@@ -91,27 +91,23 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: wire the tiling engine to real terminals. Swap `CanvasHostView` for `WorkspaceView`. Old canvas still compiles but is no longer the detail view.
 
-- [ ] `Workspace/Workspace.swift`: the model holding the root `TileNode`, with observable mutations.
-- [ ] `Workspace/WorkspaceStore.swift`: load/save `.xyzterminal/workspace.json` per repo, debounced.
-- [ ] Swap `TileNode.pane(.terminal(worktreeID:))` content for a `TerminalPaneView` backed by a `TerminalSession`. Reuse `TerminalManager` — rekey sessions by `paneID` (not `nodeID`).
-- [ ] Same worktree may appear in multiple panes; each pane gets its own session, its own PTY.
-- [ ] `WorkspaceView`: replaces `CanvasHostView` as the detail view in `XyzterminalApp`. Renders the root tile + a drop target for the empty state.
-- [ ] Dragging a worktree from the sidebar into a pane's drop zone adds a new terminal pane.
-- [ ] Pane header: worktree display name, branch, a close button. Closing removes the pane and collapses its parent split.
-- [ ] Verify: open a repo, drag worktree A, drag worktree B alongside, resize divider, close one, app restart restores layout.
+- [x] `Workspace/Workspace.swift`: observable model holding root TileNode, terminal hosts, debounced save to `.xyzterminal/workspace.json`.
+- [x] `Workspace/TerminalHost.swift` + `TerminalPaneView.swift`: per-pane NSViewRepresentable wrapping a `TerminalSession`. Session survives view rebuilds via the Workspace-owned `terminalHosts` dict.
+- [x] Same worktree may appear in multiple panes; distinct paneIDs = distinct sessions, distinct scrollback files.
+- [x] `WorkspaceView` replaces `CanvasHostView` as the detail view.
+- [x] Drag worktree from sidebar → empty drop zone or pane edge/center zone → add or split terminal.
+- [x] Pane header: display name, branch, close button. Missing worktree state shows an error + remove pane button.
+- [x] Layout persists across restarts via `workspace.json`.
 
 ### M4 — Delete the canvas
 
 **Goal**: remove all dead code and legacy model concepts in one commit. App is now exclusively tiled.
 
-- [ ] Delete `Canvas/` entirely (Metal view, input handler, renderer, camera, hit testing, edge tessellator, overlays, section editor, task card editor, terminal config sheet, shaders).
-- [ ] Delete `Wiring/` (WorkflowEngine, WiringAction).
-- [ ] Delete `SectionLayout.swift`.
-- [ ] Strip `CanvasDocument` down to what `Workspace` needs — or just rename `CanvasDocument` → `Workspace` and absorb remaining state. Remove nodes, edges, selection, camera, section helpers, inline editing, pending terminal deletions.
-- [ ] Remove from `CanvasNode.swift`: `TaskCardData`, `SectionData`, `NodeKind.taskCard`, `NodeKind.section`. If nothing remains, delete the file and fold `TerminalNodeData` into `Workspace/Pane.swift` (or its replacement).
-- [ ] Persistence: replace `canvas.json` with `workspace.json`. Delete legacy snapshot struct.
-- [ ] Remove toolbar buttons for Task Card, Section, Snap.
-- [ ] Verify: project builds, launches, tiling works, no warnings.
+- [x] Delete `Canvas/`, `Wiring/`, `MCP/`, `SectionLayout.swift`.
+- [x] Delete `Model/CanvasDocument.swift`, `Model/CanvasNode.swift`, `Model/Persistence.swift`, `Terminal/TerminalManager.swift`, `Xyzterminal-Bridging-Header.h`.
+- [x] Strip `main.swift` (no more MCP bridge branch); remove `CanvasHostView`, `migrateLastProjectPath`, old toolbar buttons.
+- [x] Drop `SWIFT_OBJC_BRIDGING_HEADER` from `project.yml`.
+- [x] Verify: project builds and launches; tiling works unchanged.
 
 ### M5 — Agent profiles on worktrees + startup script auto-run
 
