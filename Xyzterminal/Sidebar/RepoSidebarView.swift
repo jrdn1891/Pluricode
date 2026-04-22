@@ -21,7 +21,11 @@ struct RepoSidebarView: View {
     var body: some View {
         List(selection: Binding(
             get: { workspaceStore.selectedWorkspaceID },
-            set: { workspaceStore.selectedWorkspaceID = $0; workspaceStore.saveSelection() }
+            set: { newValue in
+                guard let newValue else { return }
+                workspaceStore.selectedWorkspaceID = newValue
+                workspaceStore.saveSelection()
+            }
         )) {
             Section("Workspaces") {
                 ForEach(workspaceStore.workspaces, id: \.id) { ws in
@@ -39,6 +43,7 @@ struct RepoSidebarView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.vertical, 2)
+                .selectionDisabled()
             }
 
             Section("Repositories") {
@@ -107,6 +112,7 @@ struct RepoSidebarView: View {
                     }
                 }
             }
+            .selectionDisabled()
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
