@@ -107,6 +107,8 @@ private struct TaskPaneBody: View {
                     paneID: paneID,
                     listID: listID,
                     store: store,
+                    repoName: workspace.repo(id: repoID)?.name,
+                    repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
                     focused: workspace.focusedPaneID == paneID,
                     onActivate: { workspace.setFocus(paneID: paneID) },
                     onClose: { workspace.closePane(paneID: paneID) }
@@ -146,6 +148,7 @@ private struct TerminalPaneBody: View {
                 title: displayName,
                 branch: worktreeID,
                 repoName: workspace.repo(id: repoID)?.name,
+                repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
                 profile: resolveProfile(),
                 focused: workspace.focusedPaneID == paneID,
                 onActivate: { workspace.setFocus(paneID: paneID) },
@@ -199,6 +202,7 @@ private struct PaneHeader: View {
     let title: String
     let branch: String
     let repoName: String?
+    let repoColor: Color?
     let profile: AgentProfile?
     let focused: Bool
     let onActivate: () -> Void
@@ -208,7 +212,7 @@ private struct PaneHeader: View {
         HStack(spacing: 8) {
             if let repoName {
                 Image(systemName: "folder.fill")
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(repoColor ?? .accentColor)
                     .font(.caption)
                 Text(repoName)
                     .font(.system(size: 12, weight: .medium))
@@ -241,7 +245,7 @@ private struct PaneHeader: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(focused ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
+        .background(headerBackground)
         .contentShape(Rectangle())
         .onTapGesture(perform: onActivate)
         .draggable(TilingDragPayload(kind: .movePane(paneID: paneID))) {
@@ -254,6 +258,12 @@ private struct PaneHeader: View {
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
+    }
+
+    private var headerBackground: Color {
+        if focused { return Color.accentColor.opacity(0.15) }
+        if let repoColor { return repoColor.opacity(0.12) }
+        return Color.secondary.opacity(0.1)
     }
 }
 

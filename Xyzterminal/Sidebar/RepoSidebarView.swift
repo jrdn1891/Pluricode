@@ -50,6 +50,31 @@ struct RepoSidebarView: View {
                 ForEach(repoStore.repos) { repo in
                     RepoRow(repo: repo, isExpanded: expanded.contains(repo.id), toggle: { toggle(repo) })
                         .contextMenu {
+                            Menu("Color") {
+                                Button {
+                                    repoStore.setColor(id: repo.id, color: nil)
+                                } label: {
+                                    ColorMenuLabel(
+                                        title: "Automatic",
+                                        swatch: repo.resolvedColor.swiftUIColor,
+                                        dashed: true,
+                                        selected: repo.color == nil
+                                    )
+                                }
+                                Divider()
+                                ForEach(RepoColor.allCases, id: \.self) { c in
+                                    Button {
+                                        repoStore.setColor(id: repo.id, color: c)
+                                    } label: {
+                                        ColorMenuLabel(
+                                            title: c.label,
+                                            swatch: c.swiftUIColor,
+                                            dashed: false,
+                                            selected: repo.color == c
+                                        )
+                                    }
+                                }
+                            }
                             Button("Show in Finder") {
                                 NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.path.path)
                             }
@@ -220,6 +245,44 @@ struct RepoSidebarView: View {
     }
 }
 
+private struct ColorMenuLabel: View {
+    let title: String
+    let swatch: Color
+    let dashed: Bool
+    let selected: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(nsImage: Self.swatchImage(color: swatch, dashed: dashed))
+            Text(title)
+            if selected {
+                Spacer()
+                Image(systemName: "checkmark")
+            }
+        }
+    }
+
+    private static func swatchImage(color: Color, dashed: Bool) -> NSImage {
+        let size = NSSize(width: 12, height: 12)
+        let img = NSImage(size: size)
+        img.lockFocus()
+        let rect = NSRect(origin: .zero, size: size).insetBy(dx: 1, dy: 1)
+        let path = NSBezierPath(ovalIn: rect)
+        if dashed {
+            NSColor(color).setStroke()
+            path.lineWidth = 1.2
+            path.setLineDash([2.0, 1.5], count: 2, phase: 0)
+            path.stroke()
+        } else {
+            NSColor(color).setFill()
+            path.fill()
+        }
+        img.unlockFocus()
+        img.isTemplate = false
+        return img
+    }
+}
+
 private struct DeleteCandidate: Identifiable {
     let repo: RepoEntry
     let worktree: Worktree
@@ -276,7 +339,7 @@ struct RepoRow: View {
             .buttonStyle(.plain)
 
             Image(systemName: "folder.fill")
-                .foregroundStyle(.tint)
+                .foregroundStyle(repo.resolvedColor.swiftUIColor)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
