@@ -14,44 +14,32 @@ extension FocusedValues {
 }
 
 @Observable
-final class WorkspaceRegistry {
-    private var workspaces: [String: Workspace] = [:]
-
-    func workspace(for repo: RepoEntry, profileStore: AgentProfileStore, taskStore: TaskStore) -> Workspace {
-        let key = repo.path.standardizedFileURL.path
-        if let existing = workspaces[key] { return existing }
-        let ws = Workspace(repo: repo, profileStore: profileStore, taskStore: taskStore)
-        ws.load()
-        workspaces[key] = ws
-        return ws
-    }
-
-    func remove(repoPath: URL) {
-        let key = repoPath.standardizedFileURL.path
-        workspaces.removeValue(forKey: key)
-    }
-
-    func saveAll() {
-        for ws in workspaces.values { ws.save() }
-    }
-}
-
-@Observable
 final class Workspace {
-    let repo: RepoEntry
-    let profileStore: AgentProfileStore
+    let id: UUID
+    var name: String
     let tiling: Tiling
-    let taskStore: TaskStore
+    let repoStore: RepoStore
+    let taskStoreRegistry: TaskStoreRegistry
+    let profileStore: AgentProfileStore
     var terminalHosts: [UUID: TerminalHost] = [:]
     var focusedPaneID: UUID?
 
     private var saveTask: Task<Void, Never>?
 
-    init(repo: RepoEntry, profileStore: AgentProfileStore, taskStore: TaskStore) {
-        self.repo = repo
+    init(
+        id: UUID = UUID(),
+        name: String,
+        root: TileNode? = nil,
+        repoStore: RepoStore,
+        taskStoreRegistry: TaskStoreRegistry,
+        profileStore: AgentProfileStore
+    ) {
+        self.id = id
+        self.name = name
+        self.tiling = Tiling(root: root)
+        self.repoStore = repoStore
+        self.taskStoreRegistry = taskStoreRegistry
         self.profileStore = profileStore
-        self.tiling = Tiling()
-        self.taskStore = taskStore
     }
 
     deinit {
@@ -60,35 +48,44 @@ final class Workspace {
         for host in terminalHosts.values { host.teardown() }
     }
 
-    var workspaceDir: URL {
-        repo.path.appendingPathComponent(".xyzterminal", isDirectory: true)
+    static var rootDir: URL {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return support.appendingPathComponent("Xyzterminal", isDirectory: true)
     }
 
-    var scrollbackDir: URL {
-        workspaceDir.appendingPathComponent("scrollback", isDirectory: true)
+    static var workspacesDir: URL {
+        rootDir.appendingPathComponent("workspaces", isDirectory: true)
     }
 
-    private var snapshotURL: URL {
-        workspaceDir.appendingPathComponent("workspace.json")
+    static var scrollbackDir: URL {
+        rootDir.appendingPathComponent("scrollback", isDirectory: true)
     }
 
-    func load() {
-        guard let data = try? Data(contentsOf: snapshotURL),
-              let snapshot = try? JSONDecoder().decode(WorkspaceSnapshot.self, from: data) else { return }
-        tiling.root = snapshot.root
+    var scrollbackDir: URL { Self.scrollbackDir }
+
+    var snapshotURL: URL {
+        Self.workspacesDir.appendingPathComponent("\(id.uuidString).json")
+    }
+
+    func repo(id: UUID) -> RepoEntry? {
+        repoStore.repos.first { $0.id == id }
+    }
+
+    func taskStore(repoID: UUID) -> TaskStore? {
+        repo(id: repoID).map { taskStoreRegistry.store(for: $0.path) }
     }
 
     func save() {
-        try? FileManager.default.createDirectory(at: workspaceDir, withIntermediateDirectories: true)
-        let snapshot = WorkspaceSnapshot(root: tiling.root)
+        try? FileManager.default.createDirectory(at: Self.workspacesDir, withIntermediateDirectories: true)
+        let snapshot = WorkspaceSnapshot(id: id, name: name, root: tiling.root)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(snapshot) {
             try? data.write(to: snapshotURL, options: .atomic)
         }
-        try? FileManager.default.createDirectory(at: scrollbackDir, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: Self.scrollbackDir, withIntermediateDirectories: true)
         for host in terminalHosts.values {
-            host.saveScrollback(to: scrollbackDir)
+            host.saveScrollback(to: Self.scrollbackDir)
         }
     }
 
@@ -99,6 +96,13 @@ final class Workspace {
             guard !Task.isCancelled, let self else { return }
             self.save()
         }
+    }
+
+    func rename(_ newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        name = trimmed
+        scheduleSave()
     }
 
     func addPane(_ content: PaneContent) {
@@ -115,7 +119,7 @@ final class Workspace {
 
     func closePane(paneID: UUID) {
         if let host = terminalHosts.removeValue(forKey: paneID) {
-            host.saveScrollback(to: scrollbackDir)
+            host.saveScrollback(to: Self.scrollbackDir)
             host.teardown()
         }
         tiling.remove(paneID: paneID)
@@ -150,12 +154,12 @@ final class Workspace {
     @discardableResult
     func acceptDrop(payload: TilingDragPayload, on targetID: UUID?, edge: TileEdge) -> Bool {
         switch payload.kind {
-        case .newTerminal(let wid):
-            let content: PaneContent = .terminal(worktreeID: wid)
+        case .newTerminal(let repoID, let worktreeID):
+            let content: PaneContent = .terminal(repoID: repoID, worktreeID: worktreeID)
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
-        case .newTaskPane(let listID):
-            let content: PaneContent = .tasks(listID: listID)
+        case .newTaskPane(let repoID, let listID):
+            let content: PaneContent = .tasks(repoID: repoID, listID: listID)
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
         case .movePane(let sourceID):
@@ -186,5 +190,114 @@ final class Workspace {
 }
 
 struct WorkspaceSnapshot: Codable {
+    var id: UUID
+    var name: String
     var root: TileNode?
+}
+
+@Observable
+final class WorkspaceStore {
+    var workspaces: [Workspace] = []
+    var selectedWorkspaceID: UUID?
+
+    private let repoStore: RepoStore
+    private let taskStoreRegistry: TaskStoreRegistry
+    private let profileStore: AgentProfileStore
+
+    private static let selectedKey = "selectedWorkspaceID"
+
+    init(repoStore: RepoStore, taskStoreRegistry: TaskStoreRegistry, profileStore: AgentProfileStore) {
+        self.repoStore = repoStore
+        self.taskStoreRegistry = taskStoreRegistry
+        self.profileStore = profileStore
+        load()
+    }
+
+    var selectedWorkspace: Workspace? {
+        guard let id = selectedWorkspaceID else { return nil }
+        return workspaces.first { $0.id == id }
+    }
+
+    @discardableResult
+    func createWorkspace(name: String) -> Workspace {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalName = trimmed.isEmpty ? "Untitled" : trimmed
+        let ws = Workspace(
+            name: finalName,
+            repoStore: repoStore,
+            taskStoreRegistry: taskStoreRegistry,
+            profileStore: profileStore
+        )
+        workspaces.append(ws)
+        sort()
+        ws.save()
+        selectedWorkspaceID = ws.id
+        saveSelection()
+        return ws
+    }
+
+    func renameWorkspace(id: UUID, name: String) {
+        guard let ws = workspaces.first(where: { $0.id == id }) else { return }
+        ws.rename(name)
+        sort()
+    }
+
+    func removeWorkspace(id: UUID) {
+        workspaces.removeAll { $0.id == id }
+        let url = Workspace.workspacesDir.appendingPathComponent("\(id.uuidString).json")
+        try? FileManager.default.removeItem(at: url)
+        if selectedWorkspaceID == id {
+            selectedWorkspaceID = workspaces.first?.id
+            saveSelection()
+        }
+    }
+
+    func saveAll() {
+        for ws in workspaces { ws.save() }
+        saveSelection()
+    }
+
+    func saveSelection() {
+        if let id = selectedWorkspaceID {
+            UserDefaults.standard.set(id.uuidString, forKey: Self.selectedKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.selectedKey)
+        }
+    }
+
+    private func sort() {
+        workspaces.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func load() {
+        let dir = Workspace.workspacesDir
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let urls = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        let snapshots: [WorkspaceSnapshot] = urls
+            .filter { $0.pathExtension == "json" }
+            .compactMap { url in
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                return try? JSONDecoder().decode(WorkspaceSnapshot.self, from: data)
+            }
+
+        workspaces = snapshots.map { snap in
+            Workspace(
+                id: snap.id,
+                name: snap.name,
+                root: snap.root,
+                repoStore: repoStore,
+                taskStoreRegistry: taskStoreRegistry,
+                profileStore: profileStore
+            )
+        }
+        sort()
+
+        if let str = UserDefaults.standard.string(forKey: Self.selectedKey),
+           let id = UUID(uuidString: str),
+           workspaces.contains(where: { $0.id == id }) {
+            selectedWorkspaceID = id
+        } else {
+            selectedWorkspaceID = workspaces.first?.id
+        }
+    }
 }

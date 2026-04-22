@@ -1,17 +1,9 @@
 import SwiftUI
 
 struct WorkspaceView: View {
-    let repo: RepoEntry
-    let profileStore: AgentProfileStore
-    let taskStoreRegistry: TaskStoreRegistry
-    let workspaceRegistry: WorkspaceRegistry
+    let workspace: Workspace
 
     var body: some View {
-        let workspace = workspaceRegistry.workspace(
-            for: repo,
-            profileStore: profileStore,
-            taskStore: taskStoreRegistry.store(for: repo.path)
-        )
         WorkspaceBody(workspace: workspace)
             .focusedSceneValue(\.workspace, workspace)
     }
@@ -44,7 +36,7 @@ private struct EmptyWorkspace: View {
             Text("Drag a worktree here")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-            Text("Or drag the Task List from the sidebar to jot down quick notes.")
+            Text("Or drag a Task List from the sidebar to jot down quick notes.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -74,10 +66,10 @@ private struct WorkspacePane: View {
         let focused = workspace.focusedPaneID == pane.id
         PaneFrame(focused: focused) {
             switch pane.content {
-            case .terminal(let worktreeID):
-                TerminalPaneBody(paneID: pane.id, worktreeID: worktreeID, workspace: workspace)
-            case .tasks(let listID):
-                TaskPaneBody(paneID: pane.id, listID: listID, workspace: workspace)
+            case .terminal(let repoID, let worktreeID):
+                TerminalPaneBody(paneID: pane.id, repoID: repoID, worktreeID: worktreeID, workspace: workspace)
+            case .tasks(let repoID, let listID):
+                TaskPaneBody(paneID: pane.id, repoID: repoID, listID: listID, workspace: workspace)
             }
         }
     }
@@ -103,39 +95,46 @@ private struct PaneFrame<Content: View>: View {
 
 private struct TaskPaneBody: View {
     let paneID: UUID
+    let repoID: UUID
     let listID: UUID
     let workspace: Workspace
     @State private var isTargeted = false
 
     var body: some View {
         GeometryReader { geo in
-            TaskPaneView(
-                paneID: paneID,
-                listID: listID,
-                store: workspace.taskStore,
-                focused: workspace.focusedPaneID == paneID,
-                onActivate: { workspace.setFocus(paneID: paneID) },
-                onClose: { workspace.closePane(paneID: paneID) }
-            )
-            .frame(width: geo.size.width, height: geo.size.height)
-            .overlay {
-                if isTargeted {
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.accentColor, lineWidth: 3)
-                        .allowsHitTesting(false)
+            if let store = workspace.taskStore(repoID: repoID) {
+                TaskPaneView(
+                    paneID: paneID,
+                    listID: listID,
+                    store: store,
+                    focused: workspace.focusedPaneID == paneID,
+                    onActivate: { workspace.setFocus(paneID: paneID) },
+                    onClose: { workspace.closePane(paneID: paneID) }
+                )
+                .frame(width: geo.size.width, height: geo.size.height)
+                .overlay {
+                    if isTargeted {
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(Color.accentColor, lineWidth: 3)
+                            .allowsHitTesting(false)
+                    }
                 }
+                .dropDestination(for: TilingDragPayload.self) { items, location in
+                    guard let payload = items.first else { return false }
+                    let edge = TileEdge.zone(for: location, in: geo.size)
+                    return workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
+                } isTargeted: { isTargeted = $0 }
+            } else {
+                MissingRepoBody(onRemove: { workspace.closePane(paneID: paneID) })
+                    .frame(width: geo.size.width, height: geo.size.height)
             }
-            .dropDestination(for: TilingDragPayload.self) { items, location in
-                guard let payload = items.first else { return false }
-                let edge = TileEdge.zone(for: location, in: geo.size)
-                return workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
-            } isTargeted: { isTargeted = $0 }
         }
     }
 }
 
 private struct TerminalPaneBody: View {
     let paneID: UUID
+    let repoID: UUID
     let worktreeID: String
     let workspace: Workspace
     @State private var isTargeted = false
@@ -146,6 +145,7 @@ private struct TerminalPaneBody: View {
                 paneID: paneID,
                 title: displayName,
                 branch: worktreeID,
+                repoName: workspace.repo(id: repoID)?.name,
                 profile: resolveProfile(),
                 focused: workspace.focusedPaneID == paneID,
                 onActivate: { workspace.setFocus(paneID: paneID) },
@@ -181,7 +181,8 @@ private struct TerminalPaneBody: View {
     }
 
     private func resolveWorktreePath() -> String? {
-        guard let wm = WorktreeManager(repoRoot: workspace.repo.path) else { return nil }
+        guard let repo = workspace.repo(id: repoID),
+              let wm = WorktreeManager(repoRoot: repo.path) else { return nil }
         return wm.listManagedWorktrees().first { $0.branch == worktreeID }?.path
     }
 
@@ -197,6 +198,7 @@ private struct PaneHeader: View {
     let paneID: UUID
     let title: String
     let branch: String
+    let repoName: String?
     let profile: AgentProfile?
     let focused: Bool
     let onActivate: () -> Void
@@ -204,6 +206,15 @@ private struct PaneHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
+            if let repoName {
+                Image(systemName: "folder.fill")
+                    .foregroundStyle(.tint)
+                    .font(.caption)
+                Text(repoName)
+                    .font(.system(size: 12, weight: .medium))
+                Text("·")
+                    .foregroundStyle(.secondary)
+            }
             Image(systemName: "arrow.triangle.branch")
                 .foregroundStyle(.secondary)
                 .font(.caption)
@@ -260,6 +271,27 @@ private struct MissingWorktreeBody: View {
             Text("It may have been deleted or renamed.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Button("Remove Pane", role: .destructive, action: onRemove)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+}
+
+private struct MissingRepoBody: View {
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 30))
+                .foregroundStyle(.orange)
+            Text("Repository unavailable")
+                .font(.headline)
+            Text("The repo this pane belongs to was removed from the library.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             Button("Remove Pane", role: .destructive, action: onRemove)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

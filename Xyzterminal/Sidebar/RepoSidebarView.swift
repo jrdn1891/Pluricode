@@ -4,6 +4,7 @@ struct RepoSidebarView: View {
     let repoStore: RepoStore
     let profileStore: AgentProfileStore
     let taskStoreRegistry: TaskStoreRegistry
+    let workspaceStore: WorkspaceStore
     @State private var expanded: Set<UUID> = []
     @State private var worktrees: [UUID: [Worktree]] = [:]
     @State private var newWorktreeRepo: RepoEntry?
@@ -13,16 +14,36 @@ struct RepoSidebarView: View {
     @State private var newListRepo: RepoEntry?
     @State private var renameListTarget: ListTarget?
     @State private var deleteListCandidate: ListTarget?
+    @State private var creatingWorkspace = false
+    @State private var renameWorkspaceTarget: Workspace?
+    @State private var deleteWorkspaceCandidate: Workspace?
 
     var body: some View {
         List(selection: Binding(
-            get: { repoStore.selectedRepoID },
-            set: { repoStore.selectedRepoID = $0; repoStore.save() }
+            get: { workspaceStore.selectedWorkspaceID },
+            set: { workspaceStore.selectedWorkspaceID = $0; workspaceStore.saveSelection() }
         )) {
+            Section("Workspaces") {
+                ForEach(workspaceStore.workspaces, id: \.id) { ws in
+                    WorkspaceRow(workspace: ws)
+                        .tag(ws.id)
+                        .contextMenu {
+                            Button("Rename...") { renameWorkspaceTarget = ws }
+                            Divider()
+                            Button("Delete", role: .destructive) { deleteWorkspaceCandidate = ws }
+                        }
+                }
+                Button(action: { creatingWorkspace = true }) {
+                    Label("New Workspace", systemImage: "plus.circle")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 2)
+            }
+
             Section("Repositories") {
                 ForEach(repoStore.repos) { repo in
                     RepoRow(repo: repo, isExpanded: expanded.contains(repo.id), toggle: { toggle(repo) })
-                        .tag(repo.id)
                         .contextMenu {
                             Button("Show in Finder") {
                                 NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.path.path)
@@ -35,7 +56,7 @@ struct RepoSidebarView: View {
 
                     if expanded.contains(repo.id) {
                         ForEach(worktrees[repo.id] ?? []) { wt in
-                            WorktreeRow(worktree: wt, profileStore: profileStore)
+                            WorktreeRow(repoID: repo.id, worktree: wt, profileStore: profileStore)
                                 .padding(.leading, 20)
                                 .contextMenu {
                                     Button("Configure...") {
@@ -63,7 +84,7 @@ struct RepoSidebarView: View {
                         .padding(.vertical, 2)
 
                         ForEach(taskStoreRegistry.store(for: repo.path).lists) { list in
-                            TaskListRow(list: list)
+                            TaskListRow(repoID: repo.id, list: list)
                                 .padding(.leading, 20)
                                 .contextMenu {
                                     Button("Rename...") {
@@ -94,6 +115,12 @@ struct RepoSidebarView: View {
             }
             .buttonStyle(.borderless)
             .padding()
+        }
+        .sheet(isPresented: $creatingWorkspace) {
+            NewWorkspaceSheet(workspaceStore: workspaceStore)
+        }
+        .sheet(item: $renameWorkspaceTarget) { ws in
+            RenameWorkspaceSheet(workspace: ws, workspaceStore: workspaceStore)
         }
         .sheet(item: $newWorktreeRepo) { repo in
             NewWorktreeSheet(repo: repo, profileStore: profileStore) { refresh(repo) }
@@ -131,6 +158,16 @@ struct RepoSidebarView: View {
                     : "This will delete \(cand.list.items.count) task\(cand.list.items.count == 1 ? "" : "s")."),
                 primaryButton: .destructive(Text("Delete")) {
                     taskStoreRegistry.store(for: cand.repo.path).removeList(id: cand.list.id)
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .alert(item: $deleteWorkspaceCandidate) { ws in
+            Alert(
+                title: Text("Delete workspace \(ws.name)?"),
+                message: Text("Panes are removed from the canvas. Worktrees and task lists in your repos are untouched."),
+                primaryButton: .destructive(Text("Delete")) {
+                    workspaceStore.removeWorkspace(id: ws.id)
                 },
                 secondaryButton: .cancel()
             )
@@ -195,6 +232,24 @@ private struct ListTarget: Identifiable {
     var id: String { "\(repo.id.uuidString):\(list.id.uuidString)" }
 }
 
+extension Workspace: Identifiable {}
+
+struct WorkspaceRow: View {
+    let workspace: Workspace
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "rectangle.split.2x1")
+                .foregroundStyle(.tint)
+                .font(.caption)
+            Text(workspace.name)
+                .font(.body)
+            Spacer()
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 struct RepoRow: View {
     let repo: RepoEntry
     let isExpanded: Bool
@@ -239,6 +294,7 @@ struct RepoRow: View {
 }
 
 struct WorktreeRow: View {
+    let repoID: UUID
     let worktree: Worktree
     let profileStore: AgentProfileStore
 
@@ -274,7 +330,7 @@ struct WorktreeRow: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 1)
-        .draggable(TilingDragPayload(kind: .newTerminal(worktreeID: worktree.branch))) {
+        .draggable(TilingDragPayload(kind: .newTerminal(repoID: repoID, worktreeID: worktree.branch))) {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.triangle.branch")
                 Text(worktree.displayName)
@@ -288,6 +344,7 @@ struct WorktreeRow: View {
 }
 
 struct TaskListRow: View {
+    let repoID: UUID
     let list: TaskList
 
     var body: some View {
@@ -306,7 +363,7 @@ struct TaskListRow: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 1)
-        .draggable(TilingDragPayload(kind: .newTaskPane(listID: list.id))) {
+        .draggable(TilingDragPayload(kind: .newTaskPane(repoID: repoID, listID: list.id))) {
             HStack(spacing: 6) {
                 Image(systemName: "checklist")
                 Text(list.name)
@@ -316,6 +373,74 @@ struct TaskListRow: View {
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
+    }
+}
+
+private struct NewWorkspaceSheet: View {
+    let workspaceStore: WorkspaceStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("New Workspace")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Name").font(.caption).foregroundStyle(.secondary)
+                TextField("Bug Fixes", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Create") {
+                    _ = workspaceStore.createWorkspace(name: name)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 360)
+    }
+}
+
+private struct RenameWorkspaceSheet: View {
+    let workspace: Workspace
+    let workspaceStore: WorkspaceStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Rename Workspace")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Name").font(.caption).foregroundStyle(.secondary)
+                TextField("Bug Fixes", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Rename") {
+                    workspaceStore.renameWorkspace(id: workspace.id, name: name)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 360)
+        .onAppear { name = workspace.name }
     }
 }
 
