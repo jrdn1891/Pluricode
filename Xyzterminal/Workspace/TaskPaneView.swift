@@ -3,9 +3,7 @@ import SwiftUI
 struct TaskPaneView: View {
     let paneID: UUID
     let listID: UUID
-    let store: TaskStore
-    let repoName: String?
-    let repoColor: Color?
+    let store: TaskListStore
     let focused: Bool
     let onActivate: () -> Void
     let onClose: () -> Void
@@ -22,8 +20,6 @@ struct TaskPaneView: View {
                 TaskPaneHeader(
                     paneID: paneID,
                     listName: list.name,
-                    repoName: repoName,
-                    repoColor: repoColor,
                     remainingCount: list.items.filter { !$0.done }.count,
                     totalCount: list.items.count,
                     focused: focused,
@@ -72,7 +68,7 @@ struct TaskPaneView: View {
 private struct TaskRow: View {
     let listID: UUID
     let task: TaskItem
-    let store: TaskStore
+    let store: TaskListStore
     @State private var hovering = false
     @State private var editingTitle: String?
 
@@ -128,8 +124,6 @@ private struct TaskRow: View {
 private struct TaskPaneHeader: View {
     let paneID: UUID
     let listName: String
-    let repoName: String?
-    let repoColor: Color?
     let remainingCount: Int
     let totalCount: Int
     let focused: Bool
@@ -139,15 +133,6 @@ private struct TaskPaneHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if let repoName {
-                Image(systemName: "folder.fill")
-                    .foregroundStyle(repoColor ?? .accentColor)
-                    .font(.caption)
-                Text(repoName)
-                    .font(.system(size: 12, weight: .medium))
-                Text("·")
-                    .foregroundStyle(.secondary)
-            }
             Image(systemName: "checklist")
                 .foregroundStyle(.secondary)
                 .font(.caption)
@@ -177,7 +162,7 @@ private struct TaskPaneHeader: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(headerBackground)
+        .background(focused ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
         .contentShape(Rectangle())
         .onTapGesture(perform: onActivate)
         .draggable(TilingDragPayload(kind: .movePane(paneID: paneID))) {
@@ -190,12 +175,6 @@ private struct TaskPaneHeader: View {
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
-    }
-
-    private var headerBackground: Color {
-        if focused { return Color.accentColor.opacity(0.15) }
-        if let repoColor { return repoColor.opacity(0.12) }
-        return Color.secondary.opacity(0.1)
     }
 }
 

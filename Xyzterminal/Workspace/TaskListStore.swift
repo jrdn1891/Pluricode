@@ -28,47 +28,26 @@ struct TaskList: Codable, Identifiable, Hashable {
 }
 
 @Observable
-final class TaskStore {
+final class TaskListStore {
     var lists: [TaskList] = []
-    let repoPath: URL
+    private var dirty: Set<UUID> = []
     private var saveTask: Task<Void, Never>?
 
-    init(repoPath: URL) {
-        self.repoPath = repoPath
+    init() {
         load()
     }
 
     deinit {
         saveTask?.cancel()
-        save()
+        flush()
     }
 
-    private var tasksURL: URL {
-        repoPath.appendingPathComponent(".xyzterminal/tasks.json")
+    static var dir: URL {
+        Workspace.rootDir.appendingPathComponent("tasklists", isDirectory: true)
     }
 
-    func load() {
-        guard let data = try? Data(contentsOf: tasksURL),
-              let decoded = try? JSONDecoder().decode([TaskList].self, from: data) else { return }
-        lists = decoded
-    }
-
-    func save() {
-        let url = tasksURL
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(lists) else { return }
-        try? data.write(to: url, options: .atomic)
-    }
-
-    func scheduleSave() {
-        saveTask?.cancel()
-        saveTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled, let self else { return }
-            self.save()
-        }
+    private func url(for id: UUID) -> URL {
+        Self.dir.appendingPathComponent("\(id.uuidString).json")
     }
 
     func list(id: UUID) -> TaskList? {
@@ -81,7 +60,8 @@ final class TaskStore {
         let finalName = trimmed.isEmpty ? "Untitled" : trimmed
         let list = TaskList(name: finalName)
         lists.append(list)
-        scheduleSave()
+        sort()
+        mark(list.id)
         return list.id
     }
 
@@ -90,12 +70,14 @@ final class TaskStore {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         lists[idx].name = trimmed
-        scheduleSave()
+        sort()
+        mark(id)
     }
 
     func removeList(id: UUID) {
         lists.removeAll { $0.id == id }
-        scheduleSave()
+        try? FileManager.default.removeItem(at: url(for: id))
+        dirty.remove(id)
     }
 
     func addTask(listID: UUID, title: String) {
@@ -103,45 +85,76 @@ final class TaskStore {
         guard !trimmed.isEmpty,
               let idx = lists.firstIndex(where: { $0.id == listID }) else { return }
         lists[idx].items.insert(TaskItem(title: trimmed), at: 0)
-        scheduleSave()
+        mark(listID)
     }
 
     func toggleTask(listID: UUID, taskID: UUID) {
         guard let listIdx = lists.firstIndex(where: { $0.id == listID }),
               let taskIdx = lists[listIdx].items.firstIndex(where: { $0.id == taskID }) else { return }
         lists[listIdx].items[taskIdx].done.toggle()
-        scheduleSave()
+        mark(listID)
     }
 
     func updateTaskTitle(listID: UUID, taskID: UUID, title: String) {
         guard let listIdx = lists.firstIndex(where: { $0.id == listID }),
               let taskIdx = lists[listIdx].items.firstIndex(where: { $0.id == taskID }) else { return }
         lists[listIdx].items[taskIdx].title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        scheduleSave()
+        mark(listID)
     }
 
     func removeTask(listID: UUID, taskID: UUID) {
         guard let listIdx = lists.firstIndex(where: { $0.id == listID }) else { return }
         lists[listIdx].items.removeAll { $0.id == taskID }
-        scheduleSave()
+        mark(listID)
     }
 
     func clearCompleted(listID: UUID) {
         guard let listIdx = lists.firstIndex(where: { $0.id == listID }) else { return }
         lists[listIdx].items.removeAll { $0.done }
+        mark(listID)
+    }
+
+    private func mark(_ id: UUID) {
+        dirty.insert(id)
         scheduleSave()
     }
-}
 
-@Observable
-final class TaskStoreRegistry {
-    private var stores: [String: TaskStore] = [:]
+    private func scheduleSave() {
+        saveTask?.cancel()
+        saveTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, let self else { return }
+            self.flush()
+        }
+    }
 
-    func store(for repoPath: URL) -> TaskStore {
-        let key = repoPath.standardizedFileURL.path
-        if let existing = stores[key] { return existing }
-        let store = TaskStore(repoPath: repoPath)
-        stores[key] = store
-        return store
+    private func flush() {
+        guard !dirty.isEmpty else { return }
+        try? FileManager.default.createDirectory(at: Self.dir, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        for id in dirty {
+            guard let list = lists.first(where: { $0.id == id }),
+                  let data = try? encoder.encode(list) else { continue }
+            try? data.write(to: url(for: id), options: .atomic)
+        }
+        dirty.removeAll()
+    }
+
+    private func sort() {
+        lists.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func load() {
+        let dir = Self.dir
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let urls = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        lists = urls
+            .filter { $0.pathExtension == "json" }
+            .compactMap { url in
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                return try? JSONDecoder().decode(TaskList.self, from: data)
+            }
+        sort()
     }
 }

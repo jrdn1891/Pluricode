@@ -3,7 +3,7 @@ import SwiftUI
 struct RepoSidebarView: View {
     let repoStore: RepoStore
     let profileStore: AgentProfileStore
-    let taskStoreRegistry: TaskStoreRegistry
+    let taskListStore: TaskListStore
     let workspaceStore: WorkspaceStore
     @State private var expanded: Set<UUID> = []
     @State private var worktrees: [UUID: [Worktree]] = [:]
@@ -11,9 +11,9 @@ struct RepoSidebarView: View {
     @State private var deleteCandidate: DeleteCandidate?
     @State private var renameTarget: RenameTarget?
     @State private var configureTarget: RenameTarget?
-    @State private var newListRepo: RepoEntry?
-    @State private var renameListTarget: ListTarget?
-    @State private var deleteListCandidate: ListTarget?
+    @State private var creatingList = false
+    @State private var renameListTarget: TaskList?
+    @State private var deleteListCandidate: TaskList?
     @State private var creatingWorkspace = false
     @State private var renameWorkspaceTarget: Workspace?
     @State private var deleteWorkspaceCandidate: Workspace?
@@ -45,6 +45,24 @@ struct RepoSidebarView: View {
                 .padding(.vertical, 2)
                 .selectionDisabled()
             }
+
+            Section("Task Lists") {
+                ForEach(taskListStore.lists) { list in
+                    TaskListRow(list: list)
+                        .contextMenu {
+                            Button("Rename...") { renameListTarget = list }
+                            Divider()
+                            Button("Delete", role: .destructive) { deleteListCandidate = list }
+                        }
+                }
+                Button(action: { creatingList = true }) {
+                    Label("New Task List", systemImage: "plus.circle")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 2)
+            }
+            .selectionDisabled()
 
             Section("Repositories") {
                 ForEach(repoStore.repos) { repo in
@@ -112,28 +130,6 @@ struct RepoSidebarView: View {
                         .buttonStyle(.plain)
                         .padding(.leading, 20)
                         .padding(.vertical, 2)
-
-                        ForEach(taskStoreRegistry.store(for: repo.path).lists) { list in
-                            TaskListRow(repoID: repo.id, list: list)
-                                .padding(.leading, 20)
-                                .contextMenu {
-                                    Button("Rename...") {
-                                        renameListTarget = ListTarget(repo: repo, list: list)
-                                    }
-                                    Divider()
-                                    Button("Delete", role: .destructive) {
-                                        deleteListCandidate = ListTarget(repo: repo, list: list)
-                                    }
-                                }
-                        }
-
-                        Button(action: { newListRepo = repo }) {
-                            Label("New Task List", systemImage: "plus.circle")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.leading, 20)
-                        .padding(.vertical, 2)
                     }
                 }
             }
@@ -162,14 +158,11 @@ struct RepoSidebarView: View {
         .sheet(item: $configureTarget) { target in
             ConfigureWorktreeSheet(target: target, profileStore: profileStore)
         }
-        .sheet(item: $newListRepo) { repo in
-            NewTaskListSheet(store: taskStoreRegistry.store(for: repo.path))
+        .sheet(isPresented: $creatingList) {
+            NewTaskListSheet(store: taskListStore)
         }
-        .sheet(item: $renameListTarget) { target in
-            RenameTaskListSheet(
-                store: taskStoreRegistry.store(for: target.repo.path),
-                list: target.list
-            )
+        .sheet(item: $renameListTarget) { list in
+            RenameTaskListSheet(store: taskListStore, list: list)
         }
         .alert(item: $deleteCandidate) { cand in
             Alert(
@@ -181,14 +174,14 @@ struct RepoSidebarView: View {
                 secondaryButton: .cancel()
             )
         }
-        .alert(item: $deleteListCandidate) { cand in
+        .alert(item: $deleteListCandidate) { list in
             Alert(
-                title: Text("Delete list \(cand.list.name)?"),
-                message: Text(cand.list.items.isEmpty
+                title: Text("Delete list \(list.name)?"),
+                message: Text(list.items.isEmpty
                     ? "The list is empty. This cannot be undone."
-                    : "This will delete \(cand.list.items.count) task\(cand.list.items.count == 1 ? "" : "s")."),
+                    : "This will delete \(list.items.count) task\(list.items.count == 1 ? "" : "s")."),
                 primaryButton: .destructive(Text("Delete")) {
-                    taskStoreRegistry.store(for: cand.repo.path).removeList(id: cand.list.id)
+                    taskListStore.removeList(id: list.id)
                 },
                 secondaryButton: .cancel()
             )
@@ -196,7 +189,7 @@ struct RepoSidebarView: View {
         .alert(item: $deleteWorkspaceCandidate) { ws in
             Alert(
                 title: Text("Delete workspace \(ws.name)?"),
-                message: Text("Panes are removed from the canvas. Worktrees and task lists in your repos are untouched."),
+                message: Text("Panes are removed from the canvas. Worktrees and task lists are untouched."),
                 primaryButton: .destructive(Text("Delete")) {
                     workspaceStore.removeWorkspace(id: ws.id)
                 },
@@ -293,12 +286,6 @@ private struct RenameTarget: Identifiable {
     let repo: RepoEntry
     let worktree: Worktree
     var id: String { "\(repo.id.uuidString):\(worktree.id)" }
-}
-
-private struct ListTarget: Identifiable {
-    let repo: RepoEntry
-    let list: TaskList
-    var id: String { "\(repo.id.uuidString):\(list.id.uuidString)" }
 }
 
 extension Workspace: Identifiable {}
@@ -413,7 +400,6 @@ struct WorktreeRow: View {
 }
 
 struct TaskListRow: View {
-    let repoID: UUID
     let list: TaskList
 
     var body: some View {
@@ -432,7 +418,7 @@ struct TaskListRow: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 1)
-        .draggable(TilingDragPayload(kind: .newTaskPane(repoID: repoID, listID: list.id))) {
+        .draggable(TilingDragPayload(kind: .newTaskPane(listID: list.id))) {
             HStack(spacing: 6) {
                 Image(systemName: "checklist")
                 Text(list.name)
@@ -754,7 +740,7 @@ private struct RenameWorktreeSheet: View {
 }
 
 private struct NewTaskListSheet: View {
-    let store: TaskStore
+    let store: TaskListStore
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
 
@@ -787,7 +773,7 @@ private struct NewTaskListSheet: View {
 }
 
 private struct RenameTaskListSheet: View {
-    let store: TaskStore
+    let store: TaskListStore
     let list: TaskList
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""

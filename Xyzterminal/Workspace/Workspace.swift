@@ -19,7 +19,7 @@ final class Workspace {
     var name: String
     let tiling: Tiling
     let repoStore: RepoStore
-    let taskStoreRegistry: TaskStoreRegistry
+    let taskListStore: TaskListStore
     let profileStore: AgentProfileStore
     var terminalHosts: [UUID: TerminalHost] = [:]
     var focusedPaneID: UUID?
@@ -31,14 +31,14 @@ final class Workspace {
         name: String,
         root: TileNode? = nil,
         repoStore: RepoStore,
-        taskStoreRegistry: TaskStoreRegistry,
+        taskListStore: TaskListStore,
         profileStore: AgentProfileStore
     ) {
         self.id = id
         self.name = name
         self.tiling = Tiling(root: root)
         self.repoStore = repoStore
-        self.taskStoreRegistry = taskStoreRegistry
+        self.taskListStore = taskListStore
         self.profileStore = profileStore
     }
 
@@ -69,10 +69,6 @@ final class Workspace {
 
     func repo(id: UUID) -> RepoEntry? {
         repoStore.repos.first { $0.id == id }
-    }
-
-    func taskStore(repoID: UUID) -> TaskStore? {
-        repo(id: repoID).map { taskStoreRegistry.store(for: $0.path) }
     }
 
     func save() {
@@ -158,8 +154,8 @@ final class Workspace {
             let content: PaneContent = .terminal(repoID: repoID, worktreeID: worktreeID)
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
-        case .newTaskPane(let repoID, let listID):
-            let content: PaneContent = .tasks(repoID: repoID, listID: listID)
+        case .newTaskPane(let listID):
+            let content: PaneContent = .tasks(listID: listID)
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
         case .movePane(let sourceID):
@@ -201,14 +197,14 @@ final class WorkspaceStore {
     var selectedWorkspaceID: UUID?
 
     private let repoStore: RepoStore
-    private let taskStoreRegistry: TaskStoreRegistry
+    private let taskListStore: TaskListStore
     private let profileStore: AgentProfileStore
 
     private static let selectedKey = "selectedWorkspaceID"
 
-    init(repoStore: RepoStore, taskStoreRegistry: TaskStoreRegistry, profileStore: AgentProfileStore) {
+    init(repoStore: RepoStore, taskListStore: TaskListStore, profileStore: AgentProfileStore) {
         self.repoStore = repoStore
-        self.taskStoreRegistry = taskStoreRegistry
+        self.taskListStore = taskListStore
         self.profileStore = profileStore
         load()
     }
@@ -225,7 +221,7 @@ final class WorkspaceStore {
         let ws = Workspace(
             name: finalName,
             repoStore: repoStore,
-            taskStoreRegistry: taskStoreRegistry,
+            taskListStore: taskListStore,
             profileStore: profileStore
         )
         workspaces.append(ws)
@@ -286,7 +282,7 @@ final class WorkspaceStore {
                 name: snap.name,
                 root: snap.root,
                 repoStore: repoStore,
-                taskStoreRegistry: taskStoreRegistry,
+                taskListStore: taskListStore,
                 profileStore: profileStore
             )
         }

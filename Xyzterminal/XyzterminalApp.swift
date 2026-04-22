@@ -4,20 +4,20 @@ import AppKit
 struct XyzterminalApp: App {
     @State private var repoStore = RepoStore()
     @State private var profileStore = AgentProfileStore()
-    @State private var taskStoreRegistry = TaskStoreRegistry()
+    @State private var taskListStore = TaskListStore()
     @State private var workspaceStore: WorkspaceStore
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
 
     init() {
         let repos = RepoStore()
-        let tasks = TaskStoreRegistry()
+        let lists = TaskListStore()
         let profiles = AgentProfileStore()
         _repoStore = State(initialValue: repos)
-        _taskStoreRegistry = State(initialValue: tasks)
+        _taskListStore = State(initialValue: lists)
         _profileStore = State(initialValue: profiles)
         _workspaceStore = State(initialValue: WorkspaceStore(
             repoStore: repos,
-            taskStoreRegistry: tasks,
+            taskListStore: lists,
             profileStore: profiles
         ))
     }
@@ -28,7 +28,7 @@ struct XyzterminalApp: App {
                 RepoSidebarView(
                     repoStore: repoStore,
                     profileStore: profileStore,
-                    taskStoreRegistry: taskStoreRegistry,
+                    taskListStore: taskListStore,
                     workspaceStore: workspaceStore
                 )
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)

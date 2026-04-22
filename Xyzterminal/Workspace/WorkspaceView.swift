@@ -68,8 +68,8 @@ private struct WorkspacePane: View {
             switch pane.content {
             case .terminal(let repoID, let worktreeID):
                 TerminalPaneBody(paneID: pane.id, repoID: repoID, worktreeID: worktreeID, workspace: workspace)
-            case .tasks(let repoID, let listID):
-                TaskPaneBody(paneID: pane.id, repoID: repoID, listID: listID, workspace: workspace)
+            case .tasks(let listID):
+                TaskPaneBody(paneID: pane.id, listID: listID, workspace: workspace)
             }
         }
     }
@@ -95,41 +95,33 @@ private struct PaneFrame<Content: View>: View {
 
 private struct TaskPaneBody: View {
     let paneID: UUID
-    let repoID: UUID
     let listID: UUID
     let workspace: Workspace
     @State private var isTargeted = false
 
     var body: some View {
         GeometryReader { geo in
-            if let store = workspace.taskStore(repoID: repoID) {
-                TaskPaneView(
-                    paneID: paneID,
-                    listID: listID,
-                    store: store,
-                    repoName: workspace.repo(id: repoID)?.name,
-                    repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
-                    focused: workspace.focusedPaneID == paneID,
-                    onActivate: { workspace.setFocus(paneID: paneID) },
-                    onClose: { workspace.closePane(paneID: paneID) }
-                )
-                .frame(width: geo.size.width, height: geo.size.height)
-                .overlay {
-                    if isTargeted {
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(Color.accentColor, lineWidth: 3)
-                            .allowsHitTesting(false)
-                    }
+            TaskPaneView(
+                paneID: paneID,
+                listID: listID,
+                store: workspace.taskListStore,
+                focused: workspace.focusedPaneID == paneID,
+                onActivate: { workspace.setFocus(paneID: paneID) },
+                onClose: { workspace.closePane(paneID: paneID) }
+            )
+            .frame(width: geo.size.width, height: geo.size.height)
+            .overlay {
+                if isTargeted {
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.accentColor, lineWidth: 3)
+                        .allowsHitTesting(false)
                 }
-                .dropDestination(for: TilingDragPayload.self) { items, location in
-                    guard let payload = items.first else { return false }
-                    let edge = TileEdge.zone(for: location, in: geo.size)
-                    return workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
-                } isTargeted: { isTargeted = $0 }
-            } else {
-                MissingRepoBody(onRemove: { workspace.closePane(paneID: paneID) })
-                    .frame(width: geo.size.width, height: geo.size.height)
             }
+            .dropDestination(for: TilingDragPayload.self) { items, location in
+                guard let payload = items.first else { return false }
+                let edge = TileEdge.zone(for: location, in: geo.size)
+                return workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
+            } isTargeted: { isTargeted = $0 }
         }
     }
 }
@@ -288,23 +280,3 @@ private struct MissingWorktreeBody: View {
     }
 }
 
-private struct MissingRepoBody: View {
-    let onRemove: () -> Void
-
-    var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 30))
-                .foregroundStyle(.orange)
-            Text("Repository unavailable")
-                .font(.headline)
-            Text("The repo this pane belongs to was removed from the library.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Remove Pane", role: .destructive, action: onRemove)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-    }
-}
