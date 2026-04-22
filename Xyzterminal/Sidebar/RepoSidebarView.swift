@@ -150,7 +150,7 @@ struct RepoSidebarView: View {
             RenameWorkspaceSheet(workspace: ws, workspaceStore: workspaceStore)
         }
         .sheet(item: $newWorktreeRepo) { repo in
-            NewWorktreeSheet(repo: repo, profileStore: profileStore) { refresh(repo) }
+            NewWorktreeSheet(repo: repo, profileStore: profileStore) { _ in refresh(repo) }
         }
         .sheet(item: $renameTarget) { target in
             RenameWorktreeSheet(target: target) { refresh(target.repo) }
@@ -531,10 +531,10 @@ private struct WorktreeConfigFields: View {
     }
 }
 
-private struct NewWorktreeSheet: View {
+struct NewWorktreeSheet: View {
     let repo: RepoEntry
     let profileStore: AgentProfileStore
-    let onCreated: () -> Void
+    let onCreated: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
     @State private var baseBranch: String = ""
@@ -612,7 +612,7 @@ private struct NewWorktreeSheet: View {
                 startupScript: startupScript.isEmpty ? nil : startupScript
             )
             config.save(at: path.path)
-            onCreated()
+            onCreated("xyz-\(cleanName)")
             dismiss()
         } catch let WorktreeError.createFailed(message) {
             error = message

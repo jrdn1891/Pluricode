@@ -41,6 +41,10 @@ struct XyzterminalApp: App {
                 }
             }
             .toolbar {
+                PaneCreationToolbar(
+                    workspace: workspaceStore.selectedWorkspace,
+                    profileStore: profileStore
+                )
                 ToolbarItemGroup {
                     Picker("Appearance", selection: $appearanceModeRaw) {
                         ForEach(AppearanceMode.allCases, id: \.rawValue) { mode in

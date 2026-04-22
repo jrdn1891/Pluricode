@@ -119,7 +119,7 @@ final class Workspace {
             host.teardown()
         }
         tiling.remove(paneID: paneID)
-        if focusedPaneID == paneID { focusedPaneID = nil }
+        if focusedPaneID == paneID { focusedPaneID = tiling.panes.first?.id }
         scheduleSave()
     }
 
@@ -141,6 +141,33 @@ final class Workspace {
         guard let id = focusedPaneID, let pane = pane(id: id) else { return }
         let edge: TileEdge = direction == .horizontal ? .right : .bottom
         splitPane(paneID: id, edge: edge, content: pane.content)
+    }
+
+    var anchorPaneID: UUID? {
+        if let id = focusedPaneID, pane(id: id) != nil { return id }
+        return tiling.panes.first?.id
+    }
+
+    enum PaneCreationAction {
+        case addNew
+        case splitRight
+        case splitDown
+
+        var edge: TileEdge? {
+            switch self {
+            case .addNew: nil
+            case .splitRight: .right
+            case .splitDown: .bottom
+            }
+        }
+    }
+
+    func performPaneCreation(_ action: PaneCreationAction, content: PaneContent) {
+        if let edge = action.edge, let anchor = anchorPaneID {
+            splitPane(paneID: anchor, edge: edge, content: content)
+        } else {
+            addPane(content)
+        }
     }
 
     func pane(id: UUID) -> Pane? {
