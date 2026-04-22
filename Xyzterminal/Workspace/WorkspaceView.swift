@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct WorkspaceView: View {
     let workspace: Workspace
@@ -97,7 +98,7 @@ private struct TaskPaneBody: View {
     let paneID: UUID
     let listID: UUID
     let workspace: Workspace
-    @State private var isTargeted = false
+    @State private var hoverEdge: TileEdge?
 
     var body: some View {
         GeometryReader { geo in
@@ -111,17 +112,19 @@ private struct TaskPaneBody: View {
             )
             .frame(width: geo.size.width, height: geo.size.height)
             .overlay {
-                if isTargeted {
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.accentColor, lineWidth: 3)
-                        .allowsHitTesting(false)
+                if let edge = hoverEdge {
+                    DropZoneOverlay(edge: edge, size: geo.size)
                 }
             }
-            .dropDestination(for: TilingDragPayload.self) { items, location in
-                guard let payload = items.first else { return false }
-                let edge = TileEdge.zone(for: location, in: geo.size)
-                return workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
-            } isTargeted: { isTargeted = $0 }
+            .onDrop(
+                of: [.plainText],
+                delegate: PaneDropDelegate(
+                    paneID: paneID,
+                    workspace: workspace,
+                    size: geo.size,
+                    hoverEdge: $hoverEdge
+                )
+            )
         }
     }
 }
@@ -131,7 +134,7 @@ private struct TerminalPaneBody: View {
     let repoID: UUID
     let worktreeID: String
     let workspace: Workspace
-    @State private var isTargeted = false
+    @State private var hoverEdge: TileEdge?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -150,17 +153,19 @@ private struct TerminalPaneBody: View {
                 GeometryReader { geo in
                     TerminalPaneView(paneID: paneID, worktreePath: path, workspace: workspace)
                         .overlay {
-                            if isTargeted {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .stroke(Color.accentColor, lineWidth: 3)
-                                    .allowsHitTesting(false)
+                            if let edge = hoverEdge {
+                                DropZoneOverlay(edge: edge, size: geo.size)
                             }
                         }
-                        .dropDestination(for: TilingDragPayload.self) { items, location in
-                            guard let payload = items.first else { return false }
-                            let edge = TileEdge.zone(for: location, in: geo.size)
-                            return workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
-                        } isTargeted: { isTargeted = $0 }
+                        .onDrop(
+                            of: [.plainText],
+                            delegate: PaneDropDelegate(
+                                paneID: paneID,
+                                workspace: workspace,
+                                size: geo.size,
+                                hoverEdge: $hoverEdge
+                            )
+                        )
                 }
             } else {
                 MissingWorktreeBody(
@@ -277,6 +282,73 @@ private struct MissingWorktreeBody: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+    }
+}
+
+private struct DropZoneOverlay: View {
+    let edge: TileEdge
+    let size: CGSize
+
+    var body: some View {
+        let rect = frame(for: edge, in: size)
+        ZStack(alignment: .topLeading) {
+            Color.clear
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.accentColor.opacity(0.22))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.accentColor, lineWidth: 2)
+                )
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+        }
+        .frame(width: size.width, height: size.height)
+        .allowsHitTesting(false)
+    }
+
+    private func frame(for edge: TileEdge, in s: CGSize) -> CGRect {
+        switch edge {
+        case .left:   CGRect(x: 0, y: 0, width: s.width / 2, height: s.height)
+        case .right:  CGRect(x: s.width / 2, y: 0, width: s.width / 2, height: s.height)
+        case .top:    CGRect(x: 0, y: 0, width: s.width, height: s.height / 2)
+        case .bottom: CGRect(x: 0, y: s.height / 2, width: s.width, height: s.height / 2)
+        case .center: CGRect(x: 0, y: 0, width: s.width, height: s.height)
+        }
+    }
+}
+
+private struct PaneDropDelegate: DropDelegate {
+    let paneID: UUID
+    let workspace: Workspace
+    let size: CGSize
+    @Binding var hoverEdge: TileEdge?
+
+    func dropEntered(info: DropInfo) {
+        hoverEdge = TileEdge.zone(for: info.location, in: size)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        hoverEdge = TileEdge.zone(for: info.location, in: size)
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        hoverEdge = nil
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let edge = TileEdge.zone(for: info.location, in: size)
+        hoverEdge = nil
+        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
+        provider.loadObject(ofClass: NSString.self) { obj, _ in
+            guard let str = obj as? String,
+                  let data = str.data(using: .utf8),
+                  let payload = try? JSONDecoder().decode(TilingDragPayload.self, from: data) else { return }
+            DispatchQueue.main.async {
+                _ = workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
+            }
+        }
+        return true
     }
 }
 
