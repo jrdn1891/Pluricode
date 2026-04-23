@@ -3,6 +3,7 @@ import AppKit
 final class TerminalHost {
     let paneID: UUID
     let session: TerminalSession
+    let containerView: NSView
     let worktreePath: String
     let repoPath: String
     let profileStore: AgentProfileStore
@@ -16,6 +17,19 @@ final class TerminalHost {
         self.session = TerminalSession(nodeID: paneID)
         session.worktreePath = worktreePath
         session.updateColors(theme: Theme(from: NSApp.effectiveAppearance))
+
+        let container = NSView()
+        container.wantsLayer = true
+        let term = session.terminalView
+        term.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(term)
+        NSLayoutConstraint.activate([
+            term.topAnchor.constraint(equalTo: container.topAnchor),
+            term.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            term.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            term.trailingAnchor.constraint(equalTo: container.trailingAnchor)
+        ])
+        self.containerView = container
     }
 
     func startIfNeeded(scrollbackDir: URL?) {
@@ -50,6 +64,6 @@ final class TerminalHost {
     }
 
     func teardown() {
-        session.terminalView.removeFromSuperview()
+        containerView.removeFromSuperview()
     }
 }
