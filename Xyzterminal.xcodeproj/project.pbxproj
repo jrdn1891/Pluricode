@@ -29,6 +29,7 @@
 		CC14D0F279F5583D5667B0D4 /* TileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D8807F79D451D6669CB351 /* TileView.swift */; };
 		CD9D32DD5990399A0B439235 /* AgentProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9C9B62C0A82E76AD43A88F /* AgentProfile.swift */; };
 		CEAF16BCE08C2FF6B55FA7A1 /* TaskListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15AD31D5FF8879E75E561D33 /* TaskListStore.swift */; };
+		CF486B7FB934E4E547A2D414 /* RepoConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DCA75C55995269AD853713F /* RepoConfig.swift */; };
 		D3774A137E5C81B828300A63 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB265D25F3219E4571B8447D /* main.swift */; };
 		EEA5CB94D64EE82CAA321F1C /* WorktreeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51FB01DA723BBB40D3DC9DEF /* WorktreeManager.swift */; };
 		EF064F2F95F6BE2AA0D28F4D /* TileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 758E84811F94A5C7522D707C /* TileNode.swift */; };
@@ -41,6 +42,7 @@
 		1E01E2B498EEB596A16D650F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2150572CE6EEA9DF3537CEBD /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
 		23CFDE6700E81D5C6B4455E4 /* AgentDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDefinition.swift; sourceTree = "<group>"; };
+		3DCA75C55995269AD853713F /* RepoConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoConfig.swift; sourceTree = "<group>"; };
 		3E9C9B62C0A82E76AD43A88F /* AgentProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfile.swift; sourceTree = "<group>"; };
 		50E1EC637C98D51034186555 /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
 		51FB01DA723BBB40D3DC9DEF /* WorktreeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeManager.swift; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 		68208F0CDF51B5D3A3EB34E2 /* Model */ = {
 			isa = PBXGroup;
 			children = (
+				3DCA75C55995269AD853713F /* RepoConfig.swift */,
 				E53F1D0451E9B5EFF0BA15B1 /* RepoStore.swift */,
 			);
 			path = Model;
@@ -257,6 +260,7 @@
 				CD9D32DD5990399A0B439235 /* AgentProfile.swift in Sources */,
 				78C57035C1719895CAE50A59 /* AgentProfileStore.swift in Sources */,
 				684CD9C91C03DFAE20F4F5F3 /* PaneCreationToolbar.swift in Sources */,
+				CF486B7FB934E4E547A2D414 /* RepoConfig.swift in Sources */,
 				207C692E80710428C5318E6B /* RepoSidebarView.swift in Sources */,
 				74457D2DE366B73DC7A15C7B /* RepoStore.swift in Sources */,
 				5CEEEFBDD7CADE7AB369CFC0 /* RoleInjector.swift in Sources */,

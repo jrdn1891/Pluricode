@@ -4,6 +4,7 @@ import AppKit
 struct TerminalPaneView: NSViewRepresentable {
     let paneID: UUID
     let worktreePath: String
+    let repoPath: String
     let workspace: Workspace
     @Environment(\.colorScheme) private var colorScheme
 
@@ -48,7 +49,12 @@ struct TerminalPaneView: NSViewRepresentable {
 
     private func hostForPane() -> TerminalHost {
         if let existing = workspace.terminalHosts[paneID] { return existing }
-        let host = TerminalHost(paneID: paneID, worktreePath: worktreePath, profileStore: workspace.profileStore)
+        let host = TerminalHost(
+            paneID: paneID,
+            worktreePath: worktreePath,
+            repoPath: repoPath,
+            profileStore: workspace.profileStore
+        )
         workspace.terminalHosts[paneID] = host
         return host
     }

@@ -150,9 +150,9 @@ private struct TerminalPaneBody: View {
                 onActivate: { workspace.setFocus(paneID: paneID) },
                 onClose: { workspace.closePane(paneID: paneID) }
             )
-            if let path = resolveWorktreePath() {
+            if let path = resolveWorktreePath(), let repoPath = workspace.repo(id: repoID)?.path.path {
                 GeometryReader { geo in
-                    TerminalPaneView(paneID: paneID, worktreePath: path, workspace: workspace)
+                    TerminalPaneView(paneID: paneID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                         .overlay {
                             if let edge = hoverEdge {
                                 DropZoneOverlay(edge: edge, size: geo.size)
