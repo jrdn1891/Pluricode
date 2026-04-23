@@ -8,15 +8,13 @@ struct RepoSidebarView: View {
     @State private var expanded: Set<UUID> = []
     @State private var worktrees: [UUID: [Worktree]] = [:]
     @State private var newWorktreeRepo: RepoEntry?
-    @State private var deleteCandidate: DeleteCandidate?
     @State private var renameTarget: RenameTarget?
     @State private var configureTarget: RenameTarget?
     @State private var creatingList = false
     @State private var renameListTarget: TaskList?
-    @State private var deleteListCandidate: TaskList?
     @State private var creatingWorkspace = false
     @State private var renameWorkspaceTarget: Workspace?
-    @State private var deleteWorkspaceCandidate: Workspace?
+    @State private var pendingDelete: PendingDelete?
 
     var body: some View {
         List(selection: Binding(
@@ -34,7 +32,7 @@ struct RepoSidebarView: View {
                         .contextMenu {
                             Button("Rename...") { renameWorkspaceTarget = ws }
                             Divider()
-                            Button("Delete", role: .destructive) { deleteWorkspaceCandidate = ws }
+                            Button("Delete", role: .destructive) { pendingDelete = .workspace(ws) }
                         }
                 }
             } header: {
@@ -47,7 +45,7 @@ struct RepoSidebarView: View {
                         .contextMenu {
                             Button("Rename...") { renameListTarget = list }
                             Divider()
-                            Button("Delete", role: .destructive) { deleteListCandidate = list }
+                            Button("Delete", role: .destructive) { pendingDelete = .taskList(list) }
                         }
                 }
             } header: {
@@ -95,7 +93,7 @@ struct RepoSidebarView: View {
                                         }
                                         Divider()
                                         Button("Delete", role: .destructive) {
-                                            deleteCandidate = DeleteCandidate(repo: repo, worktree: wt)
+                                            pendingDelete = .worktree(repo: repo, worktree: wt)
                                         }
                                     }
                                 }
@@ -142,44 +140,38 @@ struct RepoSidebarView: View {
         .sheet(item: $renameListTarget) { list in
             RenameTaskListSheet(store: taskListStore, list: list)
         }
-        .alert(item: $deleteCandidate) { cand in
-            Alert(
-                title: Text("Delete \(cand.worktree.displayName)?"),
-                message: Text("This runs `git worktree remove --force` and deletes the branch `\(cand.worktree.branch)`."),
-                primaryButton: .destructive(Text("Delete")) {
-                    delete(cand)
-                },
-                secondaryButton: .cancel()
-            )
-        }
-        .alert(
-            "Delete list \(deleteListCandidate?.name ?? "")?",
-            isPresented: Binding(
-                get: { deleteListCandidate != nil },
-                set: { if !$0 { deleteListCandidate = nil } }
-            ),
-            presenting: deleteListCandidate,
-            actions: { list in
-                Button("Delete", role: .destructive) {
-                    taskListStore.removeList(id: list.id)
-                }
-                Button("Cancel", role: .cancel) { }
-            },
-            message: { list in
-                Text(list.items.isEmpty
-                    ? "The list is empty. This cannot be undone."
-                    : "This will delete \(list.items.count) task\(list.items.count == 1 ? "" : "s").")
+        .alert(item: $pendingDelete) { item in
+            switch item {
+            case .worktree(let repo, let wt):
+                return Alert(
+                    title: Text("Delete \(wt.displayName)?"),
+                    message: Text("This runs `git worktree remove --force` and deletes the branch `\(wt.branch)`."),
+                    primaryButton: .destructive(Text("Delete")) {
+                        deleteWorktree(repo: repo, worktree: wt)
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .taskList(let list):
+                return Alert(
+                    title: Text("Delete list \(list.name)?"),
+                    message: Text(list.items.isEmpty
+                        ? "The list is empty. This cannot be undone."
+                        : "This will delete \(list.items.count) task\(list.items.count == 1 ? "" : "s")."),
+                    primaryButton: .destructive(Text("Delete")) {
+                        taskListStore.removeList(id: list.id)
+                    },
+                    secondaryButton: .cancel()
+                )
+            case .workspace(let ws):
+                return Alert(
+                    title: Text("Delete workspace \(ws.name)?"),
+                    message: Text("Panes are removed from the canvas. Worktrees and task lists are untouched."),
+                    primaryButton: .destructive(Text("Delete")) {
+                        workspaceStore.removeWorkspace(id: ws.id)
+                    },
+                    secondaryButton: .cancel()
+                )
             }
-        )
-        .alert(item: $deleteWorkspaceCandidate) { ws in
-            Alert(
-                title: Text("Delete workspace \(ws.name)?"),
-                message: Text("Panes are removed from the canvas. Worktrees and task lists are untouched."),
-                primaryButton: .destructive(Text("Delete")) {
-                    workspaceStore.removeWorkspace(id: ws.id)
-                },
-                secondaryButton: .cancel()
-            )
         }
     }
 
@@ -200,15 +192,15 @@ struct RepoSidebarView: View {
         worktrees[repo.id] = wm.listManagedWorktrees()
     }
 
-    private func delete(_ cand: DeleteCandidate) {
-        guard let wm = WorktreeManager(repoRoot: cand.repo.path) else { return }
-        let url = URL(fileURLWithPath: cand.worktree.path)
+    private func deleteWorktree(repo: RepoEntry, worktree: Worktree) {
+        guard let wm = WorktreeManager(repoRoot: repo.path) else { return }
+        let url = URL(fileURLWithPath: worktree.path)
         try? wm.removeWorktree(at: url)
         _ = try? Process.run(
             URL(fileURLWithPath: "/usr/bin/git"),
-            arguments: ["-C", cand.repo.path.path, "branch", "-D", cand.worktree.branch]
+            arguments: ["-C", repo.path.path, "branch", "-D", worktree.branch]
         )
-        refresh(cand.repo)
+        refresh(repo)
     }
 
     private func pickFolder() {
@@ -349,10 +341,18 @@ private struct ColorPickerRow: View {
     }
 }
 
-private struct DeleteCandidate: Identifiable {
-    let repo: RepoEntry
-    let worktree: Worktree
-    var id: String { "\(repo.id.uuidString):\(worktree.id)" }
+private enum PendingDelete: Identifiable {
+    case worktree(repo: RepoEntry, worktree: Worktree)
+    case taskList(TaskList)
+    case workspace(Workspace)
+
+    var id: String {
+        switch self {
+        case .worktree(let repo, let wt): return "wt:\(repo.id.uuidString):\(wt.id)"
+        case .taskList(let list): return "tl:\(list.id)"
+        case .workspace(let ws): return "ws:\(ws.id)"
+        }
+    }
 }
 
 private struct RenameTarget: Identifiable {
