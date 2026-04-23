@@ -118,8 +118,56 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     var onDataReceived: (() -> Void)?
 
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        registerForDraggedTypes(registeredDraggedTypes + [.fileURL, .tiff, .png])
+    }
+
+    required init?(coder: NSCoder) { super.init(coder: coder) }
+
     override func dataReceived(slice: ArraySlice<UInt8>) {
         super.dataReceived(slice: slice)
         onDataReceived?()
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        droppedPaths(sender).isEmpty ? super.draggingEntered(sender) : .copy
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        droppedPaths(sender).isEmpty ? super.draggingUpdated(sender) : .copy
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let paths = droppedPaths(sender)
+        guard !paths.isEmpty else { return super.performDragOperation(sender) }
+        let bytes = Array(paths.map(Self.shellEscape).joined(separator: " ").utf8)
+        process?.send(data: bytes[...])
+        return true
+    }
+
+    private func droppedPaths(_ sender: NSDraggingInfo) -> [String] {
+        let pb = sender.draggingPasteboard
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+           !urls.isEmpty {
+            return urls.filter(\.isFileURL).map(\.path)
+        }
+        if let image = NSImage(pasteboard: pb), let path = Self.writeTempPNG(image) {
+            return [path]
+        }
+        return []
+    }
+
+    private static func writeTempPNG(_ image: NSImage) -> String? {
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let data = rep.representation(using: .png, properties: [:]) else { return nil }
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("xyzterminal-\(UUID().uuidString.prefix(8)).png")
+        do { try data.write(to: url); return url.path } catch { return nil }
+    }
+
+    private static func shellEscape(_ path: String) -> String {
+        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
