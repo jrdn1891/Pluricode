@@ -557,7 +557,7 @@ struct WorktreeRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if !stats.isClean {
+            if !isMerged && !stats.isClean {
                 HStack(spacing: 4) {
                     if stats.additions > 0 {
                         Text("+\(stats.additions)")
