@@ -66,41 +66,17 @@ struct RepoSidebarView: View {
 
             Section("Repositories") {
                 ForEach(repoStore.repos) { repo in
-                    RepoRow(repo: repo, isExpanded: expanded.contains(repo.id), toggle: { toggle(repo) })
-                        .contextMenu {
-                            Menu("Color") {
-                                Button {
-                                    repoStore.setColor(id: repo.id, color: nil)
-                                } label: {
-                                    ColorMenuLabel(
-                                        title: "Automatic",
-                                        swatch: repo.resolvedColor.swiftUIColor,
-                                        dashed: true,
-                                        selected: repo.color == nil
-                                    )
-                                }
-                                Divider()
-                                ForEach(RepoColor.allCases, id: \.self) { c in
-                                    Button {
-                                        repoStore.setColor(id: repo.id, color: c)
-                                    } label: {
-                                        ColorMenuLabel(
-                                            title: c.label,
-                                            swatch: c.swiftUIColor,
-                                            dashed: false,
-                                            selected: repo.color == c
-                                        )
-                                    }
-                                }
-                            }
-                            Button("Show in Finder") {
-                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.path.path)
-                            }
-                            Divider()
-                            Button("Remove", role: .destructive) {
-                                repoStore.removeRepo(id: repo.id)
-                            }
-                        }
+                    RepoRow(
+                        repo: repo,
+                        isExpanded: expanded.contains(repo.id),
+                        toggle: { toggle(repo) },
+                        onSetColor: { repoStore.setColor(id: repo.id, color: $0) },
+                        onNewWorktree: { newWorktreeRepo = repo },
+                        onShowInFinder: {
+                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.path.path)
+                        },
+                        onRemove: { repoStore.removeRepo(id: repo.id) }
+                    )
 
                     if expanded.contains(repo.id) {
                         ForEach(worktrees[repo.id] ?? []) { wt in
@@ -282,6 +258,72 @@ private struct ColorMenuLabel: View {
     }
 }
 
+private struct ColorPickerPopover: View {
+    let current: RepoColor?
+    let resolved: RepoColor
+    let onSelect: (RepoColor?) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ColorPickerRow(
+                title: "Automatic",
+                swatch: resolved.swiftUIColor,
+                dashed: true,
+                selected: current == nil
+            ) { onSelect(nil) }
+            Divider().padding(.vertical, 4)
+            ForEach(RepoColor.allCases, id: \.self) { c in
+                ColorPickerRow(
+                    title: c.label,
+                    swatch: c.swiftUIColor,
+                    dashed: false,
+                    selected: current == c
+                ) { onSelect(c) }
+            }
+        }
+        .padding(6)
+        .frame(width: 160)
+    }
+}
+
+private struct ColorPickerRow: View {
+    let title: String
+    let swatch: Color
+    let dashed: Bool
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Group {
+                    if dashed {
+                        Circle()
+                            .strokeBorder(swatch, style: StrokeStyle(lineWidth: 1.2, dash: [2, 1.5]))
+                    } else {
+                        Circle().fill(swatch)
+                    }
+                }
+                .frame(width: 10, height: 10)
+                Text(title)
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.caption)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+            .background(hovered ? Color.accentColor.opacity(0.25) : Color.clear)
+            .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+}
+
 private struct DeleteCandidate: Identifiable {
     let repo: RepoEntry
     let worktree: Worktree
@@ -316,6 +358,13 @@ struct RepoRow: View {
     let repo: RepoEntry
     let isExpanded: Bool
     let toggle: () -> Void
+    let onSetColor: (RepoColor?) -> Void
+    let onNewWorktree: () -> Void
+    let onShowInFinder: () -> Void
+    let onRemove: () -> Void
+
+    @State private var isHovered = false
+    @State private var showColorPicker = false
 
     private var pathExists: Bool {
         FileManager.default.fileExists(atPath: repo.path.path)
@@ -323,6 +372,63 @@ struct RepoRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            Button {
+                showColorPicker = true
+            } label: {
+                Circle()
+                    .fill(repo.resolvedColor.swiftUIColor)
+                    .frame(width: 10, height: 10)
+                    .padding(2)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Change color")
+            .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
+                ColorPickerPopover(
+                    current: repo.color,
+                    resolved: repo.resolvedColor
+                ) { color in
+                    onSetColor(color)
+                    showColorPicker = false
+                }
+            }
+
+            Text(repo.name)
+                .font(.body)
+
+            if !pathExists {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.yellow)
+                    .font(.caption)
+            }
+
+            Spacer(minLength: 4)
+
+            if isHovered {
+                Menu {
+                    Button("Show in Finder", action: onShowInFinder)
+                    Divider()
+                    Button("Remove", role: .destructive, action: onRemove)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 14)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+
+                Button(action: onNewWorktree) {
+                    Image(systemName: "plus")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 12)
+                }
+                .buttonStyle(.plain)
+                .help("New Worktree")
+            }
+
             Button(action: toggle) {
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                     .font(.caption)
@@ -330,28 +436,10 @@ struct RepoRow: View {
                     .frame(width: 12)
             }
             .buttonStyle(.plain)
-
-            Image(systemName: "folder.fill")
-                .foregroundStyle(repo.resolvedColor.swiftUIColor)
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(repo.name)
-                        .font(.body)
-                    if !pathExists {
-                        Image(systemName: "exclamationmark.triangle")
-                            .foregroundStyle(.yellow)
-                            .font(.caption)
-                    }
-                }
-                Text(repo.path.path)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.head)
-            }
         }
         .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
     }
 }
 
