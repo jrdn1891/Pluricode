@@ -460,6 +460,7 @@ struct WorktreeRow: View {
     let repoID: UUID
     let worktree: Worktree
     let profileStore: AgentProfileStore
+    @State private var stats: DiffStats = .zero
 
     private var assignedProfile: AgentProfile? {
         let config = WorktreeConfig.load(at: worktree.path)
@@ -490,9 +491,30 @@ struct WorktreeRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if !stats.isClean {
+                HStack(spacing: 4) {
+                    if stats.additions > 0 {
+                        Text("+\(stats.additions)")
+                            .foregroundStyle(.green)
+                    }
+                    if stats.deletions > 0 {
+                        Text("-\(stats.deletions)")
+                            .foregroundStyle(.red)
+                    }
+                }
+                .font(.caption.monospacedDigit())
+            }
         }
         .contentShape(Rectangle())
         .padding(.vertical, 1)
+        .task(id: worktree.path) {
+            let path = URL(fileURLWithPath: worktree.path)
+            while !Task.isCancelled {
+                let next = await Task.detached { WorktreeManager.diffStats(at: path) }.value
+                if next != stats { stats = next }
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
         .draggable(TilingDragPayload(kind: .newTerminal(repoID: repoID, worktreeID: worktree.branch))) {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.triangle.branch")
