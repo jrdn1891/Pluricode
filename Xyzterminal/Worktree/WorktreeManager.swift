@@ -161,10 +161,11 @@ final class WorktreeManager {
     }
 
     static func diffStats(at path: URL) -> DiffStats {
+        guard let base = baseCommit(at: path) else { return .zero }
         var adds = 0
         var dels = 0
         if let result = try? run("git", args: [
-            "-C", path.path, "diff", "HEAD", "--numstat"
+            "-C", path.path, "diff", base, "--numstat"
         ]), result.status == 0 {
             for line in result.stdout.components(separatedBy: "\n") where !line.isEmpty {
                 let parts = line.split(separator: "\t")
@@ -185,6 +186,21 @@ final class WorktreeManager {
             }
         }
         return DiffStats(additions: adds, deletions: dels)
+    }
+
+    private static func baseCommit(at path: URL) -> String? {
+        var base = "main"
+        if let result = try? run("git", args: [
+            "-C", path.path, "symbolic-ref", "refs/remotes/origin/HEAD", "--short"
+        ]), result.status == 0 {
+            let name = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty { base = name }
+        }
+        guard let result = try? run("git", args: [
+            "-C", path.path, "merge-base", "HEAD", base
+        ]), result.status == 0 else { return nil }
+        let sha = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return sha.isEmpty ? nil : sha
     }
 
     func currentBranch(at path: URL) -> String? {
