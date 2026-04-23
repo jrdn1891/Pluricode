@@ -23,6 +23,7 @@ final class Workspace {
     let profileStore: AgentProfileStore
     var terminalHosts: [UUID: TerminalHost] = [:]
     var focusedPaneID: UUID?
+    var expandedPaneID: UUID?
 
     private var saveTask: Task<Void, Never>?
 
@@ -120,7 +121,35 @@ final class Workspace {
         }
         tiling.remove(paneID: paneID)
         if focusedPaneID == paneID { focusedPaneID = tiling.panes.first?.id }
+        if expandedPaneID == paneID { expandedPaneID = nil }
         scheduleSave()
+    }
+
+    func expandPane(paneID: UUID) {
+        expandedPaneID = paneID
+    }
+
+    func collapseExpandedPane() {
+        expandedPaneID = nil
+    }
+
+    func worktreePath(paneID: UUID) -> String? {
+        guard let pane = pane(id: paneID),
+              case .terminal(let repoID, let worktreeID) = pane.content,
+              let repo = repo(id: repoID),
+              let wm = WorktreeManager(repoRoot: repo.path) else { return nil }
+        return wm.listManagedWorktrees().first { $0.branch == worktreeID }?.path
+    }
+
+    func paneDisplayName(worktreeID: String) -> String {
+        worktreeID.hasPrefix("xyz-") ? String(worktreeID.dropFirst("xyz-".count)) : worktreeID
+    }
+
+    func paneProfile(paneID: UUID) -> AgentProfile? {
+        guard let path = worktreePath(paneID: paneID) else { return nil }
+        let config = WorktreeConfig.load(at: path)
+        guard let id = config.agentProfileID else { return nil }
+        return profileStore.profile(id: id)
     }
 
     func setWeights(splitID: UUID, weights: [Float]) {
