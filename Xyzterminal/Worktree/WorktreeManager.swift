@@ -85,11 +85,27 @@ final class WorktreeManager {
 
     func listManagedWorktrees() -> [Worktree] {
         let rootPath = worktreeRoot.standardizedFileURL.path
+        let primaryPath = repoRoot.standardizedFileURL.path
         let all = (try? listWorktrees()) ?? []
-        return all
+
+        var result: [Worktree] = []
+        if let primary = all.first(where: {
+            URL(fileURLWithPath: $0.path).standardizedFileURL.path == primaryPath
+        }) {
+            result.append(Worktree(
+                branch: primary.branch.isEmpty ? defaultBranch() : primary.branch,
+                path: primary.path,
+                head: primary.head,
+                isPrimary: true
+            ))
+        }
+
+        let managed = all
             .filter { URL(fileURLWithPath: $0.path).standardizedFileURL.path.hasPrefix(rootPath) }
-            .map { Worktree(branch: $0.branch, path: $0.path, head: $0.head) }
+            .map { Worktree(branch: $0.branch, path: $0.path, head: $0.head, isPrimary: false) }
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        result.append(contentsOf: managed)
+        return result
     }
 
     func renameWorktree(oldBranch: String, newName: String) throws -> Worktree {
@@ -97,7 +113,7 @@ final class WorktreeManager {
         guard newBranch != oldBranch else {
             let info = try listWorktrees().first { $0.branch == oldBranch }
             guard let info else { throw WorktreeError.createFailed("worktree not found") }
-            return Worktree(branch: info.branch, path: info.path, head: info.head)
+            return Worktree(branch: info.branch, path: info.path, head: info.head, isPrimary: false)
         }
 
         guard let info = try listWorktrees().first(where: { $0.branch == oldBranch }) else {
@@ -120,7 +136,7 @@ final class WorktreeManager {
 
         let updated = try listWorktrees().first { $0.branch == newBranch }
         guard let updated else { throw WorktreeError.createFailed("rename failed to resolve") }
-        return Worktree(branch: updated.branch, path: updated.path, head: updated.head)
+        return Worktree(branch: updated.branch, path: updated.path, head: updated.head, isPrimary: false)
     }
 
     func uncommittedCount(at path: URL) -> Int {

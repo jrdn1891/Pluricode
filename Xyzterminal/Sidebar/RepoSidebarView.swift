@@ -107,18 +107,24 @@ struct RepoSidebarView: View {
                             WorktreeRow(repoID: repo.id, worktree: wt, profileStore: profileStore)
                                 .padding(.leading, 20)
                                 .contextMenu {
-                                    Button("Configure...") {
-                                        configureTarget = RenameTarget(repo: repo, worktree: wt)
-                                    }
-                                    Button("Rename...") {
-                                        renameTarget = RenameTarget(repo: repo, worktree: wt)
-                                    }
-                                    Button("Show in Finder") {
-                                        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: wt.path)
-                                    }
-                                    Divider()
-                                    Button("Delete", role: .destructive) {
-                                        deleteCandidate = DeleteCandidate(repo: repo, worktree: wt)
+                                    if wt.isPrimary {
+                                        Button("Show in Finder") {
+                                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: wt.path)
+                                        }
+                                    } else {
+                                        Button("Configure...") {
+                                            configureTarget = RenameTarget(repo: repo, worktree: wt)
+                                        }
+                                        Button("Rename...") {
+                                            renameTarget = RenameTarget(repo: repo, worktree: wt)
+                                        }
+                                        Button("Show in Finder") {
+                                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: wt.path)
+                                        }
+                                        Divider()
+                                        Button("Delete", role: .destructive) {
+                                            deleteCandidate = DeleteCandidate(repo: repo, worktree: wt)
+                                        }
                                     }
                                 }
                         }
