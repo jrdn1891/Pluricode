@@ -69,7 +69,12 @@ struct RepoSidebarView: View {
 
                     if expanded.contains(repo.id) {
                         ForEach(worktrees[repo.id] ?? []) { wt in
-                            WorktreeRow(repoID: repo.id, worktree: wt, profileStore: profileStore)
+                            WorktreeRow(
+                                repoID: repo.id,
+                                worktree: wt,
+                                profileStore: profileStore,
+                                workspaceStore: workspaceStore
+                            )
                                 .padding(.leading, 20)
                                 .contextMenu {
                                     if wt.isPrimary {
@@ -467,7 +472,9 @@ struct WorktreeRow: View {
     let repoID: UUID
     let worktree: Worktree
     let profileStore: AgentProfileStore
+    let workspaceStore: WorkspaceStore
     @State private var stats: DiffStats = .zero
+    @State private var isHovered = false
 
     private var assignedProfile: AgentProfile? {
         let config = WorktreeConfig.load(at: worktree.path)
@@ -511,9 +518,21 @@ struct WorktreeRow: View {
                 }
                 .font(.caption.monospacedDigit())
             }
+            if isHovered, let ws = workspaceStore.selectedWorkspace {
+                Button {
+                    ws.addPane(.terminal(repoID: repoID, worktreeID: worktree.branch))
+                } label: {
+                    Image(systemName: "plus.rectangle.on.rectangle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Add to \(ws.name)")
+            }
         }
         .contentShape(Rectangle())
         .padding(.vertical, 1)
+        .onHover { isHovered = $0 }
         .task(id: worktree.path) {
             let path = URL(fileURLWithPath: worktree.path)
             while !Task.isCancelled {
