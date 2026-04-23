@@ -10,6 +10,7 @@ struct RepoSidebarView: View {
     @State private var newWorktreeRepo: RepoEntry?
     @State private var renameTarget: RenameTarget?
     @State private var configureTarget: RenameTarget?
+    @State private var configureRepo: RepoEntry?
     @State private var creatingList = false
     @State private var renameListTarget: TaskList?
     @State private var creatingWorkspace = false
@@ -61,6 +62,7 @@ struct RepoSidebarView: View {
                         toggle: { toggle(repo) },
                         onSetColor: { repoStore.setColor(id: repo.id, color: $0) },
                         onNewWorktree: { newWorktreeRepo = repo },
+                        onConfigure: { configureRepo = repo },
                         onShowInFinder: {
                             NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.path.path)
                         },
@@ -133,6 +135,9 @@ struct RepoSidebarView: View {
         }
         .sheet(item: $configureTarget) { target in
             ConfigureWorktreeSheet(target: target, profileStore: profileStore)
+        }
+        .sheet(item: $configureRepo) { repo in
+            ConfigureRepoSheet(repo: repo)
         }
         .sheet(isPresented: $creatingList) {
             NewTaskListSheet(store: taskListStore)
@@ -385,6 +390,7 @@ struct RepoRow: View {
     let toggle: () -> Void
     let onSetColor: (RepoColor?) -> Void
     let onNewWorktree: () -> Void
+    let onConfigure: () -> Void
     let onShowInFinder: () -> Void
     let onRemove: () -> Void
 
@@ -431,6 +437,7 @@ struct RepoRow: View {
 
             if isHovered {
                 Menu {
+                    Button("Configure...", action: onConfigure)
                     Button("Show in Finder", action: onShowInFinder)
                     Divider()
                     Button("Remove", role: .destructive, action: onRemove)
@@ -656,32 +663,19 @@ private struct RenameWorkspaceSheet: View {
 
 private struct WorktreeConfigFields: View {
     @Binding var agentProfileID: UUID?
-    @Binding var startupScript: String
     let profileStore: AgentProfileStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Agent Profile").font(.caption).foregroundStyle(.secondary)
-                Picker("", selection: $agentProfileID) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(profileStore.profiles) { profile in
-                        Text(profile.name).tag(UUID?.some(profile.id))
-                    }
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Agent Profile").font(.caption).foregroundStyle(.secondary)
+            Picker("", selection: $agentProfileID) {
+                Text("None").tag(UUID?.none)
+                ForEach(profileStore.profiles) { profile in
+                    Text(profile.name).tag(UUID?.some(profile.id))
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Startup Script").font(.caption).foregroundStyle(.secondary)
-                TextField("claude --dangerously-skip-permissions", text: $startupScript, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(2...5)
-                Text("Runs in the pane's shell after it opens in this worktree.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .labelsHidden()
+            .pickerStyle(.menu)
         }
     }
 }
@@ -694,7 +688,6 @@ struct NewWorktreeSheet: View {
     @State private var name: String = ""
     @State private var baseBranch: String = ""
     @State private var agentProfileID: UUID?
-    @State private var startupScript: String = ""
     @State private var error: String?
     @State private var isCreating = false
 
@@ -722,7 +715,6 @@ struct NewWorktreeSheet: View {
 
             WorktreeConfigFields(
                 agentProfileID: $agentProfileID,
-                startupScript: $startupScript,
                 profileStore: profileStore
             )
 
@@ -762,10 +754,7 @@ struct NewWorktreeSheet: View {
                 name: cleanName,
                 baseBranch: baseBranch.isEmpty ? wm.defaultBranch() : baseBranch
             )
-            let config = WorktreeConfig(
-                agentProfileID: agentProfileID,
-                startupScript: startupScript.isEmpty ? nil : startupScript
-            )
+            let config = WorktreeConfig(agentProfileID: agentProfileID)
             config.save(at: path.path)
             onCreated("xyz-\(cleanName)")
             dismiss()
@@ -790,7 +779,6 @@ private struct ConfigureWorktreeSheet: View {
     let profileStore: AgentProfileStore
     @Environment(\.dismiss) private var dismiss
     @State private var agentProfileID: UUID?
-    @State private var startupScript: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -799,7 +787,6 @@ private struct ConfigureWorktreeSheet: View {
 
             WorktreeConfigFields(
                 agentProfileID: $agentProfileID,
-                startupScript: $startupScript,
                 profileStore: profileStore
             )
 
@@ -814,18 +801,54 @@ private struct ConfigureWorktreeSheet: View {
         .padding(24)
         .frame(width: 460)
         .onAppear {
-            let config = WorktreeConfig.load(at: target.worktree.path)
-            agentProfileID = config.agentProfileID
-            startupScript = config.startupScript ?? ""
+            agentProfileID = WorktreeConfig.load(at: target.worktree.path).agentProfileID
         }
     }
 
     private func save() {
-        let config = WorktreeConfig(
-            agentProfileID: agentProfileID,
-            startupScript: startupScript.isEmpty ? nil : startupScript
-        )
-        config.save(at: target.worktree.path)
+        WorktreeConfig(agentProfileID: agentProfileID).save(at: target.worktree.path)
+        dismiss()
+    }
+}
+
+private struct ConfigureRepoSheet: View {
+    let repo: RepoEntry
+    @Environment(\.dismiss) private var dismiss
+    @State private var startupScript: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Configure \(repo.name)")
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Startup Script").font(.caption).foregroundStyle(.secondary)
+                TextField("claude --dangerously-skip-permissions", text: $startupScript, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...5)
+                Text("Runs in every worktree's shell after it opens.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Save") { save() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(24)
+        .frame(width: 460)
+        .onAppear {
+            startupScript = RepoConfig.load(at: repo.path.path).startupScript ?? ""
+        }
+    }
+
+    private func save() {
+        RepoConfig(startupScript: startupScript.isEmpty ? nil : startupScript)
+            .save(at: repo.path.path)
         dismiss()
     }
 }
