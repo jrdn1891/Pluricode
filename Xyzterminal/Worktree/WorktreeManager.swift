@@ -145,6 +145,21 @@ final class WorktreeManager {
         return result.stdout.components(separatedBy: "\n").filter { !$0.isEmpty }.count
     }
 
+    static func isMerged(at path: URL) -> Bool {
+        guard let branch = try? run("git", args: [
+            "-C", path.path, "rev-parse", "--abbrev-ref", "HEAD"
+        ]), branch.status == 0 else { return false }
+        let name = branch.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name != "HEAD" else { return false }
+
+        guard let result = try? run("gh", args: [
+            "pr", "list", "--state", "merged", "--head", name, "--limit", "1", "--json", "number"
+        ], cwd: path), result.status == 0 else { return false }
+
+        let out = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !out.isEmpty && out != "[]"
+    }
+
     static func diffStats(at path: URL) -> DiffStats {
         var adds = 0
         var dels = 0
@@ -197,10 +212,31 @@ final class WorktreeManager {
         return root.isEmpty ? nil : URL(fileURLWithPath: root)
     }
 
-    private static func run(_ executable: String, args: [String]) throws -> ProcessResult {
+    private static func resolveExecutable(_ name: String) -> URL? {
+        if name.contains("/") {
+            return URL(fileURLWithPath: name)
+        }
+        let candidates = [
+            "/usr/bin/\(name)",
+            "/opt/homebrew/bin/\(name)",
+            "/usr/local/bin/\(name)",
+            NSHomeDirectory() + "/.local/bin/\(name)",
+        ]
+        let fm = FileManager.default
+        for path in candidates where fm.isExecutableFile(atPath: path) {
+            return URL(fileURLWithPath: path)
+        }
+        return nil
+    }
+
+    private static func run(_ executable: String, args: [String], cwd: URL? = nil) throws -> ProcessResult {
+        guard let execURL = resolveExecutable(executable) else {
+            return ProcessResult(status: 127, stdout: "", stderr: "executable not found: \(executable)")
+        }
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/\(executable)")
+        process.executableURL = execURL
         process.arguments = args
+        if let cwd { process.currentDirectoryURL = cwd }
         let stdout = Pipe()
         let stderr = Pipe()
         process.standardOutput = stdout
@@ -214,8 +250,8 @@ final class WorktreeManager {
         )
     }
 
-    private func run(_ executable: String, args: [String]) throws -> ProcessResult {
-        try Self.run(executable, args: args)
+    private func run(_ executable: String, args: [String], cwd: URL? = nil) throws -> ProcessResult {
+        try Self.run(executable, args: args, cwd: cwd)
     }
 }
 
