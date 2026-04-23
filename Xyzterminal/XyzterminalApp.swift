@@ -3,22 +3,48 @@ import AppKit
 
 struct XyzterminalApp: App {
     @State private var repoStore = RepoStore()
+    @State private var profileStore = AgentProfileStore()
+    @State private var taskListStore = TaskListStore()
+    @State private var workspaceStore: WorkspaceStore
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
+
+    init() {
+        let repos = RepoStore()
+        let lists = TaskListStore()
+        let profiles = AgentProfileStore()
+        _repoStore = State(initialValue: repos)
+        _taskListStore = State(initialValue: lists)
+        _profileStore = State(initialValue: profiles)
+        _workspaceStore = State(initialValue: WorkspaceStore(
+            repoStore: repos,
+            taskListStore: lists,
+            profileStore: profiles
+        ))
+    }
 
     var body: some Scene {
         WindowGroup {
             NavigationSplitView {
-                RepoSidebarView(repoStore: repoStore)
-                    .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
+                RepoSidebarView(
+                    repoStore: repoStore,
+                    profileStore: profileStore,
+                    taskListStore: taskListStore,
+                    workspaceStore: workspaceStore
+                )
+                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
             } detail: {
-                if let repo = repoStore.selectedRepo {
-                    CanvasHostView(repoEntry: repo)
-                        .id(repo.id)
+                if let workspace = workspaceStore.selectedWorkspace {
+                    WorkspaceView(workspace: workspace)
+                        .id(workspace.id)
                 } else {
-                    EmptyCanvasView(repoStore: repoStore)
+                    EmptyDetailView(workspaceStore: workspaceStore, hasRepos: !repoStore.repos.isEmpty)
                 }
             }
             .toolbar {
+                PaneCreationToolbar(
+                    workspace: workspaceStore.selectedWorkspace,
+                    profileStore: profileStore
+                )
                 ToolbarItemGroup {
                     Picker("Appearance", selection: $appearanceModeRaw) {
                         ForEach(AppearanceMode.allCases, id: \.rawValue) { mode in
@@ -31,90 +57,86 @@ struct XyzterminalApp: App {
             }
             .onAppear {
                 (AppearanceMode(rawValue: appearanceModeRaw) ?? .system).apply()
-                migrateLastProjectPath()
             }
             .onChange(of: appearanceModeRaw) { _, newValue in
                 (AppearanceMode(rawValue: newValue) ?? .system).apply()
             }
         }
         .defaultSize(width: 1200, height: 800)
-    }
-
-    private func migrateLastProjectPath() {
-        guard repoStore.repos.isEmpty,
-              let last = Persistence.lastProjectPath,
-              FileManager.default.fileExists(atPath: last.path) else { return }
-        repoStore.addRepo(last)
-        UserDefaults.standard.removeObject(forKey: "lastProjectPath")
+        .commands {
+            CommandMenu("Pane") {
+                PaneCommands()
+            }
+        }
     }
 }
 
-struct CanvasHostView: View {
-    let repoEntry: RepoEntry
-    @State private var document = CanvasDocument()
+struct PaneCommands: View {
+    @FocusedValue(\.workspace) var workspace
 
     var body: some View {
-        CanvasContainerView(document: document)
-            .toolbar {
-                ToolbarItemGroup {
-                    Button(action: {
-                        let id = document.addNode(kind: .taskCard(TaskCardData(title: "")))
-                        document.onStartInlineEdit?(id)
-                    }) {
-                        Label("Task Card", systemImage: "square.text.square")
-                    }
-                    Button(action: { document.addNode(kind: .section(SectionData())) }) {
-                        Label("Section", systemImage: "rectangle.3.group")
-                    }
-                    Button(action: { document.showTerminalConfig = true }) {
-                        Label("Terminal", systemImage: "terminal")
-                    }
-                    Divider()
-                    Toggle(isOn: Binding(
-                        get: { document.snapToGrid },
-                        set: { document.snapToGrid = $0 }
-                    )) {
-                        Label("Snap", systemImage: "grid")
-                    }
-                }
-            }
-            .onAppear { openProject(repoEntry.path) }
-    }
+        Button("Close Pane") {
+            workspace?.closeFocusedPane()
+        }
+        .keyboardShortcut("w", modifiers: .command)
+        .disabled(workspace?.focusedPaneID == nil)
 
-    private func openProject(_ url: URL) {
-        document.projectPath = url
-        Persistence.load(into: document)
+        Button("Split Right") {
+            workspace?.splitFocusedPane(direction: .horizontal)
+        }
+        .keyboardShortcut("d", modifiers: .command)
+        .disabled(workspace?.focusedPaneID == nil)
 
-        let server = MCPServer(document: document)
-        server.start()
-        document.mcpServer = server
+        Button("Split Down") {
+            workspace?.splitFocusedPane(direction: .vertical)
+        }
+        .keyboardShortcut("d", modifiers: [.command, .shift])
+        .disabled(workspace?.focusedPaneID == nil)
     }
 }
 
-struct EmptyCanvasView: View {
-    let repoStore: RepoStore
+struct EmptyDetailView: View {
+    let workspaceStore: WorkspaceStore
+    let hasRepos: Bool
+    @State private var creating = false
+    @State private var draftName = ""
 
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "folder.badge.gearshape")
+            Image(systemName: "rectangle.split.2x1")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
-            Text("No repository selected")
+            Text("No workspace selected")
                 .font(.title2)
-            Text("Add a git repository from the sidebar")
+            Text(hasRepos
+                ? "Create a workspace to start arranging panes."
+                : "Add a repository in the sidebar, then create a workspace.")
                 .foregroundStyle(.secondary)
-            Button("Add Repository...") {
-                let panel = NSOpenPanel()
-                panel.canChooseDirectories = true
-                panel.canChooseFiles = false
-                panel.allowsMultipleSelection = false
-                panel.message = "Select a git repository"
-                if panel.runModal() == .OK, let url = panel.url {
-                    repoStore.addRepo(url)
-                }
-            }
-            .controlSize(.large)
+                .multilineTextAlignment(.center)
+            Button("New Workspace...") { creating = true }
+                .controlSize(.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $creating) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("New Workspace").font(.headline)
+                TextField("Bug Fixes", text: $draftName)
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Spacer()
+                    Button("Cancel") { creating = false }
+                        .keyboardShortcut(.cancelAction)
+                    Button("Create") {
+                        _ = workspaceStore.createWorkspace(name: draftName)
+                        draftName = ""
+                        creating = false
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .padding(24)
+            .frame(width: 360)
+        }
     }
 }

@@ -25,7 +25,6 @@ targets:
         INFOPLIST_FILE: Xyzterminal/Info.plist
         CODE_SIGN_ENTITLEMENTS: Xyzterminal/Xyzterminal.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: com.xyzterminal.app
-        SWIFT_OBJC_BRIDGING_HEADER: Xyzterminal/Xyzterminal-Bridging-Header.h
         CODE_SIGN_IDENTITY: "-"
         ENABLE_APP_SANDBOX: false
         ENABLE_HARDENED_RUNTIME: false

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import simd
 
 struct AgentProfile: Identifiable, Codable {
@@ -7,6 +8,10 @@ struct AgentProfile: Identifiable, Codable {
     var instructions: String
     var agentDefinition: String
     var color: SIMD4<Float>
+
+    var swiftUIColor: Color {
+        Color(red: Double(color.x), green: Double(color.y), blue: Double(color.z), opacity: Double(color.w))
+    }
 
     static let defaults: [AgentProfile] = [
         AgentProfile(
