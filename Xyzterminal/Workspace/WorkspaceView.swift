@@ -210,9 +210,9 @@ private struct PaneHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             if let repoName {
-                Image(systemName: "folder.fill")
-                    .foregroundStyle(repoColor ?? .accentColor)
-                    .font(.caption)
+                Circle()
+                    .fill(repoColor ?? .accentColor)
+                    .frame(width: 10, height: 10)
                 Text(repoName)
                     .font(.system(size: 12, weight: .medium))
                 Text("·")
