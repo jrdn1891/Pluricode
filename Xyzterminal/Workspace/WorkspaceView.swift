@@ -5,8 +5,15 @@ struct WorkspaceView: View {
     let workspace: Workspace
 
     var body: some View {
-        WorkspaceBody(workspace: workspace)
-            .focusedSceneValue(\.workspace, workspace)
+        ZStack {
+            WorkspaceBody(workspace: workspace)
+            if let id = workspace.expandedPaneID {
+                ExpandedPaneOverlay(paneID: id, workspace: workspace)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: workspace.expandedPaneID)
+        .focusedSceneValue(\.workspace, workspace)
     }
 }
 
@@ -137,20 +144,28 @@ private struct TerminalPaneBody: View {
     @State private var hoverEdge: TileEdge?
 
     var body: some View {
+        let isExpanded = workspace.expandedPaneID == paneID
         VStack(spacing: 0) {
             PaneHeader(
                 paneID: paneID,
                 workspace: workspace,
-                title: displayName,
+                title: workspace.paneDisplayName(worktreeID: worktreeID),
                 branch: worktreeID,
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
-                profile: resolveProfile(),
+                profile: workspace.paneProfile(paneID: paneID),
                 focused: workspace.focusedPaneID == paneID,
+                isExpanded: isExpanded,
                 onActivate: { workspace.setFocus(paneID: paneID) },
+                onExpand: {
+                    if isExpanded { workspace.collapseExpandedPane() }
+                    else { workspace.expandPane(paneID: paneID) }
+                },
                 onClose: { workspace.closePane(paneID: paneID) }
             )
-            if let path = resolveWorktreePath(), let repoPath = workspace.repo(id: repoID)?.path.path {
+            if isExpanded {
+                ExpandedPanePlaceholder()
+            } else if let path = workspace.worktreePath(paneID: paneID), let repoPath = workspace.repo(id: repoID)?.path.path {
                 GeometryReader { geo in
                     TerminalPaneView(paneID: paneID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                         .overlay {
@@ -177,21 +192,17 @@ private struct TerminalPaneBody: View {
         }
     }
 
-    private var displayName: String {
-        worktreeID.hasPrefix("xyz-") ? String(worktreeID.dropFirst("xyz-".count)) : worktreeID
-    }
+}
 
-    private func resolveWorktreePath() -> String? {
-        guard let repo = workspace.repo(id: repoID),
-              let wm = WorktreeManager(repoRoot: repo.path) else { return nil }
-        return wm.listManagedWorktrees().first { $0.branch == worktreeID }?.path
-    }
-
-    private func resolveProfile() -> AgentProfile? {
-        guard let path = resolveWorktreePath() else { return nil }
-        let config = WorktreeConfig.load(at: path)
-        guard let id = config.agentProfileID else { return nil }
-        return workspace.profileStore.profile(id: id)
+private struct ExpandedPanePlaceholder: View {
+    var body: some View {
+        ZStack {
+            Color.secondary.opacity(0.08)
+            Text("Expanded")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -204,7 +215,9 @@ private struct PaneHeader: View {
     let repoColor: Color?
     let profile: AgentProfile?
     let focused: Bool
+    let isExpanded: Bool
     let onActivate: () -> Void
+    let onExpand: () -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -236,12 +249,23 @@ private struct PaneHeader: View {
             }
             HeaderIdleBadge(paneID: paneID, workspace: workspace, focused: focused)
             Spacer()
-            Button(action: onClose) {
-                Image(systemName: "xmark")
+            Button(action: onExpand) {
+                Image(systemName: isExpanded
+                    ? "arrow.down.right.and.arrow.up.left"
+                    : "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .help(isExpanded ? "Collapse" : "Expand")
+            if !isExpanded {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -394,3 +418,88 @@ private struct PaneDropDelegate: DropDelegate {
     }
 }
 
+private struct ExpandedPaneOverlay: View {
+    let paneID: UUID
+    let workspace: Workspace
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { workspace.collapseExpandedPane() }
+            GeometryReader { geo in
+                ExpandedPaneCard(paneID: paneID, workspace: workspace)
+                    .frame(
+                        width: min(geo.size.width * 0.9, 1400),
+                        height: min(geo.size.height * 0.9, 900)
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .onExitCommand { workspace.collapseExpandedPane() }
+    }
+}
+
+private struct ExpandedPaneCard: View {
+    let paneID: UUID
+    let workspace: Workspace
+
+    var body: some View {
+        if let pane = workspace.pane(id: paneID),
+           case .terminal(let repoID, let worktreeID) = pane.content {
+            TerminalExpandedContent(
+                paneID: paneID,
+                repoID: repoID,
+                worktreeID: worktreeID,
+                workspace: workspace
+            )
+            .background(cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.35), radius: 30, y: 10)
+        }
+    }
+
+    private var cardBackground: Color {
+        Color(nsColor: .windowBackgroundColor)
+    }
+}
+
+private struct TerminalExpandedContent: View {
+    let paneID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let workspace: Workspace
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PaneHeader(
+                paneID: paneID,
+                workspace: workspace,
+                title: workspace.paneDisplayName(worktreeID: worktreeID),
+                branch: worktreeID,
+                repoName: workspace.repo(id: repoID)?.name,
+                repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
+                profile: workspace.paneProfile(paneID: paneID),
+                focused: workspace.focusedPaneID == paneID,
+                isExpanded: true,
+                onActivate: { workspace.setFocus(paneID: paneID) },
+                onExpand: { workspace.collapseExpandedPane() },
+                onClose: { workspace.closePane(paneID: paneID) }
+            )
+            if let path = workspace.worktreePath(paneID: paneID),
+               let repoPath = workspace.repo(id: repoID)?.path.path {
+                TerminalPaneView(paneID: paneID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+            } else {
+                MissingWorktreeBody(
+                    worktreeID: worktreeID,
+                    onRemove: { workspace.closePane(paneID: paneID) }
+                )
+            }
+        }
+    }
+}
