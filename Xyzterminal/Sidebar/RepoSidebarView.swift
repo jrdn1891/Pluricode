@@ -27,7 +27,7 @@ struct RepoSidebarView: View {
                 workspaceStore.saveSelection()
             }
         )) {
-            Section("Workspaces") {
+            Section {
                 ForEach(workspaceStore.workspaces, id: \.id) { ws in
                     WorkspaceRow(workspace: ws)
                         .tag(ws.id)
@@ -37,16 +37,11 @@ struct RepoSidebarView: View {
                             Button("Delete", role: .destructive) { deleteWorkspaceCandidate = ws }
                         }
                 }
-                Button(action: { creatingWorkspace = true }) {
-                    Label("New Workspace", systemImage: "plus.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .padding(.vertical, 2)
-                .selectionDisabled()
+            } header: {
+                SidebarSectionHeader(title: "Workspaces") { creatingWorkspace = true }
             }
 
-            Section("Task Lists") {
+            Section {
                 ForEach(taskListStore.lists) { list in
                     TaskListRow(list: list)
                         .contextMenu {
@@ -55,12 +50,8 @@ struct RepoSidebarView: View {
                             Button("Delete", role: .destructive) { deleteListCandidate = list }
                         }
                 }
-                Button(action: { creatingList = true }) {
-                    Label("New Task List", systemImage: "plus.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .padding(.vertical, 2)
+            } header: {
+                SidebarSectionHeader(title: "Task Lists") { creatingList = true }
             }
             .selectionDisabled()
 
@@ -255,6 +246,28 @@ private struct ColorMenuLabel: View {
         img.unlockFocus()
         img.isTemplate = false
         return img
+    }
+}
+
+private struct SidebarSectionHeader: View {
+    let title: String
+    let onAdd: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(title)
+            Spacer()
+            Button(action: onAdd) {
+                Image(systemName: "plus")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .opacity(hovered ? 1 : 0)
+        }
+        .contentShape(Rectangle())
+        .onHover { hovered = $0 }
     }
 }
 

@@ -55,6 +55,7 @@ struct XyzterminalApp: App {
                     .pickerStyle(.menu)
                 }
             }
+            .navigationTitle(workspaceStore.selectedWorkspace?.name ?? "Xyzterminal")
             .onAppear {
                 (AppearanceMode(rawValue: appearanceModeRaw) ?? .system).apply()
             }
