@@ -145,6 +145,19 @@ final class WorktreeManager {
         return result.stdout.components(separatedBy: "\n").filter { !$0.isEmpty }.count
     }
 
+    static func isMerged(at path: URL) -> Bool {
+        guard let headRef = try? run("git", args: [
+            "-C", path.path, "symbolic-ref", "refs/remotes/origin/HEAD", "--short"
+        ]), headRef.status == 0 else { return false }
+        let target = headRef.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let result = try? run("git", args: [
+            "-C", path.path, "cherry", target, "HEAD"
+        ]), result.status == 0 else { return false }
+        let lines = result.stdout.components(separatedBy: "\n").filter { !$0.isEmpty }
+        guard !lines.isEmpty else { return false }
+        return lines.allSatisfy { $0.hasPrefix("-") }
+    }
+
     static func diffStats(at path: URL) -> DiffStats {
         var adds = 0
         var dels = 0

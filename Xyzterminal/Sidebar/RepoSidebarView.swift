@@ -461,6 +461,7 @@ struct WorktreeRow: View {
     let worktree: Worktree
     let profileStore: AgentProfileStore
     @State private var stats: DiffStats = .zero
+    @State private var isMerged: Bool = false
 
     private var assignedProfile: AgentProfile? {
         let config = WorktreeConfig.load(at: worktree.path)
@@ -471,7 +472,7 @@ struct WorktreeRow: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "arrow.triangle.branch")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isMerged ? Color.green : Color.secondary)
                 .font(.caption)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
@@ -510,8 +511,11 @@ struct WorktreeRow: View {
         .task(id: worktree.path) {
             let path = URL(fileURLWithPath: worktree.path)
             while !Task.isCancelled {
-                let next = await Task.detached { WorktreeManager.diffStats(at: path) }.value
-                if next != stats { stats = next }
+                let (nextStats, nextMerged) = await Task.detached {
+                    (WorktreeManager.diffStats(at: path), WorktreeManager.isMerged(at: path))
+                }.value
+                if nextStats != stats { stats = nextStats }
+                if nextMerged != isMerged { isMerged = nextMerged }
                 try? await Task.sleep(for: .seconds(3))
             }
         }
