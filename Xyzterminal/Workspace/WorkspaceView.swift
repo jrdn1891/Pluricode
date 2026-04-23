@@ -140,6 +140,7 @@ private struct TerminalPaneBody: View {
         VStack(spacing: 0) {
             PaneHeader(
                 paneID: paneID,
+                workspace: workspace,
                 title: displayName,
                 branch: worktreeID,
                 repoName: workspace.repo(id: repoID)?.name,
@@ -196,6 +197,7 @@ private struct TerminalPaneBody: View {
 
 private struct PaneHeader: View {
     let paneID: UUID
+    let workspace: Workspace
     let title: String
     let branch: String
     let repoName: String?
@@ -232,6 +234,7 @@ private struct PaneHeader: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
             }
+            HeaderIdleBadge(paneID: paneID, workspace: workspace, focused: focused)
             Spacer()
             Button(action: onClose) {
                 Image(systemName: "xmark")
@@ -282,6 +285,45 @@ private struct MissingWorktreeBody: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+    }
+}
+
+private struct HeaderIdleBadge: View {
+    let paneID: UUID
+    let workspace: Workspace
+    let focused: Bool
+
+    var body: some View {
+        if let session = workspace.terminalHosts[paneID]?.session {
+            HeaderIdleBadgeContent(session: session, focused: focused)
+        }
+    }
+}
+
+private struct HeaderIdleBadgeContent: View {
+    @ObservedObject var session: TerminalSession
+    let focused: Bool
+    @State private var pulse = false
+
+    private var show: Bool { session.isIdle && !focused }
+
+    var body: some View {
+        ZStack {
+            if show {
+                Text("🥱")
+                    .font(.system(size: 13))
+                    .opacity(pulse ? 1.0 : 0.65)
+                    .scaleEffect(pulse ? 1.06 : 0.96)
+                    .transition(.opacity)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                            pulse = true
+                        }
+                    }
+                    .onDisappear { pulse = false }
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: show)
     }
 }
 

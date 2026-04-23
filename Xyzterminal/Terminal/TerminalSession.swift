@@ -1,24 +1,38 @@
 import AppKit
+import Combine
 import SwiftTerm
 
-final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
+final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, ObservableObject {
     let nodeID: UUID
     let terminalView: LocalProcessTerminalView
     var worktreePath: String?
     var onProcessTerminated: ((Int32?) -> Void)?
+    @Published private(set) var isIdle: Bool = false
     private var lastAppliedZoom: Float = 1.0
     private var pendingScript: String?
     private var fallbackTimer: DispatchWorkItem?
     private var lastSavedBufferSize: Int = 0
+    private var idleWorkItem: DispatchWorkItem?
 
     static let baseFontSize: CGFloat = 13
+    static let idleThreshold: TimeInterval = 4.0
 
     init(nodeID: UUID) {
         self.nodeID = nodeID
-        self.terminalView = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 270))
+        let view = ActivityAwareTerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 270))
+        self.terminalView = view
         super.init()
+        view.onDataReceived = { [weak self] in self?.noteActivity() }
         terminalView.processDelegate = self
         terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize, weight: .regular)
+    }
+
+    private func noteActivity() {
+        if isIdle { isIdle = false }
+        idleWorkItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in self?.isIdle = true }
+        idleWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.idleThreshold, execute: item)
     }
 
     func scheduleStartupScript(_ script: String) {
@@ -95,6 +109,17 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate {
         pendingScript = nil
         fallbackTimer?.cancel()
         fallbackTimer = nil
+        idleWorkItem?.cancel()
+        idleWorkItem = nil
         onProcessTerminated?(exitCode)
+    }
+}
+
+private final class ActivityAwareTerminalView: LocalProcessTerminalView {
+    var onDataReceived: (() -> Void)?
+
+    override func dataReceived(slice: ArraySlice<UInt8>) {
+        super.dataReceived(slice: slice)
+        onDataReceived?()
     }
 }
