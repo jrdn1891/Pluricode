@@ -16,6 +16,8 @@ struct RepoSidebarView: View {
     @State private var creatingWorkspace = false
     @State private var renameWorkspaceTarget: Workspace?
     @State private var pendingDelete: PendingDelete?
+    @State private var selectedWorktrees: Set<WorktreeKey> = []
+    @State private var worktreeAnchor: WorktreeKey?
 
     var body: some View {
         List(selection: Binding(
@@ -75,7 +77,11 @@ struct RepoSidebarView: View {
                                 repoID: repo.id,
                                 worktree: wt,
                                 profileStore: profileStore,
-                                workspaceStore: workspaceStore
+                                workspaceStore: workspaceStore,
+                                isSelected: selectedWorktrees.contains(WorktreeKey(repoID: repo.id, branch: wt.branch)),
+                                onSelect: { flags in
+                                    selectWorktree(WorktreeKey(repoID: repo.id, branch: wt.branch), flags: flags)
+                                }
                             )
                                 .padding(.leading, 20)
                                 .contextMenu {
@@ -187,6 +193,37 @@ struct RepoSidebarView: View {
             expanded.insert(repo.id)
             refresh(repo)
         }
+    }
+
+    private func selectWorktree(_ key: WorktreeKey, flags: NSEvent.ModifierFlags) {
+        if flags.contains(.shift), let anchor = worktreeAnchor {
+            let order = flattenedWorktreeKeys()
+            if let a = order.firstIndex(of: anchor), let b = order.firstIndex(of: key) {
+                let range = a <= b ? order[a...b] : order[b...a]
+                selectedWorktrees = Set(range)
+                return
+            }
+        }
+        if flags.contains(.command) {
+            if selectedWorktrees.contains(key) {
+                selectedWorktrees.remove(key)
+            } else {
+                selectedWorktrees.insert(key)
+            }
+        } else {
+            selectedWorktrees = [key]
+        }
+        worktreeAnchor = key
+    }
+
+    private func flattenedWorktreeKeys() -> [WorktreeKey] {
+        var result: [WorktreeKey] = []
+        for repo in repoStore.repos where expanded.contains(repo.id) {
+            for wt in worktrees[repo.id] ?? [] {
+                result.append(WorktreeKey(repoID: repo.id, branch: wt.branch))
+            }
+        }
+        return result
     }
 
     private func refresh(_ repo: RepoEntry) {
@@ -366,6 +403,11 @@ private struct RenameTarget: Identifiable {
     var id: String { "\(repo.id.uuidString):\(worktree.id)" }
 }
 
+struct WorktreeKey: Hashable {
+    let repoID: UUID
+    let branch: String
+}
+
 extension Workspace: Identifiable {}
 
 struct WorkspaceRow: View {
@@ -480,6 +522,8 @@ struct WorktreeRow: View {
     let worktree: Worktree
     let profileStore: AgentProfileStore
     let workspaceStore: WorkspaceStore
+    let isSelected: Bool
+    let onSelect: (NSEvent.ModifierFlags) -> Void
     @State private var stats: DiffStats = .zero
     @State private var isMerged: Bool = false
     @State private var isHovered = false
@@ -538,9 +582,17 @@ struct WorktreeRow: View {
                 .help("Add to \(ws.name)")
             }
         }
-        .contentShape(Rectangle())
         .padding(.vertical, 1)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isSelected ? Color.accentColor.opacity(0.25) : Color.clear)
+        )
+        .contentShape(Rectangle())
         .onHover { isHovered = $0 }
+        .onTapGesture {
+            onSelect(NSEvent.modifierFlags)
+        }
         .task(id: worktree.path) {
             let path = URL(fileURLWithPath: worktree.path)
             while !Task.isCancelled {
