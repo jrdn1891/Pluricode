@@ -145,6 +145,33 @@ final class WorktreeManager {
         return result.stdout.components(separatedBy: "\n").filter { !$0.isEmpty }.count
     }
 
+    static func diffStats(at path: URL) -> DiffStats {
+        var adds = 0
+        var dels = 0
+        if let result = try? run("git", args: [
+            "-C", path.path, "diff", "HEAD", "--numstat"
+        ]), result.status == 0 {
+            for line in result.stdout.components(separatedBy: "\n") where !line.isEmpty {
+                let parts = line.split(separator: "\t")
+                guard parts.count >= 2 else { continue }
+                adds += Int(parts[0]) ?? 0
+                dels += Int(parts[1]) ?? 0
+            }
+        }
+        if let result = try? run("git", args: [
+            "-C", path.path, "ls-files", "--others", "--exclude-standard"
+        ]), result.status == 0 {
+            for rel in result.stdout.components(separatedBy: "\n") where !rel.isEmpty {
+                let file = path.appendingPathComponent(rel)
+                guard let data = try? Data(contentsOf: file), !data.isEmpty else { continue }
+                var lines = data.reduce(into: 0) { if $1 == 0x0A { $0 += 1 } }
+                if data.last != 0x0A { lines += 1 }
+                adds += lines
+            }
+        }
+        return DiffStats(additions: adds, deletions: dels)
+    }
+
     func currentBranch(at path: URL) -> String? {
         guard let result = try? run("git", args: ["-C", path.path, "rev-parse", "--abbrev-ref", "HEAD"]),
               result.status == 0 else { return nil }
@@ -196,6 +223,13 @@ struct ProcessResult {
     var status: Int32
     var stdout: String
     var stderr: String
+}
+
+struct DiffStats: Equatable, Sendable {
+    var additions: Int
+    var deletions: Int
+    var isClean: Bool { additions == 0 && deletions == 0 }
+    static let zero = DiffStats(additions: 0, deletions: 0)
 }
 
 enum WorktreeError: Error {
