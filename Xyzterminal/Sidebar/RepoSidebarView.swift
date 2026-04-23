@@ -437,12 +437,12 @@ struct RepoRow: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
                         .frame(width: 14)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .tint(.secondary)
 
                 Button(action: onNewWorktree) {
                     Image(systemName: "plus")
