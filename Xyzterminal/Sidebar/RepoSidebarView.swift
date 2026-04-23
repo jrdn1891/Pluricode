@@ -485,7 +485,7 @@ struct WorktreeRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "arrow.triangle.branch")
+            Image(systemName: isMerged ? "arrow.trianglehead.merge" : "arrow.triangle.branch")
                 .foregroundStyle(isMerged ? Color.green : Color.secondary)
                 .font(.caption)
             VStack(alignment: .leading, spacing: 1) {
