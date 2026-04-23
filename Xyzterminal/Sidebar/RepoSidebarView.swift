@@ -147,18 +147,25 @@ struct RepoSidebarView: View {
                 secondaryButton: .cancel()
             )
         }
-        .alert(item: $deleteListCandidate) { list in
-            Alert(
-                title: Text("Delete list \(list.name)?"),
-                message: Text(list.items.isEmpty
-                    ? "The list is empty. This cannot be undone."
-                    : "This will delete \(list.items.count) task\(list.items.count == 1 ? "" : "s")."),
-                primaryButton: .destructive(Text("Delete")) {
+        .alert(
+            "Delete list \(deleteListCandidate?.name ?? "")?",
+            isPresented: Binding(
+                get: { deleteListCandidate != nil },
+                set: { if !$0 { deleteListCandidate = nil } }
+            ),
+            presenting: deleteListCandidate,
+            actions: { list in
+                Button("Delete", role: .destructive) {
                     taskListStore.removeList(id: list.id)
-                },
-                secondaryButton: .cancel()
-            )
-        }
+                }
+                Button("Cancel", role: .cancel) { }
+            },
+            message: { list in
+                Text(list.items.isEmpty
+                    ? "The list is empty. This cannot be undone."
+                    : "This will delete \(list.items.count) task\(list.items.count == 1 ? "" : "s").")
+            }
+        )
         .alert(item: $deleteWorkspaceCandidate) { ws in
             Alert(
                 title: Text("Delete workspace \(ws.name)?"),
