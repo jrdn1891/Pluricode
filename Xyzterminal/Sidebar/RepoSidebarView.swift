@@ -237,6 +237,7 @@ struct RepoSidebarView: View {
     private func deleteWorktree(repo: RepoEntry, worktree: Worktree) {
         guard let wm = WorktreeManager(repoRoot: repo.path) else { return }
         let url = URL(fileURLWithPath: worktree.path)
+        workspaceStore.removePanes(repoID: repo.id, worktreeID: worktree.branch)
         try? wm.removeWorktree(at: url)
         _ = try? Process.run(
             URL(fileURLWithPath: "/usr/bin/git"),
