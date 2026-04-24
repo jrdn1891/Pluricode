@@ -304,6 +304,17 @@ final class WorkspaceStore {
         }
     }
 
+    func removePanes(repoID: UUID, worktreeID: String) {
+        for ws in workspaces {
+            let targets = ws.tiling.panes.compactMap { pane -> UUID? in
+                guard case .terminal(let r, let w) = pane.content,
+                      r == repoID, w == worktreeID else { return nil }
+                return pane.id
+            }
+            for id in targets { ws.closePane(paneID: id) }
+        }
+    }
+
     func saveAll() {
         for ws in workspaces { ws.save() }
         saveSelection()
