@@ -131,16 +131,16 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        droppedPaths(sender).isEmpty ? super.draggingEntered(sender) : .copy
+        droppedPaths(sender).isEmpty ? [] : .copy
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        droppedPaths(sender).isEmpty ? super.draggingUpdated(sender) : .copy
+        droppedPaths(sender).isEmpty ? [] : .copy
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let paths = droppedPaths(sender)
-        guard !paths.isEmpty else { return super.performDragOperation(sender) }
+        guard !paths.isEmpty else { return false }
         let bytes = Array(paths.map(Self.shellEscape).joined(separator: " ").utf8)
         process?.send(data: bytes[...])
         return true

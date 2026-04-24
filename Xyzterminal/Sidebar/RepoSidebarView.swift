@@ -611,7 +611,12 @@ struct WorktreeRow: View {
                 try? await Task.sleep(for: .seconds(30))
             }
         }
-        .draggable(TilingDragPayload(kind: .newTerminal(repoID: repoID, worktreeID: worktree.branch))) {
+        .onDrag({
+            let payload = TilingDragPayload(kind: .newTerminal(repoID: repoID, worktreeID: worktree.branch))
+            let data = (try? JSONEncoder().encode(payload)) ?? Data()
+            let string = String(data: data, encoding: .utf8) ?? ""
+            return NSItemProvider(object: string as NSString)
+        }, preview: {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.triangle.branch")
                 Text(worktree.displayName)
@@ -620,7 +625,7 @@ struct WorktreeRow: View {
             .padding(.vertical, 6)
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
+        })
     }
 }
 
@@ -643,7 +648,12 @@ struct TaskListRow: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 1)
-        .draggable(TilingDragPayload(kind: .newTaskPane(listID: list.id))) {
+        .onDrag({
+            let payload = TilingDragPayload(kind: .newTaskPane(listID: list.id))
+            let data = (try? JSONEncoder().encode(payload)) ?? Data()
+            let string = String(data: data, encoding: .utf8) ?? ""
+            return NSItemProvider(object: string as NSString)
+        }, preview: {
             HStack(spacing: 6) {
                 Image(systemName: "checklist")
                 Text(list.name)
@@ -652,7 +662,7 @@ struct TaskListRow: View {
             .padding(.vertical, 6)
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
+        })
     }
 }
 
