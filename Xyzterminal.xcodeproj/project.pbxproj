@@ -33,6 +33,7 @@
 		D3774A137E5C81B828300A63 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB265D25F3219E4571B8447D /* main.swift */; };
 		EEA5CB94D64EE82CAA321F1C /* WorktreeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51FB01DA723BBB40D3DC9DEF /* WorktreeManager.swift */; };
 		EF064F2F95F6BE2AA0D28F4D /* TileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 758E84811F94A5C7522D707C /* TileNode.swift */; };
+		F8534729D4855357CE1CDA3E /* IdleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31E98F7375274CAA364984DD /* IdleOverlay.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		1E01E2B498EEB596A16D650F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		2150572CE6EEA9DF3537CEBD /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
 		23CFDE6700E81D5C6B4455E4 /* AgentDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDefinition.swift; sourceTree = "<group>"; };
+		31E98F7375274CAA364984DD /* IdleOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdleOverlay.swift; sourceTree = "<group>"; };
 		3DCA75C55995269AD853713F /* RepoConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoConfig.swift; sourceTree = "<group>"; };
 		3E9C9B62C0A82E76AD43A88F /* AgentProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfile.swift; sourceTree = "<group>"; };
 		50E1EC637C98D51034186555 /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
@@ -107,6 +109,7 @@
 		324C4D7DB9241F7B03B47DE5 /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
+				31E98F7375274CAA364984DD /* IdleOverlay.swift */,
 				F1B55323D71C83C9B2BD2C5A /* PaneCreationToolbar.swift */,
 				15AD31D5FF8879E75E561D33 /* TaskListStore.swift */,
 				A06DBEC52019F0AC5D56CF63 /* TaskPaneView.swift */,
@@ -259,6 +262,7 @@
 				7C3F4526734E5D2CD133071B /* AgentDefinition.swift in Sources */,
 				CD9D32DD5990399A0B439235 /* AgentProfile.swift in Sources */,
 				78C57035C1719895CAE50A59 /* AgentProfileStore.swift in Sources */,
+				F8534729D4855357CE1CDA3E /* IdleOverlay.swift in Sources */,
 				684CD9C91C03DFAE20F4F5F3 /* PaneCreationToolbar.swift in Sources */,
 				CF486B7FB934E4E547A2D414 /* RepoConfig.swift in Sources */,
 				207C692E80710428C5318E6B /* RepoSidebarView.swift in Sources */,
