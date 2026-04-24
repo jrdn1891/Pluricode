@@ -169,6 +169,11 @@ private struct TerminalPaneBody: View {
                 GeometryReader { geo in
                     TerminalPaneView(paneID: paneID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                         .overlay {
+                            if let session = workspace.terminalHosts[paneID]?.session {
+                                IdleOverlay(session: session, focused: workspace.focusedPaneID == paneID)
+                            }
+                        }
+                        .overlay {
                             if let edge = hoverEdge {
                                 DropZoneOverlay(edge: edge, size: geo.size)
                             }
@@ -247,7 +252,6 @@ private struct PaneHeader: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
             }
-            HeaderIdleBadge(paneID: paneID, workspace: workspace, focused: focused)
             Spacer()
             Button(action: onExpand) {
                 Image(systemName: isExpanded
@@ -309,45 +313,6 @@ private struct MissingWorktreeBody: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
-    }
-}
-
-private struct HeaderIdleBadge: View {
-    let paneID: UUID
-    let workspace: Workspace
-    let focused: Bool
-
-    var body: some View {
-        if let session = workspace.terminalHosts[paneID]?.session {
-            HeaderIdleBadgeContent(session: session, focused: focused)
-        }
-    }
-}
-
-private struct HeaderIdleBadgeContent: View {
-    @ObservedObject var session: TerminalSession
-    let focused: Bool
-    @State private var pulse = false
-
-    private var show: Bool { session.isIdle && !focused }
-
-    var body: some View {
-        ZStack {
-            if show {
-                Text("🥱")
-                    .font(.system(size: 13))
-                    .opacity(pulse ? 1.0 : 0.65)
-                    .scaleEffect(pulse ? 1.06 : 0.96)
-                    .transition(.opacity)
-                    .onAppear {
-                        withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                            pulse = true
-                        }
-                    }
-                    .onDisappear { pulse = false }
-            }
-        }
-        .animation(.easeInOut(duration: 0.3), value: show)
     }
 }
 
