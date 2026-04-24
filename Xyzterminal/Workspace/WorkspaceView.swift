@@ -59,10 +59,7 @@ private struct EmptyWorkspace: View {
                 )
                 .padding(32)
         }
-        .dropDestination(for: TilingDragPayload.self) { items, _ in
-            guard let payload = items.first else { return false }
-            return workspace.acceptDrop(payload: payload, on: nil, edge: .center)
-        } isTargeted: { isTargeted = $0 }
+        .onDrop(of: [.plainText], delegate: EmptyWorkspaceDropDelegate(workspace: workspace, isTargeted: $isTargeted))
     }
 }
 
@@ -345,6 +342,28 @@ private struct DropZoneOverlay: View {
         case .bottom: CGRect(x: 0, y: s.height / 2, width: s.width, height: s.height / 2)
         case .center: CGRect(x: 0, y: 0, width: s.width, height: s.height)
         }
+    }
+}
+
+private struct EmptyWorkspaceDropDelegate: DropDelegate {
+    let workspace: Workspace
+    @Binding var isTargeted: Bool
+
+    func dropEntered(info: DropInfo) { isTargeted = true }
+    func dropExited(info: DropInfo) { isTargeted = false }
+
+    func performDrop(info: DropInfo) -> Bool {
+        isTargeted = false
+        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
+        provider.loadObject(ofClass: NSString.self) { obj, _ in
+            guard let str = obj as? String,
+                  let data = str.data(using: .utf8),
+                  let payload = try? JSONDecoder().decode(TilingDragPayload.self, from: data) else { return }
+            DispatchQueue.main.async {
+                _ = workspace.acceptDrop(payload: payload, on: nil, edge: .center)
+            }
+        }
+        return true
     }
 }
 
