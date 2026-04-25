@@ -2,9 +2,8 @@ import SwiftUI
 
 struct IdleOverlay: View {
     @ObservedObject var session: TerminalSession
-    let focused: Bool
 
-    private var visible: Bool { session.isIdle && !focused }
+    private var visible: Bool { session.isIdle }
 
     var body: some View {
         ZStack {

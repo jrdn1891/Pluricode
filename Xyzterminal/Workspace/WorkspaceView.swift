@@ -68,8 +68,7 @@ private struct WorkspacePane: View {
     let workspace: Workspace
 
     var body: some View {
-        let focused = workspace.focusedPaneID == pane.id
-        PaneFrame(focused: focused) {
+        PaneFrame {
             switch pane.content {
             case .terminal(let repoID, let worktreeID):
                 TerminalPaneBody(paneID: pane.id, repoID: repoID, worktreeID: worktreeID, workspace: workspace)
@@ -81,7 +80,6 @@ private struct WorkspacePane: View {
 }
 
 private struct PaneFrame<Content: View>: View {
-    let focused: Bool
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -89,10 +87,7 @@ private struct PaneFrame<Content: View>: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay {
                 RoundedRectangle(cornerRadius: 4)
-                    .stroke(
-                        focused ? Color.accentColor : Color.secondary.opacity(0.2),
-                        lineWidth: focused ? 2 : 1
-                    )
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
                     .allowsHitTesting(false)
             }
     }
@@ -110,7 +105,6 @@ private struct TaskPaneBody: View {
                 paneID: paneID,
                 listID: listID,
                 store: workspace.taskListStore,
-                focused: workspace.focusedPaneID == paneID,
                 onActivate: { workspace.setFocus(paneID: paneID) },
                 onClose: { workspace.closePane(paneID: paneID) }
             )
@@ -151,7 +145,6 @@ private struct TerminalPaneBody: View {
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
                 profile: workspace.paneProfile(paneID: paneID),
-                focused: workspace.focusedPaneID == paneID,
                 isExpanded: isExpanded,
                 onActivate: { workspace.setFocus(paneID: paneID) },
                 onExpand: {
@@ -167,7 +160,7 @@ private struct TerminalPaneBody: View {
                     TerminalPaneView(paneID: paneID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                         .overlay {
                             if let session = workspace.terminalHosts[paneID]?.session {
-                                IdleOverlay(session: session, focused: workspace.focusedPaneID == paneID)
+                                IdleOverlay(session: session)
                             }
                         }
                         .overlay {
@@ -216,7 +209,6 @@ private struct PaneHeader: View {
     let repoName: String?
     let repoColor: Color?
     let profile: AgentProfile?
-    let focused: Bool
     let isExpanded: Bool
     let onActivate: () -> Void
     let onExpand: () -> Void
@@ -286,7 +278,6 @@ private struct PaneHeader: View {
     }
 
     private var headerBackground: Color {
-        if focused { return Color.accentColor.opacity(0.15) }
         if let repoColor { return repoColor.opacity(0.12) }
         return Color.secondary.opacity(0.1)
     }
@@ -469,7 +460,6 @@ private struct TerminalExpandedContent: View {
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
                 profile: workspace.paneProfile(paneID: paneID),
-                focused: workspace.focusedPaneID == paneID,
                 isExpanded: true,
                 onActivate: { workspace.setFocus(paneID: paneID) },
                 onExpand: { workspace.collapseExpandedPane() },
