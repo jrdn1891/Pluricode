@@ -57,7 +57,7 @@ final class Workspace {
 
     static var rootDir: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return support.appendingPathComponent("Xyzterminal", isDirectory: true)
+        return support.appendingPathComponent("Pluricode", isDirectory: true)
     }
 
     static var workspacesDir: URL {
@@ -148,7 +148,7 @@ final class Workspace {
     }
 
     func paneDisplayName(worktreeID: String) -> String {
-        worktreeID.hasPrefix("xyz-") ? String(worktreeID.dropFirst("xyz-".count)) : worktreeID
+        worktreeID.hasPrefix("pluri-") ? String(worktreeID.dropFirst("pluri-".count)) : worktreeID
     }
 
     func paneProfile(paneID: UUID) -> AgentProfile? {

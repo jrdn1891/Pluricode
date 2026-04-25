@@ -1,4 +1,4 @@
-# Xyzterminal V1 Requirements
+# Pluricode V1 Requirements
 
 A native macOS app providing a freeform infinite canvas where terminal agents and task cards coexist. Agents work in isolated git worktrees. Users visually plan tasks, assign them to agents by dragging, and wire agents together for handover and review.
 
@@ -45,7 +45,7 @@ A native macOS app providing a freeform infinite canvas where terminal agents an
 
 ## Agent-to-App Communication (MCP Bridge)
 
-Xyzterminal runs a local MCP server per terminal node. The agent inside the terminal connects to it and gains tools to update the canvas. This is how agents report back without the user polling terminal output.
+Pluricode runs a local MCP server per terminal node. The agent inside the terminal connects to it and gains tools to update the canvas. This is how agents report back without the user polling terminal output.
 
 ### MCP tools exposed to agents
 

@@ -12,13 +12,13 @@ final class WorktreeManager {
 
     init?(repoRoot: URL) {
         self.repoRoot = repoRoot
-        self.worktreeRoot = repoRoot.appendingPathComponent(".xyzterminal/worktrees", isDirectory: true)
+        self.worktreeRoot = repoRoot.appendingPathComponent(".pluricode/worktrees", isDirectory: true)
         try? FileManager.default.createDirectory(at: worktreeRoot, withIntermediateDirectories: true)
     }
 
     func createWorktree(name: String, baseBranch: String) throws -> URL {
         let path = worktreeRoot.appendingPathComponent(name)
-        let branchName = "xyz-\(name)"
+        let branchName = "pluri-\(name)"
         let result = try run("git", args: [
             "-C", repoRoot.path,
             "worktree", "add",
@@ -109,7 +109,7 @@ final class WorktreeManager {
     }
 
     func renameWorktree(oldBranch: String, newName: String) throws -> Worktree {
-        let newBranch = "xyz-\(newName)"
+        let newBranch = "pluri-\(newName)"
         guard newBranch != oldBranch else {
             let info = try listWorktrees().first { $0.branch == oldBranch }
             guard let info else { throw WorktreeError.createFailed("worktree not found") }

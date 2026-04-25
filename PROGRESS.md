@@ -1,4 +1,4 @@
-# Xyzterminal — Progress
+# Pluricode — Progress
 
 ## Phase 1: Metal Canvas Foundation ✅
 - Infinite pannable/zoomable Metal-rendered canvas (pinch, scroll, trackpad)
@@ -21,7 +21,7 @@
 
 ## Phase 3: Persistence and Task Cards ✅
 - All model types Codable (SIMD2 extension, custom NodeKind coding)
-- Auto-save to `{project}/.xyzterminal/canvas.json` (debounced 1s)
+- Auto-save to `{project}/.pluricode/canvas.json` (debounced 1s)
 - Load on app startup, persists nodes/edges/camera across restarts
 - SwiftUI text label overlay on nodes (title, status dot, body preview)
 - Labels scale with zoom, hidden below 0.25x
@@ -39,7 +39,7 @@
 
 ## Phase 5: Git Worktree Management ✅
 - `WorktreeManager` wraps `git worktree add/remove/list` via Process
-- Each terminal node creates its own worktree under `{repo}/.xyzterminal/worktrees/`
+- Each terminal node creates its own worktree under `{repo}/.pluricode/worktrees/`
 - Branches from the repo's default branch (auto-detected from origin/HEAD)
 - Shell starts in the worktree directory
 - Branch name shown in terminal title bar
