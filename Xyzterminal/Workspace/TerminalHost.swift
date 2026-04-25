@@ -50,7 +50,7 @@ final class TerminalHost {
 
         let repoConfig = RepoConfig.load(at: repoPath)
         if let script = repoConfig.startupScript, !script.isEmpty {
-            session.scheduleStartupScript(script)
+            session.sendStartupScript(script)
         }
     }
 
