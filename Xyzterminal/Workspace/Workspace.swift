@@ -21,6 +21,7 @@ final class Workspace {
     let repoStore: RepoStore
     let taskListStore: TaskListStore
     let profileStore: AgentProfileStore
+    let statsService: StatsService
     var terminalHosts: [UUID: TerminalHost] = [:]
     var focusedPaneID: UUID?
     var expandedPaneID: UUID?
@@ -36,7 +37,8 @@ final class Workspace {
         root: TileNode? = nil,
         repoStore: RepoStore,
         taskListStore: TaskListStore,
-        profileStore: AgentProfileStore
+        profileStore: AgentProfileStore,
+        statsService: StatsService
     ) {
         self.id = id
         self.name = name
@@ -44,6 +46,7 @@ final class Workspace {
         self.repoStore = repoStore
         self.taskListStore = taskListStore
         self.profileStore = profileStore
+        self.statsService = statsService
     }
 
     deinit {
@@ -246,6 +249,10 @@ final class Workspace {
             let content: PaneContent = .tasks(listID: listID)
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
+        case .newStats:
+            let content: PaneContent = .stats
+            if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
+            else { addPane(content) }
         case .movePane(let sourceID):
             guard let targetID, sourceID != targetID else { return false }
             if edge == .center {
@@ -287,6 +294,7 @@ final class WorkspaceStore {
     private let repoStore: RepoStore
     private let taskListStore: TaskListStore
     private let profileStore: AgentProfileStore
+    let statsService: StatsService
 
     private static let selectedKey = "selectedWorkspaceID"
 
@@ -294,6 +302,7 @@ final class WorkspaceStore {
         self.repoStore = repoStore
         self.taskListStore = taskListStore
         self.profileStore = profileStore
+        self.statsService = StatsService(repoStore: repoStore)
         load()
     }
 
@@ -310,7 +319,8 @@ final class WorkspaceStore {
             name: finalName,
             repoStore: repoStore,
             taskListStore: taskListStore,
-            profileStore: profileStore
+            profileStore: profileStore,
+            statsService: statsService
         )
         workspaces.append(ws)
         sort()
@@ -382,7 +392,8 @@ final class WorkspaceStore {
                 root: snap.root,
                 repoStore: repoStore,
                 taskListStore: taskListStore,
-                profileStore: profileStore
+                profileStore: profileStore,
+                statsService: statsService
             )
         }
         sort()

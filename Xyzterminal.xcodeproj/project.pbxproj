@@ -12,6 +12,7 @@
 		2A2AF656DE9A9967FD711A2A /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 636E45B2BF07B7864B35E7D7 /* Theme.swift */; };
 		2B4288433D9A160E89E77CD1 /* TaskPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A06DBEC52019F0AC5D56CF63 /* TaskPaneView.swift */; };
 		398197DDA5C1480CE91F0C4A /* TerminalPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C72607C9B7D825688EAEBF3 /* TerminalPaneView.swift */; };
+		4C4BA31EC0A88EF4A29F6269 /* StatsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F2B6E66FA974699215F50D2 /* StatsService.swift */; };
 		4C8709DE55D951E3B1DDA0A9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D87F8A583A9EB1C5FD4461E4 /* Assets.xcassets */; };
 		5CEEEFBDD7CADE7AB369CFC0 /* RoleInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1522F6957B93725AE97A8077 /* RoleInjector.swift */; };
 		5E6E2222C66716774B9BA58E /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF5B06FA2B675DA6DA254883 /* Workspace.swift */; };
@@ -24,8 +25,10 @@
 		796876B5EEE08B154090A53A /* WorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2150572CE6EEA9DF3537CEBD /* WorkspaceView.swift */; };
 		7C3F4526734E5D2CD133071B /* AgentDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CFDE6700E81D5C6B4455E4 /* AgentDefinition.swift */; };
 		819598C5ABB6655AF40AC8B0 /* XyzterminalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93E3027195DC0BEA489C7CB5 /* XyzterminalApp.swift */; };
+		8CF93F43FC0223A4E6500EDF /* StatsPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7936F44DECA671D406F3231 /* StatsPaneView.swift */; };
 		B4D8CFC8DB2B1A4211DA1C80 /* Worktree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E1EC637C98D51034186555 /* Worktree.swift */; };
 		B8D92654BBEE065E05FF3702 /* WorktreeConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F93C3FCE4A44D4D3BF9C074 /* WorktreeConfig.swift */; };
+		BB3BB36A79556923D68942FA /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8CB30838990797C00B36F41 /* ProcessRunner.swift */; };
 		CC14D0F279F5583D5667B0D4 /* TileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3D8807F79D451D6669CB351 /* TileView.swift */; };
 		CD9D32DD5990399A0B439235 /* AgentProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E9C9B62C0A82E76AD43A88F /* AgentProfile.swift */; };
 		CEAF16BCE08C2FF6B55FA7A1 /* TaskListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15AD31D5FF8879E75E561D33 /* TaskListStore.swift */; };
@@ -52,6 +55,7 @@
 		5F76534926A9A9F7A3B41892 /* SplitDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDivider.swift; sourceTree = "<group>"; };
 		636E45B2BF07B7864B35E7D7 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		659DDF23C27DB244C74B8FB1 /* Xyzterminal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Xyzterminal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F2B6E66FA974699215F50D2 /* StatsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsService.swift; sourceTree = "<group>"; };
 		758E84811F94A5C7522D707C /* TileNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileNode.swift; sourceTree = "<group>"; };
 		7F93C3FCE4A44D4D3BF9C074 /* WorktreeConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeConfig.swift; sourceTree = "<group>"; };
 		88D413E0D0A7B412073F18F4 /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
@@ -60,12 +64,14 @@
 		D3D8807F79D451D6669CB351 /* TileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileView.swift; sourceTree = "<group>"; };
 		D7DBE7DB259BC8D3612E88D7 /* RepoSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoSidebarView.swift; sourceTree = "<group>"; };
 		D87F8A583A9EB1C5FD4461E4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D8CB30838990797C00B36F41 /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
 		DA34D13C14453D471A75A8BD /* TerminalHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalHost.swift; sourceTree = "<group>"; };
 		DB265D25F3219E4571B8447D /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		DF5B06FA2B675DA6DA254883 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
 		E53F1D0451E9B5EFF0BA15B1 /* RepoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoStore.swift; sourceTree = "<group>"; };
 		E7106615CDC2B36FE1BE6436 /* Xyzterminal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Xyzterminal.entitlements; sourceTree = "<group>"; };
 		F1B55323D71C83C9B2BD2C5A /* PaneCreationToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneCreationToolbar.swift; sourceTree = "<group>"; };
+		F7936F44DECA671D406F3231 /* StatsPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsPaneView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +97,7 @@
 		011495FBCC7C652430732943 /* Worktree */ = {
 			isa = PBXGroup;
 			children = (
+				D8CB30838990797C00B36F41 /* ProcessRunner.swift */,
 				50E1EC637C98D51034186555 /* Worktree.swift */,
 				7F93C3FCE4A44D4D3BF9C074 /* WorktreeConfig.swift */,
 				51FB01DA723BBB40D3DC9DEF /* WorktreeManager.swift */,
@@ -111,6 +118,8 @@
 			children = (
 				31E98F7375274CAA364984DD /* IdleOverlay.swift */,
 				F1B55323D71C83C9B2BD2C5A /* PaneCreationToolbar.swift */,
+				F7936F44DECA671D406F3231 /* StatsPaneView.swift */,
+				6F2B6E66FA974699215F50D2 /* StatsService.swift */,
 				15AD31D5FF8879E75E561D33 /* TaskListStore.swift */,
 				A06DBEC52019F0AC5D56CF63 /* TaskPaneView.swift */,
 				DA34D13C14453D471A75A8BD /* TerminalHost.swift */,
@@ -264,11 +273,14 @@
 				78C57035C1719895CAE50A59 /* AgentProfileStore.swift in Sources */,
 				F8534729D4855357CE1CDA3E /* IdleOverlay.swift in Sources */,
 				684CD9C91C03DFAE20F4F5F3 /* PaneCreationToolbar.swift in Sources */,
+				BB3BB36A79556923D68942FA /* ProcessRunner.swift in Sources */,
 				CF486B7FB934E4E547A2D414 /* RepoConfig.swift in Sources */,
 				207C692E80710428C5318E6B /* RepoSidebarView.swift in Sources */,
 				74457D2DE366B73DC7A15C7B /* RepoStore.swift in Sources */,
 				5CEEEFBDD7CADE7AB369CFC0 /* RoleInjector.swift in Sources */,
 				1359D40DF1BB142B6F3ED4CA /* SplitDivider.swift in Sources */,
+				8CF93F43FC0223A4E6500EDF /* StatsPaneView.swift in Sources */,
+				4C4BA31EC0A88EF4A29F6269 /* StatsService.swift in Sources */,
 				CEAF16BCE08C2FF6B55FA7A1 /* TaskListStore.swift in Sources */,
 				2B4288433D9A160E89E77CD1 /* TaskPaneView.swift in Sources */,
 				7666026E194745D4FF68B0BD /* TerminalHost.swift in Sources */,
