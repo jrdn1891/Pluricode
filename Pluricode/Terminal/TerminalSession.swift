@@ -62,6 +62,9 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     func updateColors(theme: Theme) {
         terminalView.nativeBackgroundColor = theme.terminalBackground
         terminalView.nativeForegroundColor = theme.terminalForeground
+        if let palette = theme.terminalPalette {
+            terminalView.installColors(palette)
+        }
     }
 
     func start(in directory: String? = nil) {
