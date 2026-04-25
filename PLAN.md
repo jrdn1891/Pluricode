@@ -24,7 +24,7 @@ Goal: observe and manage multiple terminals running in parallel, each scoped to 
 ```
 Worktree                                 // one per managed worktree under a repo
   id            = branch name            // stable identifier; derives path via git
-  displayName   = branch with xyz- prefix stripped
+  displayName   = branch with pluri- prefix stripped
   path          = from git worktree list
   branch        = from git
   head          = from git
@@ -44,17 +44,17 @@ Split
   children: [TileNode]
   weights:  [Float]                      // sum to 1.0
 
-Workspace                                // one per repo, persisted to .xyzterminal/workspace.json
+Workspace                                // one per repo, persisted to .pluricode/workspace.json
   root: TileNode?                        // nil = empty canvas
 
-TaskItem                                 // repo-scoped, persisted to .xyzterminal/tasks.json
+TaskItem                                 // repo-scoped, persisted to .pluricode/tasks.json
   id: UUID
   title: String
   done: Bool
   createdAt: Date
 ```
 
-**What we do NOT store**: paths, branches, heads (all derived from `git worktree list`). Worktree records are not persisted separately — the list is the filesystem. Display names are the branch suffix. Per-worktree config (agent profile, startup script) lives in `{worktree}/.xyzterminal/worktree.json`.
+**What we do NOT store**: paths, branches, heads (all derived from `git worktree list`). Worktree records are not persisted separately — the list is the filesystem. Display names are the branch suffix. Per-worktree config (agent profile, startup script) lives in `{worktree}/.pluricode/worktree.json`.
 
 ---
 
@@ -66,12 +66,12 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: sidebar shows Repos → Worktrees. Users create, rename, delete worktrees explicitly. No canvas changes yet. Old canvas continues to work; this is purely additive.
 
-- [x] Extend `WorktreeManager` with a `listManagedWorktrees()` that filters `git worktree list` to ones under `{repo}/.xyzterminal/worktrees/`, returning `[Worktree]` with display name derived from the branch.
+- [x] Extend `WorktreeManager` with a `listManagedWorktrees()` that filters `git worktree list` to ones under `{repo}/.pluricode/worktrees/`, returning `[Worktree]` with display name derived from the branch.
 - [x] Add `Worktree` struct (Identifiable by branch name) in `Worktree/Worktree.swift`.
 - [x] `RepoSidebarView`: replace flat repo list with a `DisclosureGroup` per repo; expanded state shows the managed worktrees underneath.
 - [x] "New Worktree" row under each repo opens an inline sheet: name input + base branch picker (defaults to repo's default branch).
 - [x] Context menu on a worktree row: Show in Finder, Delete (confirm dialog, runs `git worktree remove --force`).
-- [x] Rename worktree: double-click row → inline edit; calls `git branch -m xyz-old xyz-new` and `git worktree move` if needed.
+- [x] Rename worktree: double-click row → inline edit; calls `git branch -m pluri-old pluri-new` and `git worktree move` if needed.
 - [x] Selecting a worktree row does not open anything yet — wire-up happens in M3.
 - [x] Build and run: create/list/delete worktrees from the sidebar; old canvas still functions.
 
@@ -91,7 +91,7 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: wire the tiling engine to real terminals. Swap `CanvasHostView` for `WorkspaceView`. Old canvas still compiles but is no longer the detail view.
 
-- [x] `Workspace/Workspace.swift`: observable model holding root TileNode, terminal hosts, debounced save to `.xyzterminal/workspace.json`.
+- [x] `Workspace/Workspace.swift`: observable model holding root TileNode, terminal hosts, debounced save to `.pluricode/workspace.json`.
 - [x] `Workspace/TerminalHost.swift` + `TerminalPaneView.swift`: per-pane NSViewRepresentable wrapping a `TerminalSession`. Session survives view rebuilds via the Workspace-owned `terminalHosts` dict.
 - [x] Same worktree may appear in multiple panes; distinct paneIDs = distinct sessions, distinct scrollback files.
 - [x] `WorkspaceView` replaces `CanvasHostView` as the detail view.
@@ -104,7 +104,7 @@ Each milestone has a checklist. Tick items as completed across sessions.
 **Goal**: remove all dead code and legacy model concepts in one commit. App is now exclusively tiled.
 
 - [x] Delete `Canvas/`, `Wiring/`, `MCP/`, `SectionLayout.swift`.
-- [x] Delete `Model/CanvasDocument.swift`, `Model/CanvasNode.swift`, `Model/Persistence.swift`, `Terminal/TerminalManager.swift`, `Xyzterminal-Bridging-Header.h`.
+- [x] Delete `Model/CanvasDocument.swift`, `Model/CanvasNode.swift`, `Model/Persistence.swift`, `Terminal/TerminalManager.swift`, `Pluricode-Bridging-Header.h`.
 - [x] Strip `main.swift` (no more MCP bridge branch); remove `CanvasHostView`, `migrateLastProjectPath`, old toolbar buttons.
 - [x] Drop `SWIFT_OBJC_BRIDGING_HEADER` from `project.yml`.
 - [x] Verify: project builds and launches; tiling works unchanged.
@@ -113,8 +113,8 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: profile and startup script move from terminal node → worktree. When a worktree opens in a pane, the agent auto-runs if a startup script is set.
 
-- [x] `Worktree/WorktreeConfig.swift` holds agentProfileID + startupScript, loaded from `{worktree}/.xyzterminal/worktree.json`.
-- [x] `Agent/AgentProfileStore.swift` is global, UserDefaults-backed, seeded from `AgentProfile.defaults`. Injected from `XyzterminalApp` into the sidebar and workspace.
+- [x] `Worktree/WorktreeConfig.swift` holds agentProfileID + startupScript, loaded from `{worktree}/.pluricode/worktree.json`.
+- [x] `Agent/AgentProfileStore.swift` is global, UserDefaults-backed, seeded from `AgentProfile.defaults`. Injected from `PluricodeApp` into the sidebar and workspace.
 - [x] Sidebar "Configure..." context menu on worktree rows opens a sheet with profile picker + startup script.
 - [x] New Worktree sheet now includes profile picker + startup script; saves the config alongside git worktree creation.
 - [x] `TerminalHost.startIfNeeded` loads the config, writes CLAUDE.md via `ProfileInjector`, and schedules the startup script.
@@ -124,7 +124,7 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: a pane can be a task list instead of a terminal. Users jot down quick todos, bugs, follow-ups, and tick them off. Scoped per-repo. Not wired to agents.
 
-- [x] `Workspace/TaskStore.swift`: `TaskItem` (id, title, done, createdAt) + observable `TaskStore` persisting `.xyzterminal/tasks.json` debounced.
+- [x] `Workspace/TaskStore.swift`: `TaskItem` (id, title, done, createdAt) + observable `TaskStore` persisting `.pluricode/tasks.json` debounced.
 - [x] `PaneContent.tasks` variant; `TilingDragPayload.Kind.newTaskPane` maps via `paneContent` helper.
 - [x] `Workspace.addPane`/`splitPane` generalized over `PaneContent` so both kinds flow through one path.
 - [x] `TaskPaneView`: header with open/total counts + clear-completed menu + close, list with checkbox, strikethrough, hover-delete, double-click to rename, bottom "Add task..." field.
@@ -144,7 +144,7 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: users create multiple named task lists per repo (e.g. "Bugs", "Improvements") and open each in its own pane. Dragging a specific list from the sidebar creates a pane bound to that list.
 
-- [ ] `TaskList` struct (id, name, items). `TaskStore` holds `[TaskList]` per repo. Persists to `.xyzterminal/tasks.json` as a list-of-lists (old flat-array format becomes unreadable — acceptable per no-backwards-compat rule).
+- [ ] `TaskList` struct (id, name, items). `TaskStore` holds `[TaskList]` per repo. Persists to `.pluricode/tasks.json` as a list-of-lists (old flat-array format becomes unreadable — acceptable per no-backwards-compat rule).
 - [ ] `TaskStoreRegistry` shared across sidebar and workspaces, keyed by repo path, so changes in the sidebar show up live in open panes.
 - [ ] `PaneContent.tasks(listID:)` and `TilingDragPayload.Kind.newTaskPane(listID:)` carry the list identity.
 - [ ] `TaskPaneView` renders and mutates a specific list by id; header shows the list's name + counts. Missing-list pane shows an error state with Remove Pane.

@@ -1,6 +1,6 @@
-name: Xyzterminal
+name: Pluricode
 options:
-  bundleIdPrefix: com.xyzterminal
+  bundleIdPrefix: com.pluricode
   deploymentTarget:
     macOS: "15.0"
   createIntermediateGroups: true
@@ -13,18 +13,18 @@ packages:
     url: https://github.com/migueldeicaza/SwiftTerm
     branch: main
 targets:
-  Xyzterminal:
+  Pluricode:
     type: application
     platform: macOS
     sources:
-      - path: Xyzterminal
+      - path: Pluricode
     dependencies:
       - package: SwiftTerm
     settings:
       base:
-        INFOPLIST_FILE: Xyzterminal/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Xyzterminal/Xyzterminal.entitlements
-        PRODUCT_BUNDLE_IDENTIFIER: com.xyzterminal.app
+        INFOPLIST_FILE: Pluricode/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Pluricode/Pluricode.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.pluricode.app
         CODE_SIGN_IDENTITY: "-"
         ENABLE_APP_SANDBOX: false
         ENABLE_HARDENED_RUNTIME: false

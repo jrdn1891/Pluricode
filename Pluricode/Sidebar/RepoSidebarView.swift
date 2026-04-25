@@ -773,7 +773,7 @@ struct NewWorktreeSheet: View {
                 Text("Name").font(.caption).foregroundStyle(.secondary)
                 TextField("frontend-fix", text: $name)
                     .textFieldStyle(.roundedBorder)
-                Text("Branch will be `xyz-\(sanitized(name))`")
+                Text("Branch will be `pluri-\(sanitized(name))`")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -829,7 +829,7 @@ struct NewWorktreeSheet: View {
             )
             let config = WorktreeConfig(agentProfileID: agentProfileID)
             config.save(at: path.path)
-            onCreated("xyz-\(cleanName)")
+            onCreated("pluri-\(cleanName)")
             dismiss()
         } catch let WorktreeError.createFailed(message) {
             error = message
@@ -942,7 +942,7 @@ private struct RenameWorktreeSheet: View {
                 Text("Name").font(.caption).foregroundStyle(.secondary)
                 TextField("name", text: $name)
                     .textFieldStyle(.roundedBorder)
-                Text("Branch will be `xyz-\(sanitized(name))`")
+                Text("Branch will be `pluri-\(sanitized(name))`")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

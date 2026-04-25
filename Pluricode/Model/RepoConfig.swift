@@ -9,7 +9,7 @@ struct RepoConfig: Codable, Equatable {
 
     static func configURL(for repoPath: String) -> URL {
         URL(fileURLWithPath: repoPath)
-            .appendingPathComponent(".xyzterminal", isDirectory: true)
+            .appendingPathComponent(".pluricode", isDirectory: true)
             .appendingPathComponent("repo.json")
     }
 

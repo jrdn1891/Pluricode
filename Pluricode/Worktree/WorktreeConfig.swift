@@ -9,7 +9,7 @@ struct WorktreeConfig: Codable, Equatable {
 
     static func configURL(for worktreePath: String) -> URL {
         URL(fileURLWithPath: worktreePath)
-            .appendingPathComponent(".xyzterminal", isDirectory: true)
+            .appendingPathComponent(".pluricode", isDirectory: true)
             .appendingPathComponent("worktree.json")
     }
 

@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-struct XyzterminalApp: App {
+struct PluricodeApp: App {
     @State private var repoStore = RepoStore()
     @State private var profileStore = AgentProfileStore()
     @State private var taskListStore = TaskListStore()
@@ -55,7 +55,7 @@ struct XyzterminalApp: App {
                     .pickerStyle(.menu)
                 }
             }
-            .navigationTitle(workspaceStore.selectedWorkspace?.name ?? "Xyzterminal")
+            .navigationTitle(workspaceStore.selectedWorkspace?.name ?? "Pluricode")
             .onAppear {
                 (AppearanceMode(rawValue: appearanceModeRaw) ?? .system).apply()
             }

@@ -1,3 +1,0 @@
-import SwiftUI
-
-XyzterminalApp.main()

@@ -145,7 +145,7 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
               let rep = NSBitmapImageRep(data: tiff),
               let data = rep.representation(using: .png, properties: [:]) else { return nil }
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("xyzterminal-\(UUID().uuidString.prefix(8)).png")
+            .appendingPathComponent("pluricode-\(UUID().uuidString.prefix(8)).png")
         do { try data.write(to: url); return url.path } catch { return nil }
     }
 
