@@ -9,8 +9,6 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     var onProcessTerminated: ((Int32?) -> Void)?
     @Published private(set) var isIdle: Bool = false
     private var lastAppliedZoom: Float = 1.0
-    private var pendingScript: String?
-    private var fallbackTimer: DispatchWorkItem?
     private var lastSavedBufferSize: Int = 0
     private var idleWorkItem: DispatchWorkItem?
 
@@ -35,20 +33,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.idleThreshold, execute: item)
     }
 
-    func scheduleStartupScript(_ script: String) {
-        pendingScript = script
-        let timer = DispatchWorkItem { [weak self] in
-            self?.deliverPendingScript()
-        }
-        fallbackTimer = timer
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0, execute: timer)
-    }
-
-    private func deliverPendingScript() {
-        guard let script = pendingScript else { return }
-        pendingScript = nil
-        fallbackTimer?.cancel()
-        fallbackTimer = nil
+    func sendStartupScript(_ script: String) {
         let bytes = Array("\(script)\n".utf8)
         terminalView.process?.send(data: bytes[...])
     }
@@ -99,16 +84,9 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
     func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
 
-    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
-        if pendingScript != nil {
-            deliverPendingScript()
-        }
-    }
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
 
     func processTerminated(source: TerminalView, exitCode: Int32?) {
-        pendingScript = nil
-        fallbackTimer?.cancel()
-        fallbackTimer = nil
         idleWorkItem?.cancel()
         idleWorkItem = nil
         onProcessTerminated?(exitCode)
