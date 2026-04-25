@@ -1,4 +1,14 @@
 import SwiftUI
+import CoreTransferable
+
+struct TaskDragPayload: Codable, Transferable, Hashable {
+    let listID: UUID
+    let taskID: UUID
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .json)
+    }
+}
 
 struct TaskPaneView: View {
     let paneID: UUID
@@ -32,6 +42,7 @@ struct TaskPaneView: View {
                             TaskRow(listID: listID, task: task, store: store)
                             Divider().opacity(0.3)
                         }
+                        TaskTrailingDropZone(listID: listID, store: store)
                     }
                 }
                 .frame(maxHeight: .infinity)
@@ -69,6 +80,7 @@ private struct TaskRow: View {
     let store: TaskListStore
     @State private var hovering = false
     @State private var editingTitle: String?
+    @State private var isTargeted = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -108,14 +120,49 @@ private struct TaskRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(hovering ? Color.secondary.opacity(0.06) : Color.clear)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.accentColor)
+                .frame(height: 2)
+                .opacity(isTargeted ? 1 : 0)
+        }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+        .draggable(TaskDragPayload(listID: listID, taskID: task.id))
+        .dropDestination(for: TaskDragPayload.self) { payloads, _ in
+            guard let payload = payloads.first, payload.listID == listID else { return false }
+            store.moveTask(listID: listID, taskID: payload.taskID, before: task.id)
+            return true
+        } isTargeted: { isTargeted = $0 }
     }
 
     private func commitEdit() {
         guard let draft = editingTitle else { return }
         store.updateTaskTitle(listID: listID, taskID: task.id, title: draft)
         editingTitle = nil
+    }
+}
+
+private struct TaskTrailingDropZone: View {
+    let listID: UUID
+    let store: TaskListStore
+    @State private var isTargeted = false
+
+    var body: some View {
+        Color.clear
+            .frame(maxWidth: .infinity, minHeight: 24)
+            .contentShape(Rectangle())
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Color.accentColor)
+                    .frame(height: 2)
+                    .opacity(isTargeted ? 1 : 0)
+            }
+            .dropDestination(for: TaskDragPayload.self) { payloads, _ in
+                guard let payload = payloads.first, payload.listID == listID else { return false }
+                store.moveTask(listID: listID, taskID: payload.taskID, before: nil)
+                return true
+            } isTargeted: { isTargeted = $0 }
     }
 }
 
