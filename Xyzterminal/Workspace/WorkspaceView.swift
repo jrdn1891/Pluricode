@@ -74,6 +74,8 @@ private struct WorkspacePane: View {
                 TerminalPaneBody(paneID: pane.id, repoID: repoID, worktreeID: worktreeID, workspace: workspace)
             case .tasks(let listID):
                 TaskPaneBody(paneID: pane.id, listID: listID, workspace: workspace)
+            case .stats:
+                StatsPaneBody(paneID: pane.id, workspace: workspace)
             }
         }
     }
@@ -105,6 +107,38 @@ private struct TaskPaneBody: View {
                 paneID: paneID,
                 listID: listID,
                 store: workspace.taskListStore,
+                onActivate: { workspace.setFocus(paneID: paneID) },
+                onClose: { workspace.closePane(paneID: paneID) }
+            )
+            .frame(width: geo.size.width, height: geo.size.height)
+            .overlay {
+                if let edge = hoverEdge {
+                    DropZoneOverlay(edge: edge, size: geo.size)
+                }
+            }
+            .onDrop(
+                of: [.plainText],
+                delegate: PaneDropDelegate(
+                    paneID: paneID,
+                    workspace: workspace,
+                    size: geo.size,
+                    hoverEdge: $hoverEdge
+                )
+            )
+        }
+    }
+}
+
+private struct StatsPaneBody: View {
+    let paneID: UUID
+    let workspace: Workspace
+    @State private var hoverEdge: TileEdge?
+
+    var body: some View {
+        GeometryReader { geo in
+            StatsPaneView(
+                paneID: paneID,
+                service: workspace.statsService,
                 onActivate: { workspace.setFocus(paneID: paneID) },
                 onClose: { workspace.closePane(paneID: paneID) }
             )

@@ -56,6 +56,11 @@ struct RepoSidebarView: View {
             }
             .selectionDisabled()
 
+            Section("Widgets") {
+                StatsWidgetRow()
+            }
+            .selectionDisabled()
+
             Section("Repositories") {
                 ForEach(repoStore.repos) { repo in
                     RepoRow(
@@ -620,6 +625,36 @@ struct WorktreeRow: View {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.triangle.branch")
                 Text(worktree.displayName)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        })
+    }
+}
+
+struct StatsWidgetRow: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "chart.bar")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            Text("Today's Stats")
+                .font(.body)
+            Spacer()
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 1)
+        .onDrag({
+            let payload = TilingDragPayload(kind: .newStats)
+            let data = (try? JSONEncoder().encode(payload)) ?? Data()
+            let string = String(data: data, encoding: .utf8) ?? ""
+            return NSItemProvider(object: string as NSString)
+        }, preview: {
+            HStack(spacing: 6) {
+                Image(systemName: "chart.bar")
+                Text("Today's Stats")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
