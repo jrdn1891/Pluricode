@@ -151,6 +151,7 @@ private struct TaskPaneHeader: View {
                     .font(.system(size: 12))
             }
             .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
             .frame(width: 20)
 
             Button(action: onClose) {
