@@ -24,8 +24,11 @@ final class Workspace {
     var terminalHosts: [UUID: TerminalHost] = [:]
     var focusedPaneID: UUID?
     var expandedPaneID: UUID?
+    var commandKeyHeld: Bool = false
 
     private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private var commandHoldTask: DispatchWorkItem?
+    static let quickSwitchHoldDelay: TimeInterval = 0.35
 
     init(
         id: UUID = UUID(),
@@ -159,6 +162,35 @@ final class Workspace {
 
     func setFocus(paneID: UUID?) {
         focusedPaneID = paneID
+    }
+
+    func setCommandKeyDown(_ down: Bool) {
+        commandHoldTask?.cancel()
+        commandHoldTask = nil
+        if down {
+            let task = DispatchWorkItem { [weak self] in
+                self?.commandKeyHeld = true
+            }
+            commandHoldTask = task
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.quickSwitchHoldDelay, execute: task)
+        } else {
+            commandKeyHeld = false
+        }
+    }
+
+    var terminalPanes: [Pane] {
+        tiling.panes.filter {
+            if case .terminal = $0.content { return true }
+            return false
+        }
+    }
+
+    func focusPane(atIndex index: Int) {
+        let panes = terminalPanes
+        guard panes.indices.contains(index) else { return }
+        let id = panes[index].id
+        setFocus(paneID: id)
+        terminalHosts[id]?.focusInput()
     }
 
     func closeFocusedPane() {

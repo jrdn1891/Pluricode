@@ -93,6 +93,16 @@ struct PaneCommands: View {
         }
         .keyboardShortcut("d", modifiers: [.command, .shift])
         .disabled(workspace?.focusedPaneID == nil)
+
+        Divider()
+
+        ForEach(1...9, id: \.self) { n in
+            Button("Focus Pane \(n)") {
+                workspace?.focusPane(atIndex: n - 1)
+            }
+            .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
+            .disabled((workspace?.terminalPanes.count ?? 0) < n)
+        }
     }
 }
 

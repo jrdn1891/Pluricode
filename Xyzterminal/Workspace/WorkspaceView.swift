@@ -1,8 +1,11 @@
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
 
 struct WorkspaceView: View {
     let workspace: Workspace
+    @State private var modifierMonitor: Any?
+    @State private var resignObserver: NSObjectProtocol?
 
     var body: some View {
         ZStack {
@@ -14,6 +17,24 @@ struct WorkspaceView: View {
         }
         .animation(.easeOut(duration: 0.15), value: workspace.expandedPaneID)
         .focusedSceneValue(\.workspace, workspace)
+        .onAppear {
+            modifierMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+                workspace.setCommandKeyDown(event.modifierFlags.contains(.command))
+                return event
+            }
+            resignObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didResignActiveNotification,
+                object: nil,
+                queue: .main
+            ) { _ in workspace.setCommandKeyDown(false) }
+        }
+        .onDisappear {
+            if let m = modifierMonitor { NSEvent.removeMonitor(m) }
+            modifierMonitor = nil
+            if let o = resignObserver { NotificationCenter.default.removeObserver(o) }
+            resignObserver = nil
+            workspace.setCommandKeyDown(false)
+        }
     }
 }
 
@@ -76,6 +97,43 @@ private struct WorkspacePane: View {
                 TaskPaneBody(paneID: pane.id, listID: listID, workspace: workspace)
             }
         }
+        .overlay {
+            QuickSwitchOverlay(paneID: pane.id, workspace: workspace)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+    }
+}
+
+private struct QuickSwitchOverlay: View {
+    let paneID: UUID
+    let workspace: Workspace
+
+    var body: some View {
+        let visible = workspace.commandKeyHeld
+            && workspace.terminalPanes.count >= 2
+            && (paneIndex.map { $0 < 9 } ?? false)
+        ZStack {
+            if visible, let index = paneIndex {
+                Color.black.opacity(0.18)
+                Text("⌘\(index + 1)")
+                    .font(.system(size: 64, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 22)
+                            .fill(.regularMaterial)
+                    )
+                    .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .allowsHitTesting(false)
+        .animation(.easeOut(duration: 0.12), value: visible)
+    }
+
+    private var paneIndex: Int? {
+        workspace.terminalPanes.firstIndex { $0.id == paneID }
     }
 }
 
