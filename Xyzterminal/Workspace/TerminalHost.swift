@@ -58,6 +58,11 @@ final class TerminalHost {
         session.updateColors(theme: theme)
     }
 
+    func focusInput() {
+        let term = session.terminalView
+        term.window?.makeFirstResponder(term)
+    }
+
     func saveScrollback(to dir: URL) {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         session.saveScrollback(to: dir)
