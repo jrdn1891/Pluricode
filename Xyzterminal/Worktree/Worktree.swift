@@ -6,7 +6,7 @@ struct Worktree: Identifiable, Hashable {
     let head: String
     let isPrimary: Bool
 
-    var id: String { branch }
+    var id: String { path }
 
     var displayName: String {
         branch.hasPrefix("xyz-") ? String(branch.dropFirst("xyz-".count)) : branch
