@@ -178,11 +178,15 @@ final class WorktreeManager {
             "-C", path.path, "ls-files", "--others", "--exclude-standard"
         ]), result.status == 0 {
             for rel in result.stdout.components(separatedBy: "\n") where !rel.isEmpty {
-                let file = path.appendingPathComponent(rel)
-                guard let data = try? Data(contentsOf: file), !data.isEmpty else { continue }
-                var lines = data.reduce(into: 0) { if $1 == 0x0A { $0 += 1 } }
-                if data.last != 0x0A { lines += 1 }
-                adds += lines
+                guard let stat = try? run("git", args: [
+                    "-C", path.path, "diff", "--no-index", "--numstat", "/dev/null", rel
+                ]), stat.status <= 1 else { continue }
+                for line in stat.stdout.components(separatedBy: "\n") where !line.isEmpty {
+                    let parts = line.split(separator: "\t")
+                    guard parts.count >= 2 else { continue }
+                    adds += Int(parts[0]) ?? 0
+                    dels += Int(parts[1]) ?? 0
+                }
             }
         }
         return DiffStats(additions: adds, deletions: dels)

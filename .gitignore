@@ -3,6 +3,6 @@
 *.xcodeproj/project.xcworkspace/xcuserdata/
 DerivedData/
 .build/
-.xyzterminal/worktrees/
+.xyzterminal/
 *.swp
 .mcp.json
