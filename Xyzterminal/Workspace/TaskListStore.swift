@@ -108,6 +108,21 @@ final class TaskListStore {
         mark(listID)
     }
 
+    func moveTask(listID: UUID, taskID: UUID, before targetID: UUID?) {
+        guard taskID != targetID,
+              let listIdx = lists.firstIndex(where: { $0.id == listID }),
+              let fromIdx = lists[listIdx].items.firstIndex(where: { $0.id == taskID }) else { return }
+        let task = lists[listIdx].items.remove(at: fromIdx)
+        let insertIdx: Int
+        if let targetID, let toIdx = lists[listIdx].items.firstIndex(where: { $0.id == targetID }) {
+            insertIdx = toIdx
+        } else {
+            insertIdx = lists[listIdx].items.count
+        }
+        lists[listIdx].items.insert(task, at: insertIdx)
+        mark(listID)
+    }
+
     func clearCompleted(listID: UUID) {
         guard let listIdx = lists.firstIndex(where: { $0.id == listID }) else { return }
         lists[listIdx].items.removeAll { $0.done }
