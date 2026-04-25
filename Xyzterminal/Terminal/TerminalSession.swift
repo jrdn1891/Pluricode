@@ -22,7 +22,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         let view = ActivityAwareTerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 270))
         self.terminalView = view
         super.init()
-        view.onDataReceived = { [weak self] in self?.noteActivity() }
+        view.onActivity = { [weak self] in self?.noteActivity() }
         terminalView.processDelegate = self
         terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize, weight: .regular)
     }
@@ -97,6 +97,10 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
     func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {}
 
+    func scrolled(source: TerminalView, position: Double) {
+        noteActivity()
+    }
+
     func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
 
     func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
@@ -116,7 +120,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 }
 
 private final class ActivityAwareTerminalView: LocalProcessTerminalView {
-    var onDataReceived: (() -> Void)?
+    var onActivity: (() -> Void)?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -127,7 +131,7 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
 
     override func dataReceived(slice: ArraySlice<UInt8>) {
         super.dataReceived(slice: slice)
-        onDataReceived?()
+        onActivity?()
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

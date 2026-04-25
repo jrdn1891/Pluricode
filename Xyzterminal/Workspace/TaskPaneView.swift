@@ -4,7 +4,6 @@ struct TaskPaneView: View {
     let paneID: UUID
     let listID: UUID
     let store: TaskListStore
-    let focused: Bool
     let onActivate: () -> Void
     let onClose: () -> Void
     @State private var draftText: String = ""
@@ -22,7 +21,6 @@ struct TaskPaneView: View {
                     listName: list.name,
                     remainingCount: list.items.filter { !$0.done }.count,
                     totalCount: list.items.count,
-                    focused: focused,
                     onActivate: onActivate,
                     onClearCompleted: { store.clearCompleted(listID: listID) },
                     onClose: onClose
@@ -126,7 +124,6 @@ private struct TaskPaneHeader: View {
     let listName: String
     let remainingCount: Int
     let totalCount: Int
-    let focused: Bool
     let onActivate: () -> Void
     let onClearCompleted: () -> Void
     let onClose: () -> Void
@@ -162,7 +159,7 @@ private struct TaskPaneHeader: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(focused ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
+        .background(Color.secondary.opacity(0.1))
         .contentShape(Rectangle())
         .onTapGesture(perform: onActivate)
         .draggable(TilingDragPayload(kind: .movePane(paneID: paneID))) {
