@@ -271,6 +271,7 @@ private struct PaneHeader: View {
     let onActivate: () -> Void
     let onExpand: () -> Void
     let onClose: () -> Void
+    @State private var isMerged: Bool = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -283,8 +284,8 @@ private struct PaneHeader: View {
                 Text("·")
                     .foregroundStyle(.secondary)
             }
-            Image(systemName: "arrow.triangle.branch")
-                .foregroundStyle(.secondary)
+            Image(systemName: isMerged ? "arrow.trianglehead.merge" : "arrow.triangle.branch")
+                .foregroundStyle(isMerged ? Color.green : Color.secondary)
                 .font(.caption)
             Text(title)
                 .font(.system(size: 12, weight: .medium))
@@ -323,9 +324,18 @@ private struct PaneHeader: View {
         .background(headerBackground)
         .contentShape(Rectangle())
         .onTapGesture(perform: onActivate)
+        .task(id: paneID) {
+            guard let pathString = workspace.worktreePath(paneID: paneID) else { return }
+            let path = URL(fileURLWithPath: pathString)
+            while !Task.isCancelled {
+                let next = await Task.detached { WorktreeManager.isMerged(at: path) }.value
+                if next != isMerged { isMerged = next }
+                try? await Task.sleep(for: .seconds(30))
+            }
+        }
         .draggable(TilingDragPayload(kind: .movePane(paneID: paneID))) {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.triangle.branch")
+                Image(systemName: isMerged ? "arrow.trianglehead.merge" : "arrow.triangle.branch")
                 Text(title)
             }
             .padding(.horizontal, 10)
