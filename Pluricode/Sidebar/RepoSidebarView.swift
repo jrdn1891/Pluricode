@@ -923,6 +923,7 @@ private struct ConfigureRepoSheet: View {
     let repo: RepoEntry
     @Environment(\.dismiss) private var dismiss
     @State private var startupScript: String = ""
+    @State private var devScript: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -939,6 +940,16 @@ private struct ConfigureRepoSheet: View {
                     .foregroundStyle(.secondary)
             }
 
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Dev Script").font(.caption).foregroundStyle(.secondary)
+                TextField("npm run dev", text: $devScript, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...5)
+                Text("Runs in the focused pane on ⌘R or via the ▶ button.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
@@ -950,13 +961,18 @@ private struct ConfigureRepoSheet: View {
         .padding(24)
         .frame(width: 460)
         .onAppear {
-            startupScript = RepoConfig.load(at: repo.path.path).startupScript ?? ""
+            let config = RepoConfig.load(at: repo.path.path)
+            startupScript = config.startupScript ?? ""
+            devScript = config.devScript ?? ""
         }
     }
 
     private func save() {
-        RepoConfig(startupScript: startupScript.isEmpty ? nil : startupScript)
-            .save(at: repo.path.path)
+        RepoConfig(
+            startupScript: startupScript.isEmpty ? nil : startupScript,
+            devScript: devScript.isEmpty ? nil : devScript
+        )
+        .save(at: repo.path.path)
         dismiss()
     }
 }

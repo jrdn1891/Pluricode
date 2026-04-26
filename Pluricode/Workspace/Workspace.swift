@@ -23,6 +23,7 @@ final class Workspace {
     let profileStore: AgentProfileStore
     let statsService: StatsService
     var terminalHosts: [UUID: TerminalHost] = [:]
+    var pendingDevScripts: [UUID: String] = [:]
     var focusedPaneID: UUID?
     var expandedPaneID: UUID?
     var commandKeyHeld: Bool = false
@@ -108,27 +109,66 @@ final class Workspace {
         scheduleSave()
     }
 
-    func addPane(_ content: PaneContent) {
+    func addPane(_ content: TabContent) {
         let id = tiling.addPane(content)
         focusedPaneID = id
         scheduleSave()
     }
 
-    func splitPane(paneID: UUID, edge: TileEdge, content: PaneContent) {
+    func splitPane(paneID: UUID, edge: TileEdge, content: TabContent) {
         let id = tiling.split(paneID: paneID, edge: edge, newContent: content)
         focusedPaneID = id
         scheduleSave()
     }
 
     func closePane(paneID: UUID) {
-        if let host = terminalHosts.removeValue(forKey: paneID) {
-            host.saveScrollback(to: Self.scrollbackDir)
-            host.teardown()
-        }
+        guard let pane = pane(id: paneID) else { return }
+        for tab in pane.tabs { teardownTab(tab.id) }
         tiling.remove(paneID: paneID)
         if focusedPaneID == paneID { focusedPaneID = tiling.panes.first?.id }
         if expandedPaneID == paneID { expandedPaneID = nil }
         scheduleSave()
+    }
+
+    func closeTab(paneID: UUID, tabID: UUID) {
+        guard let pane = pane(id: paneID) else { return }
+        if pane.tabs.count <= 1 {
+            closePane(paneID: paneID)
+            return
+        }
+        teardownTab(tabID)
+        tiling.updatePane(paneID) { p in
+            p.tabs.removeAll { $0.id == tabID }
+            if p.activeTabID == tabID, let next = p.tabs.first {
+                p.activeTabID = next.id
+            }
+        }
+        scheduleSave()
+    }
+
+    func setActiveTab(paneID: UUID, tabID: UUID) {
+        tiling.updatePane(paneID) { $0.activeTabID = tabID }
+        scheduleSave()
+    }
+
+    func cycleTab(paneID: UUID, by delta: Int) {
+        guard let pane = pane(id: paneID), pane.tabs.count > 1 else { return }
+        let idx = pane.tabs.firstIndex { $0.id == pane.activeTabID } ?? 0
+        let count = pane.tabs.count
+        let next = ((idx + delta) % count + count) % count
+        setActiveTab(paneID: paneID, tabID: pane.tabs[next].id)
+    }
+
+    private func teardownTab(_ tabID: UUID) {
+        if let host = terminalHosts.removeValue(forKey: tabID) {
+            host.saveScrollback(to: Self.scrollbackDir)
+            host.teardown()
+        }
+        pendingDevScripts.removeValue(forKey: tabID)
+    }
+
+    func consumePendingDevScript(tabID: UUID) -> String? {
+        pendingDevScripts.removeValue(forKey: tabID)
     }
 
     func expandPane(paneID: UUID) {
@@ -139,9 +179,9 @@ final class Workspace {
         expandedPaneID = nil
     }
 
-    func worktreePath(paneID: UUID) -> String? {
-        guard let pane = pane(id: paneID),
-              case .terminal(let repoID, let worktreeID) = pane.content,
+    func worktreePath(tabID: UUID) -> String? {
+        guard let (_, tab) = locateTab(id: tabID),
+              case .terminal(let repoID, let worktreeID) = tab.content,
               let repo = repo(id: repoID),
               let wm = WorktreeManager(repoRoot: repo.path) else { return nil }
         return wm.listManagedWorktrees().first { $0.branch == worktreeID }?.path
@@ -151,11 +191,62 @@ final class Workspace {
         worktreeID.hasPrefix("pluri-") ? String(worktreeID.dropFirst("pluri-".count)) : worktreeID
     }
 
-    func paneProfile(paneID: UUID) -> AgentProfile? {
-        guard let path = worktreePath(paneID: paneID) else { return nil }
+    func tabProfile(tabID: UUID) -> AgentProfile? {
+        guard let path = worktreePath(tabID: tabID) else { return nil }
         let config = WorktreeConfig.load(at: path)
         guard let id = config.agentProfileID else { return nil }
         return profileStore.profile(id: id)
+    }
+
+    func devScript(paneID: UUID) -> String? {
+        guard let pane = pane(id: paneID),
+              case .terminal(let repoID, _) = pane.activeTab.content,
+              let repo = repo(id: repoID) else { return nil }
+        let script = RepoConfig.load(at: repo.path.path).devScript
+        return (script?.isEmpty == false) ? script : nil
+    }
+
+    func runDevScript(paneID: UUID) {
+        guard let pane = pane(id: paneID),
+              case .terminal(let repoID, let worktreeID) = pane.activeTab.content,
+              let repo = repo(id: repoID),
+              let script = RepoConfig.load(at: repo.path.path).devScript,
+              !script.isEmpty else { return }
+        let newTab = Tab(content: .terminal(repoID: repoID, worktreeID: worktreeID), name: "dev")
+        pendingDevScripts[newTab.id] = script
+        tiling.updatePane(paneID) { p in
+            p.tabs.append(newTab)
+            p.activeTabID = newTab.id
+        }
+        focusedPaneID = paneID
+        scheduleSave()
+    }
+
+    func runDevScriptOnFocusedPane() {
+        guard let id = focusedPaneID else { return }
+        runDevScript(paneID: id)
+    }
+
+    var focusedDevScript: String? {
+        guard let id = focusedPaneID else { return nil }
+        return devScript(paneID: id)
+    }
+
+    func tabLabel(_ tab: Tab, fallback: String) -> String {
+        if let name = tab.name, !name.isEmpty { return name }
+        if case .terminal(_, let worktreeID) = tab.content {
+            return paneDisplayName(worktreeID: worktreeID)
+        }
+        return fallback
+    }
+
+    private func locateTab(id tabID: UUID) -> (Pane, Tab)? {
+        for pane in tiling.panes {
+            if let tab = pane.tabs.first(where: { $0.id == tabID }) {
+                return (pane, tab)
+            }
+        }
+        return nil
     }
 
     func setWeights(splitID: UUID, weights: [Float]) {
@@ -183,7 +274,7 @@ final class Workspace {
 
     var terminalPanes: [Pane] {
         tiling.panes.filter {
-            if case .terminal = $0.content { return true }
+            if case .terminal = $0.activeTab.content { return true }
             return false
         }
     }
@@ -191,20 +282,30 @@ final class Workspace {
     func focusPane(atIndex index: Int) {
         let panes = terminalPanes
         guard panes.indices.contains(index) else { return }
-        let id = panes[index].id
-        setFocus(paneID: id)
-        terminalHosts[id]?.focusInput()
+        let pane = panes[index]
+        setFocus(paneID: pane.id)
+        terminalHosts[pane.activeTabID]?.focusInput()
     }
 
-    func closeFocusedPane() {
+    func closeFocusedTab() {
+        guard let paneID = focusedPaneID, let pane = pane(id: paneID) else { return }
+        closeTab(paneID: paneID, tabID: pane.activeTabID)
+    }
+
+    func cycleFocusedTab(by delta: Int) {
         guard let id = focusedPaneID else { return }
-        closePane(paneID: id)
+        cycleTab(paneID: id, by: delta)
+    }
+
+    var focusedPaneTabCount: Int {
+        guard let id = focusedPaneID, let pane = pane(id: id) else { return 0 }
+        return pane.tabs.count
     }
 
     func splitFocusedPane(direction: TileDirection) {
         guard let id = focusedPaneID, let pane = pane(id: id) else { return }
         let edge: TileEdge = direction == .horizontal ? .right : .bottom
-        splitPane(paneID: id, edge: edge, content: pane.content)
+        splitPane(paneID: id, edge: edge, content: pane.activeTab.content)
     }
 
     var anchorPaneID: UUID? {
@@ -226,7 +327,7 @@ final class Workspace {
         }
     }
 
-    func performPaneCreation(_ action: PaneCreationAction, content: PaneContent) {
+    func performPaneCreation(_ action: PaneCreationAction, content: TabContent) {
         if let edge = action.edge, let anchor = anchorPaneID {
             splitPane(paneID: anchor, edge: edge, content: content)
         } else {
@@ -242,15 +343,15 @@ final class Workspace {
     func acceptDrop(payload: TilingDragPayload, on targetID: UUID?, edge: TileEdge) -> Bool {
         switch payload.kind {
         case .newTerminal(let repoID, let worktreeID):
-            let content: PaneContent = .terminal(repoID: repoID, worktreeID: worktreeID)
+            let content: TabContent = .terminal(repoID: repoID, worktreeID: worktreeID)
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
         case .newTaskPane(let listID):
-            let content: PaneContent = .tasks(listID: listID)
+            let content: TabContent = .tasks(listID: listID)
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
         case .newStats:
-            let content: PaneContent = .stats
+            let content: TabContent = .stats
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
         case .movePane(let sourceID):
@@ -348,12 +449,16 @@ final class WorkspaceStore {
 
     func removePanes(repoID: UUID, worktreeID: String) {
         for ws in workspaces {
-            let targets = ws.tiling.panes.compactMap { pane -> UUID? in
-                guard case .terminal(let r, let w) = pane.content,
-                      r == repoID, w == worktreeID else { return nil }
-                return pane.id
+            let targets: [(UUID, UUID)] = ws.tiling.panes.flatMap { pane in
+                pane.tabs.compactMap { tab -> (UUID, UUID)? in
+                    guard case .terminal(let r, let w) = tab.content,
+                          r == repoID, w == worktreeID else { return nil }
+                    return (pane.id, tab.id)
+                }
             }
-            for id in targets { ws.closePane(paneID: id) }
+            for (paneID, tabID) in targets {
+                ws.closeTab(paneID: paneID, tabID: tabID)
+            }
         }
     }
 

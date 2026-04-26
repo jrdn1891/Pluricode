@@ -2,31 +2,32 @@ import SwiftUI
 import AppKit
 
 struct TerminalPaneView: NSViewRepresentable {
-    let paneID: UUID
+    let tabID: UUID
     let worktreePath: String
     let repoPath: String
     let workspace: Workspace
     @Environment(\.colorScheme) private var colorScheme
 
     func makeNSView(context: Context) -> NSView {
-        let host = hostForPane()
+        let host = hostForTab()
         host.startIfNeeded(scrollbackDir: workspace.scrollbackDir)
         return host.containerView
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        hostForPane().applyTheme(Theme(from: NSApp.effectiveAppearance))
+        hostForTab().applyTheme(Theme(from: NSApp.effectiveAppearance))
     }
 
-    private func hostForPane() -> TerminalHost {
-        if let existing = workspace.terminalHosts[paneID] { return existing }
+    private func hostForTab() -> TerminalHost {
+        if let existing = workspace.terminalHosts[tabID] { return existing }
         let host = TerminalHost(
-            paneID: paneID,
+            tabID: tabID,
             worktreePath: worktreePath,
             repoPath: repoPath,
-            profileStore: workspace.profileStore
+            profileStore: workspace.profileStore,
+            extraStartupScript: workspace.consumePendingDevScript(tabID: tabID)
         )
-        workspace.terminalHosts[paneID] = host
+        workspace.terminalHosts[tabID] = host
         return host
     }
 }

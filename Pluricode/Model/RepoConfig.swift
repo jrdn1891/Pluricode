@@ -2,9 +2,11 @@ import Foundation
 
 struct RepoConfig: Codable, Equatable {
     var startupScript: String?
+    var devScript: String?
 
-    init(startupScript: String? = nil) {
+    init(startupScript: String? = nil, devScript: String? = nil) {
         self.startupScript = startupScript
+        self.devScript = devScript
     }
 
     static func configURL(for repoPath: String) -> URL {

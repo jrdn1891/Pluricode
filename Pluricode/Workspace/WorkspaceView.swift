@@ -90,19 +90,95 @@ private struct WorkspacePane: View {
 
     var body: some View {
         PaneFrame {
-            switch pane.content {
-            case .terminal(let repoID, let worktreeID):
-                TerminalPaneBody(paneID: pane.id, repoID: repoID, worktreeID: worktreeID, workspace: workspace)
-            case .tasks(let listID):
-                TaskPaneBody(paneID: pane.id, listID: listID, workspace: workspace)
-            case .stats:
-                StatsPaneBody(paneID: pane.id, workspace: workspace)
+            VStack(spacing: 0) {
+                if pane.tabs.count >= 2 {
+                    TabStrip(pane: pane, workspace: workspace)
+                }
+                TabBody(pane: pane, workspace: workspace)
             }
         }
         .overlay {
             QuickSwitchOverlay(paneID: pane.id, workspace: workspace)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
         }
+    }
+}
+
+private struct TabBody: View {
+    let pane: Pane
+    let workspace: Workspace
+
+    var body: some View {
+        let tab = pane.activeTab
+        switch tab.content {
+        case .terminal(let repoID, let worktreeID):
+            TerminalPaneBody(
+                pane: pane,
+                tabID: tab.id,
+                repoID: repoID,
+                worktreeID: worktreeID,
+                workspace: workspace
+            )
+        case .tasks(let listID):
+            TaskPaneBody(pane: pane, tabID: tab.id, listID: listID, workspace: workspace)
+        case .stats:
+            StatsPaneBody(pane: pane, tabID: tab.id, workspace: workspace)
+        }
+    }
+}
+
+private struct TabStrip: View {
+    let pane: Pane
+    let workspace: Workspace
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(pane.tabs) { tab in
+                TabCell(
+                    label: workspace.tabLabel(tab, fallback: "tab"),
+                    isActive: tab.id == pane.activeTabID,
+                    onSelect: { workspace.setActiveTab(paneID: pane.id, tabID: tab.id) },
+                    onClose: { workspace.closeTab(paneID: pane.id, tabID: tab.id) }
+                )
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 6)
+        .padding(.top, 4)
+        .padding(.bottom, 2)
+        .background(Color.secondary.opacity(0.06))
+    }
+}
+
+private struct TabCell: View {
+    let label: String
+    let isActive: Bool
+    let onSelect: () -> Void
+    let onClose: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: isActive ? .semibold : .regular))
+                .foregroundStyle(isActive ? .primary : .secondary)
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .opacity(hovering || isActive ? 1 : 0)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isActive ? Color.secondary.opacity(0.18) : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onSelect)
+        .onHover { hovering = $0 }
     }
 }
 
@@ -154,7 +230,8 @@ private struct PaneFrame<Content: View>: View {
 }
 
 private struct TaskPaneBody: View {
-    let paneID: UUID
+    let pane: Pane
+    let tabID: UUID
     let listID: UUID
     let workspace: Workspace
     @State private var hoverEdge: TileEdge?
@@ -162,11 +239,11 @@ private struct TaskPaneBody: View {
     var body: some View {
         GeometryReader { geo in
             TaskPaneView(
-                paneID: paneID,
+                paneID: pane.id,
                 listID: listID,
                 store: workspace.taskListStore,
-                onActivate: { workspace.setFocus(paneID: paneID) },
-                onClose: { workspace.closePane(paneID: paneID) }
+                onActivate: { workspace.setFocus(paneID: pane.id) },
+                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
             )
             .frame(width: geo.size.width, height: geo.size.height)
             .overlay {
@@ -177,7 +254,7 @@ private struct TaskPaneBody: View {
             .onDrop(
                 of: [.plainText],
                 delegate: PaneDropDelegate(
-                    paneID: paneID,
+                    paneID: pane.id,
                     workspace: workspace,
                     size: geo.size,
                     hoverEdge: $hoverEdge
@@ -188,17 +265,18 @@ private struct TaskPaneBody: View {
 }
 
 private struct StatsPaneBody: View {
-    let paneID: UUID
+    let pane: Pane
+    let tabID: UUID
     let workspace: Workspace
     @State private var hoverEdge: TileEdge?
 
     var body: some View {
         GeometryReader { geo in
             StatsPaneView(
-                paneID: paneID,
+                paneID: pane.id,
                 service: workspace.statsService,
-                onActivate: { workspace.setFocus(paneID: paneID) },
-                onClose: { workspace.closePane(paneID: paneID) }
+                onActivate: { workspace.setFocus(paneID: pane.id) },
+                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
             )
             .frame(width: geo.size.width, height: geo.size.height)
             .overlay {
@@ -209,7 +287,7 @@ private struct StatsPaneBody: View {
             .onDrop(
                 of: [.plainText],
                 delegate: PaneDropDelegate(
-                    paneID: paneID,
+                    paneID: pane.id,
                     workspace: workspace,
                     size: geo.size,
                     hoverEdge: $hoverEdge
@@ -220,38 +298,41 @@ private struct StatsPaneBody: View {
 }
 
 private struct TerminalPaneBody: View {
-    let paneID: UUID
+    let pane: Pane
+    let tabID: UUID
     let repoID: UUID
     let worktreeID: String
     let workspace: Workspace
     @State private var hoverEdge: TileEdge?
 
     var body: some View {
-        let isExpanded = workspace.expandedPaneID == paneID
+        let isExpanded = workspace.expandedPaneID == pane.id
         VStack(spacing: 0) {
             PaneHeader(
-                paneID: paneID,
+                pane: pane,
+                tabID: tabID,
                 workspace: workspace,
                 title: workspace.paneDisplayName(worktreeID: worktreeID),
                 branch: worktreeID,
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
-                profile: workspace.paneProfile(paneID: paneID),
+                profile: workspace.tabProfile(tabID: tabID),
                 isExpanded: isExpanded,
-                onActivate: { workspace.setFocus(paneID: paneID) },
+                onActivate: { workspace.setFocus(paneID: pane.id) },
                 onExpand: {
                     if isExpanded { workspace.collapseExpandedPane() }
-                    else { workspace.expandPane(paneID: paneID) }
+                    else { workspace.expandPane(paneID: pane.id) }
                 },
-                onClose: { workspace.closePane(paneID: paneID) }
+                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
             )
             if isExpanded {
                 ExpandedPanePlaceholder()
-            } else if let path = workspace.worktreePath(paneID: paneID), let repoPath = workspace.repo(id: repoID)?.path.path {
+            } else if let path = workspace.worktreePath(tabID: tabID), let repoPath = workspace.repo(id: repoID)?.path.path {
                 GeometryReader { geo in
-                    TerminalPaneView(paneID: paneID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+                    TerminalPaneView(tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+                        .id(tabID)
                         .overlay {
-                            if let session = workspace.terminalHosts[paneID]?.session {
+                            if let session = workspace.terminalHosts[tabID]?.session {
                                 IdleOverlay(session: session)
                             }
                         }
@@ -263,7 +344,7 @@ private struct TerminalPaneBody: View {
                         .onDrop(
                             of: [.plainText],
                             delegate: PaneDropDelegate(
-                                paneID: paneID,
+                                paneID: pane.id,
                                 workspace: workspace,
                                 size: geo.size,
                                 hoverEdge: $hoverEdge
@@ -273,7 +354,7 @@ private struct TerminalPaneBody: View {
             } else {
                 MissingWorktreeBody(
                     worktreeID: worktreeID,
-                    onRemove: { workspace.closePane(paneID: paneID) }
+                    onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
                 )
             }
         }
@@ -294,7 +375,8 @@ private struct ExpandedPanePlaceholder: View {
 }
 
 private struct PaneHeader: View {
-    let paneID: UUID
+    let pane: Pane
+    let tabID: UUID
     let workspace: Workspace
     let title: String
     let branch: String
@@ -306,6 +388,7 @@ private struct PaneHeader: View {
     let onExpand: () -> Void
     let onClose: () -> Void
     @State private var isMerged: Bool = false
+    @State private var devScript: String?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -335,6 +418,15 @@ private struct PaneHeader: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if devScript != nil {
+                Button(action: { workspace.runDevScript(paneID: pane.id) }) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Run dev script in a new tab (⌘R)")
+            }
             Button(action: onExpand) {
                 Image(systemName: isExpanded
                     ? "arrow.down.right.and.arrow.up.left"
@@ -358,8 +450,9 @@ private struct PaneHeader: View {
         .background(headerBackground)
         .contentShape(Rectangle())
         .onTapGesture(perform: onActivate)
-        .task(id: paneID) {
-            guard let pathString = workspace.worktreePath(paneID: paneID) else { return }
+        .task(id: tabID) {
+            devScript = workspace.devScript(paneID: pane.id)
+            guard let pathString = workspace.worktreePath(tabID: tabID) else { return }
             let path = URL(fileURLWithPath: pathString)
             while !Task.isCancelled {
                 let next = await Task.detached { WorktreeManager.isMerged(at: path) }.value
@@ -367,7 +460,7 @@ private struct PaneHeader: View {
                 try? await Task.sleep(for: .seconds(30))
             }
         }
-        .draggable(TilingDragPayload(kind: .movePane(paneID: paneID))) {
+        .draggable(TilingDragPayload(kind: .movePane(paneID: pane.id))) {
             HStack(spacing: 6) {
                 Image(systemName: isMerged ? "arrow.trianglehead.merge" : "arrow.triangle.branch")
                 Text(title)
@@ -524,9 +617,10 @@ private struct ExpandedPaneCard: View {
 
     var body: some View {
         if let pane = workspace.pane(id: paneID),
-           case .terminal(let repoID, let worktreeID) = pane.content {
+           case .terminal(let repoID, let worktreeID) = pane.activeTab.content {
             TerminalExpandedContent(
-                paneID: paneID,
+                pane: pane,
+                tabID: pane.activeTabID,
                 repoID: repoID,
                 worktreeID: worktreeID,
                 workspace: workspace
@@ -547,7 +641,8 @@ private struct ExpandedPaneCard: View {
 }
 
 private struct TerminalExpandedContent: View {
-    let paneID: UUID
+    let pane: Pane
+    let tabID: UUID
     let repoID: UUID
     let worktreeID: String
     let workspace: Workspace
@@ -555,25 +650,27 @@ private struct TerminalExpandedContent: View {
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader(
-                paneID: paneID,
+                pane: pane,
+                tabID: tabID,
                 workspace: workspace,
                 title: workspace.paneDisplayName(worktreeID: worktreeID),
                 branch: worktreeID,
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
-                profile: workspace.paneProfile(paneID: paneID),
+                profile: workspace.tabProfile(tabID: tabID),
                 isExpanded: true,
-                onActivate: { workspace.setFocus(paneID: paneID) },
+                onActivate: { workspace.setFocus(paneID: pane.id) },
                 onExpand: { workspace.collapseExpandedPane() },
-                onClose: { workspace.closePane(paneID: paneID) }
+                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
             )
-            if let path = workspace.worktreePath(paneID: paneID),
+            if let path = workspace.worktreePath(tabID: tabID),
                let repoPath = workspace.repo(id: repoID)?.path.path {
-                TerminalPaneView(paneID: paneID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+                TerminalPaneView(tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+                    .id(tabID)
             } else {
                 MissingWorktreeBody(
                     worktreeID: worktreeID,
-                    onRemove: { workspace.closePane(paneID: paneID) }
+                    onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
                 )
             }
         }

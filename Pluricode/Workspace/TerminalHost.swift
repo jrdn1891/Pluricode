@@ -1,20 +1,28 @@
 import AppKit
 
 final class TerminalHost {
-    let paneID: UUID
+    let tabID: UUID
     let session: TerminalSession
     let containerView: NSView
     let worktreePath: String
     let repoPath: String
     let profileStore: AgentProfileStore
+    let extraStartupScript: String?
     private var hasStarted = false
 
-    init(paneID: UUID, worktreePath: String, repoPath: String, profileStore: AgentProfileStore) {
-        self.paneID = paneID
+    init(
+        tabID: UUID,
+        worktreePath: String,
+        repoPath: String,
+        profileStore: AgentProfileStore,
+        extraStartupScript: String? = nil
+    ) {
+        self.tabID = tabID
         self.worktreePath = worktreePath
         self.repoPath = repoPath
         self.profileStore = profileStore
-        self.session = TerminalSession(nodeID: paneID)
+        self.extraStartupScript = extraStartupScript
+        self.session = TerminalSession(nodeID: tabID)
         session.worktreePath = worktreePath
         session.updateColors(theme: Theme(from: NSApp.effectiveAppearance))
 
@@ -48,8 +56,9 @@ final class TerminalHost {
         }
         session.start(in: worktreePath)
 
-        let repoConfig = RepoConfig.load(at: repoPath)
-        if let script = repoConfig.startupScript, !script.isEmpty {
+        if let extra = extraStartupScript, !extra.isEmpty {
+            session.sendStartupScript(extra)
+        } else if let script = RepoConfig.load(at: repoPath).startupScript, !script.isEmpty {
             session.sendStartupScript(script)
         }
     }

@@ -56,15 +56,44 @@ struct TilingDragPayload: Codable, Transferable, Hashable {
     }
 }
 
-struct Pane: Identifiable, Hashable, Codable {
-    let id: UUID
-    var content: PaneContent
-}
-
-enum PaneContent: Hashable, Codable {
+enum TabContent: Hashable, Codable {
     case terminal(repoID: UUID, worktreeID: String)
     case tasks(listID: UUID)
     case stats
+}
+
+struct Tab: Identifiable, Hashable, Codable {
+    let id: UUID
+    var content: TabContent
+    var name: String?
+
+    init(id: UUID = UUID(), content: TabContent, name: String? = nil) {
+        self.id = id
+        self.content = content
+        self.name = name
+    }
+}
+
+struct Pane: Identifiable, Hashable, Codable {
+    let id: UUID
+    var tabs: [Tab]
+    var activeTabID: UUID
+
+    init(id: UUID = UUID(), tabs: [Tab], activeTabID: UUID? = nil) {
+        precondition(!tabs.isEmpty, "Pane must have at least one tab")
+        self.id = id
+        self.tabs = tabs
+        self.activeTabID = activeTabID ?? tabs[0].id
+    }
+
+    init(content: TabContent, name: String? = nil) {
+        let tab = Tab(content: content, name: name)
+        self.init(id: UUID(), tabs: [tab], activeTabID: tab.id)
+    }
+
+    var activeTab: Tab {
+        tabs.first { $0.id == activeTabID } ?? tabs[0]
+    }
 }
 
 struct Split: Identifiable, Hashable, Codable {
@@ -94,8 +123,8 @@ final class Tiling {
         self.root = root
     }
 
-    func addPane(_ content: PaneContent) -> UUID {
-        let pane = Pane(id: UUID(), content: content)
+    func addPane(_ content: TabContent) -> UUID {
+        let pane = Pane(content: content)
         if let existingRoot = root, let firstPaneID = Self.allPanes(in: existingRoot).first?.id {
             root = Self.insertSibling(pane, at: .right, adjacentTo: firstPaneID, in: existingRoot)
         } else {
@@ -104,13 +133,13 @@ final class Tiling {
         return pane.id
     }
 
-    func split(paneID: UUID, edge: TileEdge, newContent: PaneContent) -> UUID {
+    func split(paneID: UUID, edge: TileEdge, newContent: TabContent) -> UUID {
         guard let current = root else {
-            let pane = Pane(id: UUID(), content: newContent)
+            let pane = Pane(content: newContent)
             root = .pane(pane)
             return pane.id
         }
-        let newPane = Pane(id: UUID(), content: newContent)
+        let newPane = Pane(content: newContent)
         if edge == .center {
             root = Self.replace(paneID: paneID, with: newPane, in: current)
         } else {
@@ -145,6 +174,11 @@ final class Tiling {
               let paneB = Self.findPaneStruct(id: b, in: current) else { return }
         let step1 = Self.replace(paneID: a, with: paneB, in: current)
         root = Self.replace(paneID: b, with: paneA, in: step1)
+    }
+
+    func updatePane(_ paneID: UUID, _ transform: (inout Pane) -> Void) {
+        guard let current = root else { return }
+        root = Self.update(paneID: paneID, in: current, transform: transform)
     }
 
     var panes: [Pane] {
@@ -228,6 +262,20 @@ extension Tiling {
                 return .split(split)
             }
             split.children = split.children.map { setWeights(splitID: splitID, weights: weights, in: $0) }
+            return .split(split)
+        }
+    }
+
+    static func update(paneID: UUID, in node: TileNode, transform: (inout Pane) -> Void) -> TileNode {
+        switch node {
+        case .pane(var p):
+            if p.id == paneID {
+                transform(&p)
+                return .pane(p)
+            }
+            return node
+        case .split(var split):
+            split.children = split.children.map { update(paneID: paneID, in: $0, transform: transform) }
             return .split(split)
         }
     }

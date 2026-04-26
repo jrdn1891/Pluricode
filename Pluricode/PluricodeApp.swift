@@ -76,8 +76,8 @@ struct PaneCommands: View {
     @FocusedValue(\.workspace) var workspace
 
     var body: some View {
-        Button("Close Pane") {
-            workspace?.closeFocusedPane()
+        Button("Close Tab") {
+            workspace?.closeFocusedTab()
         }
         .keyboardShortcut("w", modifiers: .command)
         .disabled(workspace?.focusedPaneID == nil)
@@ -93,6 +93,26 @@ struct PaneCommands: View {
         }
         .keyboardShortcut("d", modifiers: [.command, .shift])
         .disabled(workspace?.focusedPaneID == nil)
+
+        Divider()
+
+        Button("Run Dev") {
+            workspace?.runDevScriptOnFocusedPane()
+        }
+        .keyboardShortcut("r", modifiers: .command)
+        .disabled(workspace?.focusedDevScript == nil)
+
+        Button("Next Tab") {
+            workspace?.cycleFocusedTab(by: 1)
+        }
+        .keyboardShortcut("]", modifiers: .command)
+        .disabled((workspace?.focusedPaneTabCount ?? 0) < 2)
+
+        Button("Previous Tab") {
+            workspace?.cycleFocusedTab(by: -1)
+        }
+        .keyboardShortcut("[", modifiers: .command)
+        .disabled((workspace?.focusedPaneTabCount ?? 0) < 2)
 
         Divider()
 
