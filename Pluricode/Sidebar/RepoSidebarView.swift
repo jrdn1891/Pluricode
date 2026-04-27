@@ -815,7 +815,7 @@ struct NewWorktreeSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Base Branch").font(.caption).foregroundStyle(.secondary)
-                TextField("main", text: $baseBranch)
+                TextField("origin/main", text: $baseBranch)
                     .textFieldStyle(.roundedBorder)
             }
 
@@ -843,7 +843,7 @@ struct NewWorktreeSheet: View {
         .frame(width: 460)
         .onAppear {
             if let wm = WorktreeManager(repoRoot: repo.path) {
-                baseBranch = wm.defaultBranch()
+                baseBranch = wm.defaultBaseRef()
             }
         }
     }
@@ -860,7 +860,7 @@ struct NewWorktreeSheet: View {
         do {
             let path = try wm.createWorktree(
                 name: cleanName,
-                baseBranch: baseBranch.isEmpty ? wm.defaultBranch() : baseBranch
+                baseBranch: baseBranch.isEmpty ? wm.defaultBaseRef() : baseBranch
             )
             let config = WorktreeConfig(agentProfileID: agentProfileID)
             config.save(at: path.path)
