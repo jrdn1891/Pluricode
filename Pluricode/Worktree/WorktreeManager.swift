@@ -19,6 +19,9 @@ final class WorktreeManager {
     func createWorktree(name: String, baseBranch: String) throws -> URL {
         let path = worktreeRoot.appendingPathComponent(name)
         let branchName = "pluri-\(name)"
+        if baseBranch.hasPrefix("origin/") {
+            _ = try? run("git", args: ["-C", repoRoot.path, "fetch", "origin", "--quiet"])
+        }
         let result = try run("git", args: [
             "-C", repoRoot.path,
             "worktree", "add",
@@ -223,6 +226,17 @@ final class WorktreeManager {
             return branch
         }
         return "main"
+    }
+
+    func defaultBaseRef() -> String {
+        if let result = try? run("git", args: [
+            "-C", repoRoot.path,
+            "symbolic-ref", "refs/remotes/origin/HEAD", "--short"
+        ]), result.status == 0 {
+            let ref = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !ref.isEmpty { return ref }
+        }
+        return defaultBranch()
     }
 
     static func findRepoRoot(from path: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)) -> URL? {
