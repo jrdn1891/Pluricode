@@ -8,12 +8,13 @@ struct WorkspaceView: View {
     @State private var resignObserver: NSObjectProtocol?
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             WorkspaceBody(workspace: workspace)
             if let id = workspace.expandedPaneID {
                 ExpandedPaneOverlay(paneID: id, workspace: workspace)
                     .transition(.opacity)
             }
+            SpawnApprovalBanner(workspace: workspace)
         }
         .animation(.easeOut(duration: 0.15), value: workspace.expandedPaneID)
         .focusedSceneValue(\.workspace, workspace)

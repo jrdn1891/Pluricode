@@ -13,6 +13,27 @@ extension FocusedValues {
     }
 }
 
+enum SpawnPolicy: Codable, Equatable {
+    case ask
+    case allow
+    case allowUpTo(Int)
+
+    var label: String {
+        switch self {
+        case .ask: "Ask each time"
+        case .allow: "Always allow"
+        case .allowUpTo(let n): "Allow up to \(n)"
+        }
+    }
+}
+
+struct PendingSpawnRequest: Identifiable {
+    let id: UUID
+    let summary: String
+    let createdAt: Date
+    let continuation: CheckedContinuation<Bool, Never>
+}
+
 @Observable
 final class Workspace {
     let id: UUID
@@ -24,18 +45,24 @@ final class Workspace {
     let statsService: StatsService
     var terminalHosts: [UUID: TerminalHost] = [:]
     var pendingDevScripts: [UUID: String] = [:]
+    var pendingMCPPrompts: [UUID: String] = [:]
     var focusedPaneID: UUID?
     var expandedPaneID: UUID?
     var commandKeyHeld: Bool = false
+    var spawnPolicy: SpawnPolicy = .ask
+    var spawnedThisSession: Int = 0
+    var pendingSpawnRequests: [PendingSpawnRequest] = []
 
     private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var commandHoldTask: DispatchWorkItem?
+    @ObservationIgnored private(set) var mcpServer: MCPServer?
     static let quickSwitchHoldDelay: TimeInterval = 0.35
 
     init(
         id: UUID = UUID(),
         name: String,
         root: TileNode? = nil,
+        spawnPolicy: SpawnPolicy = .ask,
         repoStore: RepoStore,
         taskListStore: TaskListStore,
         profileStore: AgentProfileStore,
@@ -44,16 +71,19 @@ final class Workspace {
         self.id = id
         self.name = name
         self.tiling = Tiling(root: root)
+        self.spawnPolicy = spawnPolicy
         self.repoStore = repoStore
         self.taskListStore = taskListStore
         self.profileStore = profileStore
         self.statsService = statsService
+        self.mcpServer = try? MCPServer(workspace: self)
     }
 
     deinit {
         saveTask?.cancel()
         save()
         for host in terminalHosts.values { host.teardown() }
+        for req in pendingSpawnRequests { req.continuation.resume(returning: false) }
     }
 
     static var rootDir: URL {
@@ -81,7 +111,7 @@ final class Workspace {
 
     func save() {
         try? FileManager.default.createDirectory(at: Self.workspacesDir, withIntermediateDirectories: true)
-        let snapshot = WorkspaceSnapshot(id: id, name: name, root: tiling.root)
+        let snapshot = WorkspaceSnapshot(id: id, name: name, root: tiling.root, spawnPolicy: spawnPolicy)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(snapshot) {
@@ -169,6 +199,164 @@ final class Workspace {
 
     func consumePendingDevScript(tabID: UUID) -> String? {
         pendingDevScripts.removeValue(forKey: tabID)
+    }
+
+    func consumePendingMCPPrompt(tabID: UUID) -> String? {
+        pendingMCPPrompts.removeValue(forKey: tabID)
+    }
+
+    func setSpawnPolicy(_ policy: SpawnPolicy) {
+        spawnPolicy = policy
+        scheduleSave()
+    }
+
+    func evaluateSpawnPolicy(summary: String) async -> Bool {
+        switch spawnPolicy {
+        case .allow:
+            return true
+        case .allowUpTo(let limit):
+            if spawnedThisSession < limit { return true }
+            return await askUserToApprove(summary: summary)
+        case .ask:
+            return await askUserToApprove(summary: summary)
+        }
+    }
+
+    private func askUserToApprove(summary: String) async -> Bool {
+        await withCheckedContinuation { cont in
+            let req = PendingSpawnRequest(
+                id: UUID(),
+                summary: summary,
+                createdAt: Date(),
+                continuation: cont
+            )
+            pendingSpawnRequests.append(req)
+        }
+    }
+
+    func resolveSpawnRequest(id: UUID, approve: Bool) {
+        guard let idx = pendingSpawnRequests.firstIndex(where: { $0.id == id }) else { return }
+        let req = pendingSpawnRequests.remove(at: idx)
+        req.continuation.resume(returning: approve)
+    }
+
+    struct SpawnResult {
+        let paneID: UUID
+        let tabID: UUID
+        let worktreeBranch: String
+        let path: String
+    }
+
+    func spawnTerminal(
+        repoID: UUID,
+        baseBranch: String?,
+        profileID: UUID?,
+        name: String?,
+        prompt: String?,
+        split: SpawnSplit
+    ) async throws -> SpawnResult {
+        guard let repo = repo(id: repoID) else {
+            throw JSONRPCError.invalid("repo not found")
+        }
+        guard let wm = WorktreeManager(repoRoot: repo.path) else {
+            throw JSONRPCError.invalid("not a git repo")
+        }
+        let resolvedBase = baseBranch.map(Self.normalizeBaseRef) ?? wm.defaultBaseRef()
+        let candidate = name.flatMap { s -> String? in
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
+        let baseName = candidate ?? Self.autoWorktreeName(profileID: profileID, profileStore: profileStore)
+        let safeName = Self.uniqueWorktreeName(base: Self.sanitize(baseName), wm: wm)
+
+        let path: URL
+        do {
+            path = try wm.createWorktree(name: safeName, baseBranch: resolvedBase)
+        } catch {
+            throw JSONRPCError.application("createWorktree failed: \(error)")
+        }
+
+        var config = WorktreeConfig.load(at: path.path)
+        config.agentProfileID = profileID
+        config.save(at: path.path)
+
+        let branch = "pluri-\(safeName)"
+        let content: TabContent = .terminal(repoID: repoID, worktreeID: branch)
+
+        let paneIDResolved: UUID
+        let tabIDResolved: UUID
+
+        switch split {
+        case .right, .down:
+            let edge: TileEdge = (split == .right) ? .right : .bottom
+            if let anchor = anchorPaneID {
+                paneIDResolved = tiling.split(paneID: anchor, edge: edge, newContent: content)
+            } else {
+                paneIDResolved = tiling.addPane(content)
+            }
+            guard let firstTab = pane(id: paneIDResolved)?.tabs.first else {
+                throw JSONRPCError.application("pane lookup failed after split")
+            }
+            tabIDResolved = firstTab.id
+        case .tab:
+            if let anchor = anchorPaneID {
+                let newTab = Tab(content: content)
+                tiling.updatePane(anchor) { p in
+                    p.tabs.append(newTab)
+                    p.activeTabID = newTab.id
+                }
+                paneIDResolved = anchor
+                tabIDResolved = newTab.id
+            } else {
+                paneIDResolved = tiling.addPane(content)
+                guard let firstTab = pane(id: paneIDResolved)?.tabs.first else {
+                    throw JSONRPCError.application("pane lookup failed")
+                }
+                tabIDResolved = firstTab.id
+            }
+        }
+
+        if let prompt, !prompt.isEmpty {
+            pendingMCPPrompts[tabIDResolved] = prompt
+        }
+        focusedPaneID = paneIDResolved
+        spawnedThisSession += 1
+        scheduleSave()
+
+        return SpawnResult(
+            paneID: paneIDResolved,
+            tabID: tabIDResolved,
+            worktreeBranch: branch,
+            path: path.path
+        )
+    }
+
+    private static func normalizeBaseRef(_ s: String) -> String { s }
+
+    private static func sanitize(_ name: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        let scalars = name.unicodeScalars.map { allowed.contains($0) ? Character($0) : "-" }
+        let collapsed = String(scalars).split(separator: "-", omittingEmptySubsequences: true).joined(separator: "-")
+        return String(collapsed.prefix(40)).trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    }
+
+    private static func autoWorktreeName(profileID: UUID?, profileStore: AgentProfileStore) -> String {
+        let suffix = String(UUID().uuidString.prefix(6)).lowercased()
+        if let id = profileID, let p = profileStore.profile(id: id) {
+            return "\(p.name.lowercased())-\(suffix)"
+        }
+        return "agent-\(suffix)"
+    }
+
+    private static func uniqueWorktreeName(base: String, wm: WorktreeManager) -> String {
+        let existing = Set(wm.listManagedWorktrees().map { $0.branch })
+        var candidate = base.isEmpty ? "agent" : base
+        var n = 2
+        while existing.contains("pluri-\(candidate)") {
+            candidate = "\(base)-\(n)"
+            n += 1
+        }
+        return candidate
     }
 
     func expandPane(paneID: UUID) {
@@ -385,6 +573,7 @@ struct WorkspaceSnapshot: Codable {
     var id: UUID
     var name: String
     var root: TileNode?
+    var spawnPolicy: SpawnPolicy?
 }
 
 @Observable
@@ -495,6 +684,7 @@ final class WorkspaceStore {
                 id: snap.id,
                 name: snap.name,
                 root: snap.root,
+                spawnPolicy: snap.spawnPolicy ?? .ask,
                 repoStore: repoStore,
                 taskListStore: taskListStore,
                 profileStore: profileStore,

@@ -152,6 +152,46 @@ Each milestone has a checklist. Tick items as completed across sessions.
 - [ ] Remove the old global "Task List" drag source from the sidebar top.
 - [ ] Verify: create two lists, drag each into the canvas, add tasks in each, rename a list (panes reflect), delete a list (pane shows missing state).
 
+### M10 — Agent orchestration via MCP
+
+**Goal**: an "orchestrator" agent running in one pane can spawn additional worktree+terminal panes in the same workspace and delegate subtasks to them. Re-introduces an MCP server (deleted in M4), but at workspace scope, not per-terminal.
+
+**Use case**: gabriel hands a long list of tasks to one agent. That agent breaks them up, spins up new worktrees/terminals in the active workspace, and assigns each subtask. The orchestrator stays the single conversational surface.
+
+**Architecture**:
+- One MCP server **per workspace** (not per pane). `MCPServer` owned by `Workspace`, `Network.framework` TCP listener on a random localhost port, port stored on the workspace.
+- `main.swift --mcp-bridge <port> <workspaceID>` re-introduced: same binary, stdio JSON-RPC ⇄ localhost TCP. No second target.
+- `.mcp.json` is written into a worktree by `TerminalHost.startIfNeeded` only when the worktree's profile has `mcpRole != .none`. Points at the bridge with the workspace's port.
+- `AgentProfile.mcpRole: .orchestrator | .worker | .none` gates which tools are exposed. Defaults: Architect → orchestrator, others → none.
+- All tool handlers run on `@MainActor`; they call existing `Workspace.spawnTerminal`, `WorktreeManager.createWorktree`, `addPane`/`splitPane` — no parallel code paths.
+- Safety: `Workspace.spawnPolicy: .ask | .allowUpTo(N) | .allow`. `.ask` shows an in-app banner per request; `.allowUpTo(N)` caps MCP-spawned panes per workspace session. Default `.ask`.
+
+**Tool surface** (exposed to orchestrator profiles):
+
+```
+spawn_terminal(repo_id?, base_branch?, profile_id?, name?, prompt?, split?: "right"|"down"|"tab")
+  → { pane_id, tab_id, worktree_branch, path }
+list_worktrees(repo_id?)             → [{ branch, path, head, profile, uncommitted }]
+list_panes()                          → [{ pane_id, tab_id, kind, repo_id?, worktree_branch?, profile? }]
+list_profiles()                       → [{ id, name, mcpRole }]
+list_repos()                          → [{ id, name, path, default_branch }]
+send_prompt(tab_id, text)             → types text into a target terminal (subject to spawnPolicy)
+close_pane(pane_id, remove_worktree?) → closes pane; optionally removes the worktree
+list_task_lists(repo_id) / list_tasks(list_id) / add_task(list_id, title) / set_task_done(task_id, done)
+```
+
+**Checklist**:
+- [x] `Agent/AgentProfile.swift`: add `mcpRole: MCPRole` field; seed Architect → `.orchestrator`, Coder/Reviewer/Tester → `.none`.
+- [x] `MCP/MCPServer.swift`: `Network.framework` TCP listener, one per `Workspace`, port held on `Workspace`. JSON-RPC 2.0 framing. Dispatch to `MCPTools` on `@MainActor`.
+- [x] `MCP/MCPBridge.swift` + `main.swift --mcp-bridge <port> <workspaceID> <token>`: stdio ⇄ TCP forwarder, MCP protocol on stdio side.
+- [x] `MCP/MCPTools.swift`: tool registry and handlers. Each handler is a thin call into `Workspace`/`WorktreeManager`/`TaskListStore`.
+- [x] `Workspace.spawnTerminal(repo:baseBranch:profile:name:prompt:split:)`: single entry point used by both the MCP handler and any future UI affordance. Reuses `WorktreeManager.createWorktree` + `WorktreeConfig.save` + `addPane`/`splitPane`. Returns identifiers.
+- [x] `TerminalHost.startIfNeeded`: when launching, if the resolved profile has `mcpRole != .none`, write `.mcp.json` into the worktree pointing at the workspace's bridge command.
+- [x] `Workspace.spawnPolicy` + an in-app confirmation banner for `.ask`. `.allowUpTo(N)` enforced via a per-session counter on `Workspace`.
+- [x] `send_prompt` is gated identically to `spawn_terminal` — never types into a terminal silently under `.ask`.
+- [x] Persist `mcpRole` and `spawnPolicy` (the latter on the workspace snapshot).
+- [x] Verify end-to-end: drop an Architect worktree onto a workspace, ask it to "split this into 3 worktrees and start each one"; confirm 3 panes appear, each with the correct profile and prompt typed; confirm `.ask` blocks an unapproved 4th spawn.
+
 ### M7 — Polish
 
 **Goal**: make the day-to-day use feel sharp.
@@ -167,7 +207,7 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 ## Ordering
 
-M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last.
+M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M10 depends on M5 (needs profiles on worktrees) and ideally M9 (task-list tools). M7 last.
 
 ## Open decisions
 

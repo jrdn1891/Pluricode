@@ -10,7 +10,10 @@ struct TerminalPaneView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let host = hostForTab()
-        host.startIfNeeded(scrollbackDir: workspace.scrollbackDir)
+        let scrollbackDir = workspace.scrollbackDir
+        Task { @MainActor in
+            await host.startIfNeeded(scrollbackDir: scrollbackDir)
+        }
         return host.containerView
     }
 
@@ -25,7 +28,9 @@ struct TerminalPaneView: NSViewRepresentable {
             worktreePath: worktreePath,
             repoPath: repoPath,
             profileStore: workspace.profileStore,
-            extraStartupScript: workspace.consumePendingDevScript(tabID: tabID)
+            extraStartupScript: workspace.consumePendingDevScript(tabID: tabID),
+            mcpPrompt: workspace.consumePendingMCPPrompt(tabID: tabID),
+            workspace: workspace
         )
         workspace.terminalHosts[tabID] = host
         return host
