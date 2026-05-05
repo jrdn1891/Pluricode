@@ -148,6 +148,38 @@ final class WorktreeManager {
         return result.stdout.components(separatedBy: "\n").filter { !$0.isEmpty }.count
     }
 
+    static func aheadBehind(at path: URL, base: String) -> (ahead: Int, behind: Int) {
+        guard !base.isEmpty,
+              let result = try? run("git", args: [
+                  "-C", path.path,
+                  "rev-list", "--left-right", "--count",
+                  "\(base)...HEAD"
+              ]),
+              result.status == 0 else { return (0, 0) }
+        let parts = result.stdout
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: { $0 == "\t" || $0 == " " })
+        guard parts.count >= 2,
+              let behind = Int(parts[0]),
+              let ahead = Int(parts[1]) else { return (0, 0) }
+        return (ahead, behind)
+    }
+
+    static func hasOpenPR(at path: URL) -> Bool {
+        guard let branch = try? run("git", args: [
+            "-C", path.path, "rev-parse", "--abbrev-ref", "HEAD"
+        ]), branch.status == 0 else { return false }
+        let name = branch.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name != "HEAD" else { return false }
+
+        guard let result = try? run("gh", args: [
+            "pr", "list", "--state", "open", "--head", name, "--limit", "1", "--json", "number"
+        ], cwd: path), result.status == 0 else { return false }
+
+        let out = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !out.isEmpty && out != "[]"
+    }
+
     static func isMerged(at path: URL) -> Bool {
         guard let branch = try? run("git", args: [
             "-C", path.path, "rev-parse", "--abbrev-ref", "HEAD"

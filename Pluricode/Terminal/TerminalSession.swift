@@ -8,6 +8,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     var worktreePath: String?
     var onProcessTerminated: ((Int32?) -> Void)?
     @Published private(set) var isIdle: Bool = false
+    @Published private(set) var idleSince: Date?
     private var lastAppliedZoom: Float = 1.0
     private var lastSavedBufferSize: Int = 0
     private var idleWorkItem: DispatchWorkItem?
@@ -27,8 +28,12 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
     private func noteActivity() {
         if isIdle { isIdle = false }
+        if idleSince != nil { idleSince = nil }
         idleWorkItem?.cancel()
-        let item = DispatchWorkItem { [weak self] in self?.isIdle = true }
+        let item = DispatchWorkItem { [weak self] in
+            self?.isIdle = true
+            self?.idleSince = Date()
+        }
         idleWorkItem = item
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.idleThreshold, execute: item)
     }

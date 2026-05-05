@@ -45,6 +45,7 @@ struct MCPTools {
         case "list_profiles":    return listProfiles()
         case "list_repos":       return listRepos()
         case "send_prompt":      return try await sendPrompt(args)
+        case "read_terminal":    return try readTerminal(args)
         case "close_pane":       return try closePane(args)
         case "list_task_lists":  return listTaskLists()
         case "list_tasks":       return try listTasks(args)
@@ -91,23 +92,37 @@ struct MCPTools {
 
     private func listWorktrees(_ args: JSONValue) -> JSONValue {
         let filterRepoID: UUID? = (args["repo_id"]?.stringValue).flatMap(UUID.init(uuidString:))
+        let includeGit = args["include_git_state"]?.boolValue ?? false
         var out: [JSONValue] = []
         for repo in workspace.repoStore.repos {
             if let filter = filterRepoID, repo.id != filter { continue }
             guard let wm = WorktreeManager(repoRoot: repo.path) else { continue }
+            let baseRef = includeGit ? wm.defaultBaseRef() : ""
             for w in wm.listManagedWorktrees() where !w.isPrimary {
+                let url = URL(fileURLWithPath: w.path)
                 let config = WorktreeConfig.load(at: w.path)
                 let profileName = config.agentProfileID
                     .flatMap { workspace.profileStore.profile(id: $0) }?.name
-                out.append(.object([
+                var entry: [String: JSONValue] = [
                     "repo_id": .string(repo.id.uuidString),
                     "branch": .string(w.branch),
                     "display_name": .string(w.displayName),
                     "path": .string(w.path),
                     "head": .string(w.head),
                     "profile": profileName.map { .string($0) } ?? .null,
-                    "uncommitted": .int(Int64(wm.uncommittedCount(at: URL(fileURLWithPath: w.path))))
-                ]))
+                    "uncommitted": .int(Int64(wm.uncommittedCount(at: url)))
+                ]
+                if includeGit {
+                    let stats = WorktreeManager.diffStats(at: url)
+                    let ab = WorktreeManager.aheadBehind(at: url, base: baseRef)
+                    entry["additions"] = .int(Int64(stats.additions))
+                    entry["deletions"] = .int(Int64(stats.deletions))
+                    entry["ahead"] = .int(Int64(ab.ahead))
+                    entry["behind"] = .int(Int64(ab.behind))
+                    entry["has_open_pr"] = .bool(WorktreeManager.hasOpenPR(at: url))
+                    entry["is_merged"] = .bool(WorktreeManager.isMerged(at: url))
+                }
+                out.append(.object(entry))
             }
         }
         return .array(out)
@@ -129,6 +144,11 @@ struct MCPTools {
                     entry["worktree_branch"] = .string(worktreeID)
                     if let p = workspace.tabProfile(tabID: tab.id) {
                         entry["profile"] = .string(p.name)
+                    }
+                    if let host = workspace.terminalHosts[tab.id] {
+                        entry["is_idle"] = .bool(host.session.isIdle)
+                        entry["idle_since_ms"] = host.session.idleSince
+                            .map { .int(Int64(Date().timeIntervalSince($0) * 1000)) } ?? .null
                     }
                 case .tasks(let listID):
                     entry["kind"] = .string("tasks")
@@ -182,6 +202,37 @@ struct MCPTools {
         }
         host.session.sendStartupScript(text)
         return .object(["sent": .bool(true)])
+    }
+
+    private func readTerminal(_ args: JSONValue) throws -> JSONValue {
+        guard let tabIDStr = args["tab_id"]?.stringValue,
+              let tabID = UUID(uuidString: tabIDStr) else {
+            throw JSONRPCError.invalid("tab_id required")
+        }
+        guard let host = workspace.terminalHosts[tabID] else {
+            throw JSONRPCError.application("no live terminal for tab \(tabIDStr)")
+        }
+        let requested = args["tail_lines"]?.intValue ?? 200
+        let tail = max(1, min(requested, 5000))
+
+        let data = host.session.terminalView.getTerminal().getBufferAsData()
+        let allLines = String(decoding: data, as: UTF8.self)
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+        let trimmed = Array(allLines.reversed()
+            .drop { $0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .reversed())
+        let suffix = Array(trimmed.suffix(tail))
+        let text = suffix.joined(separator: "\n")
+
+        var entry: [String: JSONValue] = [
+            "text": .string(text),
+            "lines": .int(Int64(suffix.count)),
+            "is_idle": .bool(host.session.isIdle)
+        ]
+        entry["idle_since_ms"] = host.session.idleSince
+            .map { .int(Int64(Date().timeIntervalSince($0) * 1000)) } ?? .null
+        return .object(entry)
     }
 
     private func closePane(_ args: JSONValue) throws -> JSONValue {
@@ -368,9 +419,10 @@ struct MCPTools {
             ),
             tool(
                 name: "list_worktrees",
-                description: "List managed worktrees across all repos, or scoped to one.",
+                description: "List managed worktrees across all repos, or scoped to one. Pass include_git_state to enrich each entry with diff stats, ahead/behind, and PR status (slower; runs gh).",
                 properties: [
-                    "repo_id": ("string", "Optional repo UUID filter.")
+                    "repo_id": ("string", "Optional repo UUID filter."),
+                    "include_git_state": ("boolean", "If true, include additions, deletions, ahead, behind, has_open_pr, is_merged. Default false.")
                 ],
                 required: []
             ),
@@ -400,6 +452,15 @@ struct MCPTools {
                     "text": ("string", "Text to send. A newline is appended automatically.")
                 ],
                 required: ["tab_id", "text"]
+            ),
+            tool(
+                name: "read_terminal",
+                description: "Read the recent visible output of a child terminal as plain text (ANSI already stripped by the renderer). Returns is_idle and idle_since_ms so the orchestrator can tell whether the child is still working.",
+                properties: [
+                    "tab_id": ("string", "UUID of the target tab."),
+                    "tail_lines": ("integer", "How many trailing non-empty lines to return. Default 200, max 5000.")
+                ],
+                required: ["tab_id"]
             ),
             tool(
                 name: "close_pane",
