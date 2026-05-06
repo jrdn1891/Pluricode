@@ -69,6 +69,10 @@ struct PluricodeApp: App {
                 PaneCommands()
             }
         }
+
+        Settings {
+            PermissionsView()
+        }
     }
 }
 

@@ -20,5 +20,11 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSMainStoryboardFile</key>
 	<string></string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Pluricode forwards microphone access to command-line tools you launch in its terminals (e.g. transcription or voice agents).</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Pluricode forwards camera access to command-line tools you launch in its terminals (e.g. demo recorders).</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Pluricode forwards Automation access to command-line tools you launch in its terminals (e.g. osascript, AppleScript).</string>
 </dict>
 </plist>

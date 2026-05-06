@@ -12,6 +12,7 @@
 		12499E714805F522F4BE1C76 /* AgentDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8BA666B2ABB6AD5B0A5F5F9 /* AgentDefinition.swift */; };
 		149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E37A72F9CD0A1326611CB3C /* Worktree.swift */; };
 		19997BD2F3D31B49597027C8 /* SplitDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E043050E27961C20DFE8E3 /* SplitDivider.swift */; };
+		1FF2534862D523B586A00545 /* PermissionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A3591F4D52D920EBF984E5 /* PermissionsService.swift */; };
 		252121A12E8E251537CBFA7D /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 370E2E0EB9B46FAF48CFEC7E /* SwiftTerm */; };
 		3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95CDC674CDC6FC6D7714CB17 /* Workspace.swift */; };
 		4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83868DA08DF195AF66F38C70 /* IdleOverlay.swift */; };
@@ -24,6 +25,7 @@
 		7C59C92DEE6916476A4B02AA /* TerminalHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDC77F2E641969738B4482B5 /* TerminalHost.swift */; };
 		80543F030E8942BE861D585D /* RepoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F722E7DD539F6776FA1674BA /* RepoStore.swift */; };
 		92F56CDF222DA4CE74E5AB1D /* AgentProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434CCFE49A70A2BD13C1FF1D /* AgentProfileStore.swift */; };
+		93E709A761D2947E0F687A71 /* PermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860492197C8C2313E336830D /* PermissionsView.swift */; };
 		97C1C6B70507B356349663B4 /* PluricodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC246AB1895B3F4814510E30 /* PluricodeApp.swift */; };
 		99EAA5BA43DBEFF39BC75180 /* TaskListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79713EC727834622CEEF2EF /* TaskListStore.swift */; };
 		B580DE40FA26200CA92C76A1 /* StatsPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4F0BC404DF971F227BE2A9 /* StatsPaneView.swift */; };
@@ -40,6 +42,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		04A3591F4D52D920EBF984E5 /* PermissionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsService.swift; sourceTree = "<group>"; };
 		0E105E5A80CFDC4A1D8A36A8 /* RepoConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoConfig.swift; sourceTree = "<group>"; };
 		19BA3EE7DFFD7B396C3E7007 /* Pluricode.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pluricode.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		259CAD09D9A3D60E24F5B0E1 /* WorktreeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeManager.swift; sourceTree = "<group>"; };
@@ -59,6 +62,7 @@
 		7FEE031048801E0886F7EF9F /* StatsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsService.swift; sourceTree = "<group>"; };
 		83868DA08DF195AF66F38C70 /* IdleOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdleOverlay.swift; sourceTree = "<group>"; };
 		84B103466B6BA9B7791B4EB8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		860492197C8C2313E336830D /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
 		861AC6957D983804F39D40DF /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		9042F7DC7ABD401886AA8DEE /* WorktreeConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeConfig.swift; sourceTree = "<group>"; };
 		95CDC674CDC6FC6D7714CB17 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
@@ -92,6 +96,15 @@
 				311D5BA84A083B24731CB565 /* TerminalSession.swift */,
 			);
 			path = Terminal;
+			sourceTree = "<group>";
+		};
+		4003EE5707EC74A3735B719F /* Permissions */ = {
+			isa = PBXGroup;
+			children = (
+				04A3591F4D52D920EBF984E5 /* PermissionsService.swift */,
+				860492197C8C2313E336830D /* PermissionsView.swift */,
+			);
+			path = Permissions;
 			sourceTree = "<group>";
 		};
 		558E3CCEDDBF1FBDEA742319 /* Sidebar */ = {
@@ -187,6 +200,7 @@
 				742F16B907FA39DBB0114F60 /* Theme.swift */,
 				B2AD17D5A2136B05FE7F5DB7 /* Agent */,
 				D05E9F1DFAAA2D4E739BC72D /* Model */,
+				4003EE5707EC74A3735B719F /* Permissions */,
 				558E3CCEDDBF1FBDEA742319 /* Sidebar */,
 				30FCD81FC357CD2F07A9F304 /* Terminal */,
 				A167B8941568B24D1F8B5356 /* Tiling */,
@@ -273,6 +287,8 @@
 				92F56CDF222DA4CE74E5AB1D /* AgentProfileStore.swift in Sources */,
 				4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */,
 				E4B9C115E3094708A1A7036B /* PaneCreationToolbar.swift in Sources */,
+				1FF2534862D523B586A00545 /* PermissionsService.swift in Sources */,
+				93E709A761D2947E0F687A71 /* PermissionsView.swift in Sources */,
 				97C1C6B70507B356349663B4 /* PluricodeApp.swift in Sources */,
 				0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */,
 				F814E0ED4F9B4CE50E1FC08D /* RepoConfig.swift in Sources */,
