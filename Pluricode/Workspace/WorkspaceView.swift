@@ -307,51 +307,18 @@ private struct TerminalPaneBody: View {
 
     var body: some View {
         let isExpanded = workspace.expandedPaneID == pane.id
-        VStack(spacing: 0) {
-            PaneHeader(
-                pane: pane,
-                tabID: tabID,
-                workspace: workspace,
-                title: workspace.paneDisplayName(worktreeID: worktreeID),
-                branch: worktreeID,
-                repoName: workspace.repo(id: repoID)?.name,
-                repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
-                profile: workspace.tabProfile(tabID: tabID),
-                isExpanded: isExpanded,
-                onActivate: { workspace.setFocus(paneID: pane.id) },
-                onExpand: {
-                    if isExpanded { workspace.collapseExpandedPane() }
-                    else { workspace.expandPane(paneID: pane.id) }
-                },
-                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
-            )
-            if isExpanded {
+        let chatMode = workspace.isChatMode(tabID: tabID)
+        if isExpanded {
+            VStack(spacing: 0) {
+                rawHeader(isExpanded: true)
                 ExpandedPanePlaceholder()
-            } else if let path = workspace.worktreePath(tabID: tabID), let repoPath = workspace.repo(id: repoID)?.path.path {
-                GeometryReader { geo in
-                    TerminalPaneView(tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
-                        .id(tabID)
-                        .overlay {
-                            if let session = workspace.terminalHosts[tabID]?.session {
-                                IdleOverlay(session: session)
-                            }
-                        }
-                        .overlay {
-                            if let edge = hoverEdge {
-                                DropZoneOverlay(edge: edge, size: geo.size)
-                            }
-                        }
-                        .onDrop(
-                            of: [.plainText],
-                            delegate: PaneDropDelegate(
-                                paneID: pane.id,
-                                workspace: workspace,
-                                size: geo.size,
-                                hoverEdge: $hoverEdge
-                            )
-                        )
-                }
-            } else {
+            }
+        } else if let path = workspace.worktreePath(tabID: tabID),
+                  let repoPath = workspace.repo(id: repoID)?.path.path {
+            paneContent(path: path, repoPath: repoPath, chatMode: chatMode)
+        } else {
+            VStack(spacing: 0) {
+                rawHeader(isExpanded: false)
                 MissingWorktreeBody(
                     worktreeID: worktreeID,
                     onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
@@ -360,6 +327,82 @@ private struct TerminalPaneBody: View {
         }
     }
 
+    @ViewBuilder
+    private func paneContent(path: String, repoPath: String, chatMode: Bool) -> some View {
+        let repoEntry = workspace.repo(id: repoID)
+        let title = workspace.paneDisplayName(worktreeID: worktreeID)
+        let profile = workspace.tabProfile(tabID: tabID)
+
+        GeometryReader { geo in
+            Group {
+                if chatMode {
+                    ChatPaneView(
+                        pane: pane,
+                        tabID: tabID,
+                        worktreePath: path,
+                        repoPath: repoPath,
+                        workspace: workspace,
+                        title: title,
+                        branch: worktreeID,
+                        repoName: repoEntry?.name,
+                        repoColor: repoEntry?.resolvedColor.swiftUIColor,
+                        profile: profile,
+                        isExpanded: false,
+                        onActivate: { workspace.setFocus(paneID: pane.id) },
+                        onToggleRaw: { workspace.toggleChatMode(tabID: tabID) },
+                        onExpand: { workspace.expandPane(paneID: pane.id) },
+                        onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+                    )
+                } else {
+                    VStack(spacing: 0) {
+                        rawHeader(isExpanded: false)
+                        TerminalPaneView(tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+                            .id(tabID)
+                            .overlay {
+                                if let session = workspace.terminalHosts[tabID]?.session {
+                                    IdleOverlay(session: session)
+                                }
+                            }
+                    }
+                }
+            }
+            .overlay {
+                if let edge = hoverEdge {
+                    DropZoneOverlay(edge: edge, size: geo.size)
+                }
+            }
+            .onDrop(
+                of: [.plainText],
+                delegate: PaneDropDelegate(
+                    paneID: pane.id,
+                    workspace: workspace,
+                    size: geo.size,
+                    hoverEdge: $hoverEdge
+                )
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func rawHeader(isExpanded: Bool) -> some View {
+        PaneHeader(
+            pane: pane,
+            tabID: tabID,
+            workspace: workspace,
+            title: workspace.paneDisplayName(worktreeID: worktreeID),
+            branch: worktreeID,
+            repoName: workspace.repo(id: repoID)?.name,
+            repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
+            profile: workspace.tabProfile(tabID: tabID),
+            isExpanded: isExpanded,
+            onActivate: { workspace.setFocus(paneID: pane.id) },
+            onExpand: {
+                if isExpanded { workspace.collapseExpandedPane() }
+                else { workspace.expandPane(paneID: pane.id) }
+            },
+            onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+        )
+    }
 }
 
 private struct ExpandedPanePlaceholder: View {

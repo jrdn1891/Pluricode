@@ -9,25 +9,14 @@ struct TerminalPaneView: NSViewRepresentable {
     @Environment(\.colorScheme) private var colorScheme
 
     func makeNSView(context: Context) -> NSView {
-        let host = hostForTab()
+        let host = workspace.terminalHost(forTab: tabID, worktreePath: worktreePath, repoPath: repoPath)
         host.startIfNeeded(scrollbackDir: workspace.scrollbackDir)
         return host.containerView
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        hostForTab().applyTheme(Theme(from: NSApp.effectiveAppearance))
-    }
-
-    private func hostForTab() -> TerminalHost {
-        if let existing = workspace.terminalHosts[tabID] { return existing }
-        let host = TerminalHost(
-            tabID: tabID,
-            worktreePath: worktreePath,
-            repoPath: repoPath,
-            profileStore: workspace.profileStore,
-            extraStartupScript: workspace.consumePendingDevScript(tabID: tabID)
-        )
-        workspace.terminalHosts[tabID] = host
-        return host
+        workspace
+            .terminalHost(forTab: tabID, worktreePath: worktreePath, repoPath: repoPath)
+            .applyTheme(Theme(from: NSApp.effectiveAppearance))
     }
 }

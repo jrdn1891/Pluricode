@@ -2,9 +2,11 @@ import Foundation
 
 struct WorktreeConfig: Codable, Equatable {
     var agentProfileID: UUID?
+    var chatSessionID: UUID?
 
-    init(agentProfileID: UUID? = nil) {
+    init(agentProfileID: UUID? = nil, chatSessionID: UUID? = nil) {
         self.agentProfileID = agentProfileID
+        self.chatSessionID = chatSessionID
     }
 
     static func configURL(for worktreePath: String) -> URL {

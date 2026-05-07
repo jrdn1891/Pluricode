@@ -2,17 +2,25 @@ import AppKit
 import Combine
 import SwiftTerm
 
+enum TerminalStatus {
+    case idle
+    case thinking
+    case working
+}
+
 final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, ObservableObject {
     let nodeID: UUID
     let terminalView: LocalProcessTerminalView
     var worktreePath: String?
     var onProcessTerminated: ((Int32?) -> Void)?
     @Published private(set) var isIdle: Bool = false
+    @Published private(set) var status: TerminalStatus = .working
     private var lastAppliedZoom: Float = 1.0
     private var lastSavedBufferSize: Int = 0
     private var idleWorkItem: DispatchWorkItem?
 
     static let baseFontSize: CGFloat = 13
+    static let chatFontSize: CGFloat = 14
     static let idleThreshold: TimeInterval = 4.0
 
     init(nodeID: UUID) {
@@ -27,8 +35,12 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
     private func noteActivity() {
         if isIdle { isIdle = false }
+        if status != .working { status = .working }
         idleWorkItem?.cancel()
-        let item = DispatchWorkItem { [weak self] in self?.isIdle = true }
+        let item = DispatchWorkItem { [weak self] in
+            self?.isIdle = true
+            self?.status = .idle
+        }
         idleWorkItem = item
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.idleThreshold, execute: item)
     }
@@ -36,6 +48,18 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     func sendStartupScript(_ script: String) {
         let bytes = Array("\(script)\n".utf8)
         terminalView.process?.send(data: bytes[...])
+    }
+
+    func submit(_ text: String) {
+        let payload = text + "\r"
+        let bytes = Array(payload.utf8)
+        terminalView.process?.send(data: bytes[...])
+        status = .thinking
+        if isIdle { isIdle = false }
+    }
+
+    func setReadOnly(_ readOnly: Bool) {
+        (terminalView as? ActivityAwareTerminalView)?.isReadOnly = readOnly
     }
 
     func saveScrollback(to dir: URL) {
@@ -59,11 +83,19 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize * CGFloat(zoom), weight: .regular)
     }
 
-    func updateColors(theme: Theme) {
-        terminalView.nativeBackgroundColor = theme.terminalBackground
-        terminalView.nativeForegroundColor = theme.terminalForeground
-        if let palette = theme.terminalPalette {
-            terminalView.installColors(palette)
+    func updateColors(theme: Theme, chatStyled: Bool = false) {
+        if chatStyled {
+            terminalView.nativeBackgroundColor = theme.chatTerminalBackground
+            terminalView.nativeForegroundColor = theme.chatTerminalForeground
+            terminalView.installColors(theme.chatTerminalPalette)
+            terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.chatFontSize, weight: .regular)
+        } else {
+            terminalView.nativeBackgroundColor = theme.terminalBackground
+            terminalView.nativeForegroundColor = theme.terminalForeground
+            if let palette = theme.terminalPalette {
+                terminalView.installColors(palette)
+            }
+            terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize * CGFloat(lastAppliedZoom), weight: .regular)
         }
     }
 
@@ -102,6 +134,10 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
 private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     var onActivity: (() -> Void)?
+    var isReadOnly: Bool = false {
+        didSet { syncKeyMonitor() }
+    }
+    private var keyMonitor: Any?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -110,9 +146,41 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
 
     required init?(coder: NSCoder) { super.init(coder: coder) }
 
+    deinit { removeKeyMonitor() }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        syncKeyMonitor()
+    }
+
     override func dataReceived(slice: ArraySlice<UInt8>) {
         super.dataReceived(slice: slice)
         onActivity?()
+    }
+
+    private func syncKeyMonitor() {
+        if isReadOnly && window != nil {
+            installKeyMonitor()
+        } else {
+            removeKeyMonitor()
+        }
+    }
+
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self,
+                  self.isReadOnly,
+                  self.window?.firstResponder === self else { return event }
+            return nil
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        keyMonitor = nil
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

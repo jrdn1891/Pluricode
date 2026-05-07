@@ -23,7 +23,9 @@ final class Workspace {
     let profileStore: AgentProfileStore
     let statsService: StatsService
     var terminalHosts: [UUID: TerminalHost] = [:]
+    var chatSessions: [UUID: ChatSession] = [:]
     var pendingDevScripts: [UUID: String] = [:]
+    var rawTerminalTabs: Set<UUID> = []
     var focusedPaneID: UUID?
     var expandedPaneID: UUID?
     var commandKeyHeld: Bool = false
@@ -164,11 +166,53 @@ final class Workspace {
             host.saveScrollback(to: Self.scrollbackDir)
             host.teardown()
         }
+        if let session = chatSessions.removeValue(forKey: tabID) {
+            session.cancel()
+        }
         pendingDevScripts.removeValue(forKey: tabID)
     }
 
     func consumePendingDevScript(tabID: UUID) -> String? {
         pendingDevScripts.removeValue(forKey: tabID)
+    }
+
+    func isChatMode(tabID: UUID) -> Bool {
+        !rawTerminalTabs.contains(tabID)
+    }
+
+    func toggleChatModeOnFocusedPane() {
+        guard let id = focusedPaneID, let pane = pane(id: id) else { return }
+        toggleChatMode(tabID: pane.activeTabID)
+    }
+
+    func toggleChatMode(tabID: UUID) {
+        if rawTerminalTabs.contains(tabID) {
+            rawTerminalTabs.remove(tabID)
+            terminalHosts[tabID]?.session.setReadOnly(true)
+        } else {
+            rawTerminalTabs.insert(tabID)
+            terminalHosts[tabID]?.session.setReadOnly(false)
+        }
+    }
+
+    func chatSession(forTab tabID: UUID, worktreePath: String) -> ChatSession {
+        if let existing = chatSessions[tabID] { return existing }
+        let session = ChatSession(worktreePath: worktreePath)
+        chatSessions[tabID] = session
+        return session
+    }
+
+    func terminalHost(forTab tabID: UUID, worktreePath: String, repoPath: String) -> TerminalHost {
+        if let existing = terminalHosts[tabID] { return existing }
+        let host = TerminalHost(
+            tabID: tabID,
+            worktreePath: worktreePath,
+            repoPath: repoPath,
+            profileStore: profileStore,
+            extraStartupScript: consumePendingDevScript(tabID: tabID)
+        )
+        terminalHosts[tabID] = host
+        return host
     }
 
     func expandPane(paneID: UUID) {

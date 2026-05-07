@@ -98,6 +98,12 @@ struct PaneCommands: View {
         .keyboardShortcut("d", modifiers: [.command, .shift])
         .disabled(workspace?.focusedPaneID == nil)
 
+        Button("Toggle Chat Mode") {
+            workspace?.toggleChatModeOnFocusedPane()
+        }
+        .keyboardShortcut("t", modifiers: [.control, .shift])
+        .disabled(workspace?.focusedPaneID == nil)
+
         Divider()
 
         Button("Run Dev") {

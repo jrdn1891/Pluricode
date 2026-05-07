@@ -8,6 +8,7 @@ final class TerminalHost {
     let repoPath: String
     let profileStore: AgentProfileStore
     let extraStartupScript: String?
+    var chatStyled: Bool = false
     private var hasStarted = false
 
     init(
@@ -24,7 +25,7 @@ final class TerminalHost {
         self.extraStartupScript = extraStartupScript
         self.session = TerminalSession(nodeID: tabID)
         session.worktreePath = worktreePath
-        session.updateColors(theme: Theme(from: NSApp.effectiveAppearance))
+        session.updateColors(theme: Theme(from: NSApp.effectiveAppearance), chatStyled: chatStyled)
 
         let container = NSView()
         container.wantsLayer = true
@@ -64,7 +65,12 @@ final class TerminalHost {
     }
 
     func applyTheme(_ theme: Theme) {
-        session.updateColors(theme: theme)
+        session.updateColors(theme: theme, chatStyled: chatStyled)
+    }
+
+    func setChatStyled(_ enabled: Bool) {
+        chatStyled = enabled
+        session.updateColors(theme: Theme(from: NSApp.effectiveAppearance), chatStyled: enabled)
     }
 
     func focusInput() {
