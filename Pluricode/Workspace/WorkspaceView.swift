@@ -313,7 +313,6 @@ private struct TerminalPaneBody: View {
                 tabID: tabID,
                 workspace: workspace,
                 title: workspace.paneDisplayName(worktreeID: worktreeID),
-                branch: worktreeID,
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
                 profile: workspace.tabProfile(tabID: tabID),
@@ -379,7 +378,6 @@ private struct PaneHeader: View {
     let tabID: UUID
     let workspace: Workspace
     let title: String
-    let branch: String
     let repoName: String?
     let repoColor: Color?
     let profile: AgentProfile?
@@ -406,9 +404,6 @@ private struct PaneHeader: View {
                 .font(.caption)
             Text(title)
                 .font(.system(size: 12, weight: .medium))
-            Text(branch)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
             if let profile {
                 Circle()
                     .fill(profile.swiftUIColor)
@@ -654,7 +649,6 @@ private struct TerminalExpandedContent: View {
                 tabID: tabID,
                 workspace: workspace,
                 title: workspace.paneDisplayName(worktreeID: worktreeID),
-                branch: worktreeID,
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
                 profile: workspace.tabProfile(tabID: tabID),
