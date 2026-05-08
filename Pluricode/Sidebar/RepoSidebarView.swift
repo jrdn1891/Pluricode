@@ -5,6 +5,7 @@ struct RepoSidebarView: View {
     let profileStore: AgentProfileStore
     let taskListStore: TaskListStore
     let workspaceStore: WorkspaceStore
+    let pinStore: PinStore
     @State private var expanded: Set<UUID> = []
     @State private var worktrees: [UUID: [Worktree]] = [:]
     @State private var newWorktreeRepo: RepoEntry?
@@ -61,70 +62,32 @@ struct RepoSidebarView: View {
             }
             .selectionDisabled()
 
+            if !pinStore.pins.isEmpty {
+                Section("Pinned") {
+                    ForEach(pinStore.pins, id: \.id) { pin in
+                        pinnedRow(pin)
+                    }
+                }
+                .selectionDisabled()
+            }
+
             Section("Repositories") {
                 ForEach(repoStore.repos) { repo in
-                    RepoRow(
-                        repo: repo,
-                        isExpanded: expanded.contains(repo.id),
-                        toggle: { toggle(repo) },
-                        onSetColor: { repoStore.setColor(id: repo.id, color: $0) },
-                        onNewWorktree: { newWorktreeRepo = repo },
-                        onConfigure: { configureRepo = repo },
-                        onShowInFinder: {
-                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.path.path)
-                        },
-                        onRemove: { repoStore.removeRepo(id: repo.id) }
-                    )
-
-                    if expanded.contains(repo.id) {
-                        ForEach(worktrees[repo.id] ?? []) { wt in
-                            WorktreeRow(
-                                repoID: repo.id,
-                                worktree: wt,
-                                profileStore: profileStore,
-                                workspaceStore: workspaceStore,
-                                isSelected: selectedWorktrees.contains(WorktreeKey(repoID: repo.id, branch: wt.branch)),
-                                onSelect: { flags in
-                                    selectWorktree(WorktreeKey(repoID: repo.id, branch: wt.branch), flags: flags)
-                                }
-                            )
-                                .padding(.leading, 20)
-                                .contextMenu {
-                                    if wt.isPrimary {
-                                        Button("Show in Finder") {
-                                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: wt.path)
-                                        }
-                                    } else {
-                                        Button("Configure...") {
-                                            configureTarget = RenameTarget(repo: repo, worktree: wt)
-                                        }
-                                        Button("Rename...") {
-                                            renameTarget = RenameTarget(repo: repo, worktree: wt)
-                                        }
-                                        Button("Show in Finder") {
-                                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: wt.path)
-                                        }
-                                        Divider()
-                                        Button("Delete", role: .destructive) {
-                                            pendingDelete = .worktree(repo: repo, worktree: wt)
-                                        }
-                                    }
-                                }
-                        }
-
-                        Button(action: { newWorktreeRepo = repo }) {
-                            Label("New Worktree", systemImage: "plus.circle")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.leading, 20)
-                        .padding(.vertical, 2)
-                    }
+                    repoAndWorktrees(repo)
                 }
             }
             .selectionDisabled()
         }
         .listStyle(.sidebar)
+        .task(id: pinStore.pins) {
+            for pin in pinStore.pins {
+                if case .worktree(let repoID, _) = pin,
+                   worktrees[repoID] == nil,
+                   let repo = repoStore.repos.first(where: { $0.id == repoID }) {
+                    refresh(repo)
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             Button(action: pickFolder) {
                 Label("Add Repository", systemImage: "plus")
@@ -142,7 +105,14 @@ struct RepoSidebarView: View {
             NewWorktreeSheet(repo: repo, profileStore: profileStore) { _ in refresh(repo) }
         }
         .sheet(item: $renameTarget) { target in
-            RenameWorktreeSheet(target: target) { refresh(target.repo) }
+            RenameWorktreeSheet(target: target) { newBranch in
+                pinStore.renameWorktree(
+                    repoID: target.repo.id,
+                    oldBranch: target.worktree.branch,
+                    newBranch: newBranch
+                )
+                refresh(target.repo)
+            }
         }
         .sheet(item: $configureTarget) { target in
             ConfigureWorktreeSheet(target: target, profileStore: profileStore)
@@ -242,6 +212,7 @@ struct RepoSidebarView: View {
     private func deleteWorktree(repo: RepoEntry, worktree: Worktree) {
         guard let wm = WorktreeManager(repoRoot: repo.path) else { return }
         let url = URL(fileURLWithPath: worktree.path)
+        pinStore.removeWorktree(repoID: repo.id, branch: worktree.branch)
         workspaceStore.removePanes(repoID: repo.id, worktreeID: worktree.branch)
         try? wm.removeWorktree(at: url)
         _ = try? Process.run(
@@ -249,6 +220,96 @@ struct RepoSidebarView: View {
             arguments: ["-C", repo.path.path, "branch", "-D", worktree.branch]
         )
         refresh(repo)
+    }
+
+    @ViewBuilder
+    private func pinnedRow(_ pin: Pin) -> some View {
+        switch pin {
+        case .repo(let repoID):
+            if let repo = repoStore.repos.first(where: { $0.id == repoID }) {
+                repoAndWorktrees(repo)
+            }
+        case .worktree(let repoID, let branch):
+            if let repo = repoStore.repos.first(where: { $0.id == repoID }),
+               let wt = (worktrees[repoID] ?? []).first(where: { $0.branch == branch }) {
+                worktreeRow(repo: repo, worktree: wt)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func repoAndWorktrees(_ repo: RepoEntry) -> some View {
+        RepoRow(
+            repo: repo,
+            isExpanded: expanded.contains(repo.id),
+            isPinned: pinStore.isPinned(.repo(repo.id)),
+            toggle: { toggle(repo) },
+            onSetColor: { repoStore.setColor(id: repo.id, color: $0) },
+            onNewWorktree: { newWorktreeRepo = repo },
+            onConfigure: { configureRepo = repo },
+            onShowInFinder: {
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: repo.path.path)
+            },
+            onTogglePin: { pinStore.toggle(.repo(repo.id)) },
+            onRemove: {
+                pinStore.removeAll(forRepo: repo.id)
+                repoStore.removeRepo(id: repo.id)
+            }
+        )
+
+        if expanded.contains(repo.id) {
+            ForEach(worktrees[repo.id] ?? []) { wt in
+                worktreeRow(repo: repo, worktree: wt)
+                    .padding(.leading, 20)
+            }
+
+            Button(action: { newWorktreeRepo = repo }) {
+                Label("New Worktree", systemImage: "plus.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 20)
+            .padding(.vertical, 2)
+        }
+    }
+
+    @ViewBuilder
+    private func worktreeRow(repo: RepoEntry, worktree wt: Worktree) -> some View {
+        WorktreeRow(
+            repoID: repo.id,
+            worktree: wt,
+            profileStore: profileStore,
+            workspaceStore: workspaceStore,
+            isSelected: selectedWorktrees.contains(WorktreeKey(repoID: repo.id, branch: wt.branch)),
+            onSelect: { flags in
+                selectWorktree(WorktreeKey(repoID: repo.id, branch: wt.branch), flags: flags)
+            }
+        ) {
+            if wt.isPrimary {
+                Button("Show in Finder") {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: wt.path)
+                }
+            } else {
+                let pin = Pin.worktree(repoID: repo.id, branch: wt.branch)
+                Button(pinStore.isPinned(pin) ? "Unpin" : "Pin") {
+                    pinStore.toggle(pin)
+                }
+                Divider()
+                Button("Configure...") {
+                    configureTarget = RenameTarget(repo: repo, worktree: wt)
+                }
+                Button("Rename...") {
+                    renameTarget = RenameTarget(repo: repo, worktree: wt)
+                }
+                Button("Show in Finder") {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: wt.path)
+                }
+                Divider()
+                Button("Delete", role: .destructive) {
+                    pendingDelete = .worktree(repo: repo, worktree: wt)
+                }
+            }
+        }
     }
 
     private func pickFolder() {
@@ -435,11 +496,13 @@ struct WorkspaceRow: View {
 struct RepoRow: View {
     let repo: RepoEntry
     let isExpanded: Bool
+    let isPinned: Bool
     let toggle: () -> Void
     let onSetColor: (RepoColor?) -> Void
     let onNewWorktree: () -> Void
     let onConfigure: () -> Void
     let onShowInFinder: () -> Void
+    let onTogglePin: () -> Void
     let onRemove: () -> Void
 
     @State private var isHovered = false
@@ -485,6 +548,8 @@ struct RepoRow: View {
 
             if isHovered {
                 Menu {
+                    Button(isPinned ? "Unpin" : "Pin", action: onTogglePin)
+                    Divider()
                     Button("Configure...", action: onConfigure)
                     Button("Show in Finder", action: onShowInFinder)
                     Divider()
@@ -520,16 +585,25 @@ struct RepoRow: View {
         .padding(.vertical, 2)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
+        .contextMenu {
+            Button(isPinned ? "Unpin" : "Pin", action: onTogglePin)
+            Divider()
+            Button("Configure...", action: onConfigure)
+            Button("Show in Finder", action: onShowInFinder)
+            Divider()
+            Button("Remove", role: .destructive, action: onRemove)
+        }
     }
 }
 
-struct WorktreeRow: View {
+struct WorktreeRow<MenuContent: View>: View {
     let repoID: UUID
     let worktree: Worktree
     let profileStore: AgentProfileStore
     let workspaceStore: WorkspaceStore
     let isSelected: Bool
     let onSelect: (NSEvent.ModifierFlags) -> Void
+    @ViewBuilder let menuContent: () -> MenuContent
     @State private var stats: DiffStats = .zero
     @State private var isMerged: Bool = false
     @State private var isHovered = false
@@ -595,6 +669,7 @@ struct WorktreeRow: View {
                 .fill(isSelected ? Color.accentColor.opacity(0.25) : Color.clear)
         )
         .contentShape(Rectangle())
+        .contextMenu { menuContent() }
         .onHover { isHovered = $0 }
         .onTapGesture {
             onSelect(NSEvent.modifierFlags)
@@ -979,7 +1054,7 @@ private struct ConfigureRepoSheet: View {
 
 private struct RenameWorktreeSheet: View {
     let target: RenameTarget
-    let onRenamed: () -> Void
+    let onRenamed: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
     @State private var error: String?
@@ -1024,8 +1099,8 @@ private struct RenameWorktreeSheet: View {
             return
         }
         do {
-            _ = try wm.renameWorktree(oldBranch: target.worktree.branch, newName: clean)
-            onRenamed()
+            let result = try wm.renameWorktree(oldBranch: target.worktree.branch, newName: clean)
+            onRenamed(result.branch)
             dismiss()
         } catch let WorktreeError.createFailed(message) {
             error = message

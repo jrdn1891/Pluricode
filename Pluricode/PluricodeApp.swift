@@ -6,6 +6,7 @@ struct PluricodeApp: App {
     @State private var profileStore = AgentProfileStore()
     @State private var taskListStore = TaskListStore()
     @State private var workspaceStore: WorkspaceStore
+    @State private var pinStore = PinStore()
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
 
     init() {
@@ -29,7 +30,8 @@ struct PluricodeApp: App {
                     repoStore: repoStore,
                     profileStore: profileStore,
                     taskListStore: taskListStore,
-                    workspaceStore: workspaceStore
+                    workspaceStore: workspaceStore,
+                    pinStore: pinStore
                 )
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
             } detail: {
