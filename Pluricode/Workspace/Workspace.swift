@@ -30,6 +30,7 @@ final class Workspace {
 
     private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var commandHoldTask: DispatchWorkItem?
+    @ObservationIgnored var isDeleted: Bool = false
     static let quickSwitchHoldDelay: TimeInterval = 0.35
 
     init(
@@ -80,6 +81,7 @@ final class Workspace {
     }
 
     func save() {
+        guard !isDeleted else { return }
         try? FileManager.default.createDirectory(at: Self.workspacesDir, withIntermediateDirectories: true)
         let snapshot = WorkspaceSnapshot(id: id, name: name, root: tiling.root)
         let encoder = JSONEncoder()
@@ -438,6 +440,9 @@ final class WorkspaceStore {
     }
 
     func removeWorkspace(id: UUID) {
+        if let ws = workspaces.first(where: { $0.id == id }) {
+            ws.isDeleted = true
+        }
         workspaces.removeAll { $0.id == id }
         let url = Workspace.workspacesDir.appendingPathComponent("\(id.uuidString).json")
         try? FileManager.default.removeItem(at: url)
