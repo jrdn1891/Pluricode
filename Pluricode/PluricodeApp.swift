@@ -7,6 +7,11 @@ struct PluricodeApp: App {
     @State private var taskListStore = TaskListStore()
     @State private var workspaceStore: WorkspaceStore
     @State private var pinStore = PinStore()
+    @State private var sidebarState = SidebarState()
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var showPalette = false
+    @State private var creatingWorkspace = false
+    @State private var pendingMergedDeletion: MergedDeletionRequest?
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
 
     init() {
@@ -25,13 +30,14 @@ struct PluricodeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            NavigationSplitView {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
                 RepoSidebarView(
                     repoStore: repoStore,
                     profileStore: profileStore,
                     taskListStore: taskListStore,
                     workspaceStore: workspaceStore,
-                    pinStore: pinStore
+                    pinStore: pinStore,
+                    sidebarState: sidebarState
                 )
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 350)
             } detail: {
@@ -55,6 +61,13 @@ struct PluricodeApp: App {
                         }
                     }
                     .pickerStyle(.menu)
+
+                    Button {
+                        showPalette = true
+                    } label: {
+                        Image(systemName: "command")
+                    }
+                    .help("Command Palette (⌘K)")
                 }
             }
             .navigationTitle(workspaceStore.selectedWorkspace?.name ?? "Pluricode")
@@ -64,11 +77,49 @@ struct PluricodeApp: App {
             .onChange(of: appearanceModeRaw) { _, newValue in
                 (AppearanceMode(rawValue: newValue) ?? .system).apply()
             }
+            .sheet(isPresented: $showPalette) {
+                CommandPaletteView(
+                    isPresented: $showPalette,
+                    columnVisibility: $columnVisibility,
+                    workspaceStore: workspaceStore,
+                    repoStore: repoStore,
+                    sidebarState: sidebarState,
+                    onCreateWorkspace: { creatingWorkspace = true },
+                    onMergedDeletionFound: { matches in
+                        pendingMergedDeletion = MergedDeletionRequest(matches: matches)
+                    }
+                )
+            }
+            .sheet(isPresented: $creatingWorkspace) {
+                NewWorkspaceSheet(workspaceStore: workspaceStore)
+            }
+            .alert(item: $pendingMergedDeletion) { request in
+                if request.matches.isEmpty {
+                    return Alert(
+                        title: Text("No Merged Worktrees"),
+                        message: Text("All worktrees still have open or unmerged PRs."),
+                        dismissButton: .default(Text("OK"))
+                    )
+                }
+                let names = request.matches.map { $0.branch }.joined(separator: ", ")
+                return Alert(
+                    title: Text("Delete \(request.matches.count) merged worktree\(request.matches.count == 1 ? "" : "s")?"),
+                    message: Text("Removes worktrees and deletes their branches:\n\(names)"),
+                    primaryButton: .destructive(Text("Delete")) {
+                        runMergedDeletion(request.matches)
+                    },
+                    secondaryButton: .cancel()
+                )
+            }
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
             CommandMenu("Pane") {
                 PaneCommands()
+            }
+            CommandGroup(after: .toolbar) {
+                Button("Command Palette") { showPalette = true }
+                    .keyboardShortcut("k", modifiers: .command)
             }
         }
 
@@ -76,6 +127,26 @@ struct PluricodeApp: App {
             PermissionsView()
         }
     }
+
+    private func runMergedDeletion(_ matches: [MergedWorktreeMatch]) {
+        var affectedRepos: Set<UUID> = []
+        for match in matches {
+            guard let repo = repoStore.repos.first(where: { $0.id == match.repoID }) else { continue }
+            let worktree = Worktree(branch: match.branch, path: match.path, head: "", isPrimary: false)
+            workspaceStore.deleteWorktree(repo: repo, worktree: worktree, pinStore: pinStore)
+            affectedRepos.insert(repo.id)
+        }
+        for id in affectedRepos {
+            if let repo = repoStore.repos.first(where: { $0.id == id }) {
+                sidebarState.refresh(repo)
+            }
+        }
+    }
+}
+
+private struct MergedDeletionRequest: Identifiable {
+    let id = UUID()
+    let matches: [MergedWorktreeMatch]
 }
 
 struct PaneCommands: View {
