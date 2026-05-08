@@ -61,7 +61,7 @@ struct RepoSidebarView: View {
             }
             .selectionDisabled()
 
-            Section("Repositories") {
+            Section {
                 ForEach(repoStore.repos) { repo in
                     RepoRow(
                         repo: repo,
@@ -121,10 +121,16 @@ struct RepoSidebarView: View {
                         .padding(.vertical, 2)
                     }
                 }
+            } header: {
+                RepoSectionHeader(
+                    anyExpanded: !expanded.isEmpty,
+                    toggleAll: toggleAllRepos
+                )
             }
             .selectionDisabled()
         }
         .listStyle(.sidebar)
+        .safeAreaPadding(.trailing, 8)
         .safeAreaInset(edge: .bottom) {
             Button(action: pickFolder) {
                 Label("Add Repository", systemImage: "plus")
@@ -197,6 +203,17 @@ struct RepoSidebarView: View {
         } else {
             expanded.insert(repo.id)
             refresh(repo)
+        }
+    }
+
+    private func toggleAllRepos() {
+        if expanded.isEmpty {
+            for repo in repoStore.repos {
+                expanded.insert(repo.id)
+                refresh(repo)
+            }
+        } else {
+            expanded.removeAll()
         }
     }
 
@@ -298,6 +315,29 @@ private struct ColorMenuLabel: View {
         img.unlockFocus()
         img.isTemplate = false
         return img
+    }
+}
+
+private struct RepoSectionHeader: View {
+    let anyExpanded: Bool
+    let toggleAll: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("Repositories")
+            Spacer()
+            Button(action: toggleAll) {
+                Image(systemName: anyExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(anyExpanded ? "Collapse all" : "Expand all")
+            .opacity(hovered ? 1 : 0)
+        }
+        .contentShape(Rectangle())
+        .onHover { hovered = $0 }
     }
 }
 
