@@ -452,6 +452,17 @@ final class WorkspaceStore {
         }
     }
 
+    func deleteWorktree(repo: RepoEntry, worktree: Worktree, pinStore: PinStore) {
+        guard let wm = WorktreeManager(repoRoot: repo.path) else { return }
+        pinStore.removeWorktree(repoID: repo.id, branch: worktree.branch)
+        removePanes(repoID: repo.id, worktreeID: worktree.branch)
+        try? wm.removeWorktree(at: URL(fileURLWithPath: worktree.path))
+        _ = try? Process.run(
+            URL(fileURLWithPath: "/usr/bin/git"),
+            arguments: ["-C", repo.path.path, "branch", "-D", worktree.branch]
+        )
+    }
+
     func removePanes(repoID: UUID, worktreeID: String) {
         for ws in workspaces {
             let targets: [(UUID, UUID)] = ws.tiling.panes.flatMap { pane in

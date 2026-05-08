@@ -6,8 +6,7 @@ struct RepoSidebarView: View {
     let taskListStore: TaskListStore
     let workspaceStore: WorkspaceStore
     let pinStore: PinStore
-    @State private var expanded: Set<UUID> = []
-    @State private var worktrees: [UUID: [Worktree]] = [:]
+    let sidebarState: SidebarState
     @State private var newWorktreeRepo: RepoEntry?
     @State private var renameTarget: RenameTarget?
     @State private var configureTarget: RenameTarget?
@@ -77,8 +76,8 @@ struct RepoSidebarView: View {
                 }
             } header: {
                 RepoSectionHeader(
-                    anyExpanded: !expanded.isEmpty,
-                    toggleAll: toggleAllRepos
+                    anyExpanded: !sidebarState.expanded.isEmpty,
+                    toggleAll: { sidebarState.toggleAll(repoStore.repos) }
                 )
             }
             .selectionDisabled()
@@ -88,9 +87,9 @@ struct RepoSidebarView: View {
         .task(id: pinStore.pins) {
             for pin in pinStore.pins {
                 if case .worktree(let repoID, _) = pin,
-                   worktrees[repoID] == nil,
+                   sidebarState.worktrees[repoID] == nil,
                    let repo = repoStore.repos.first(where: { $0.id == repoID }) {
-                    refresh(repo)
+                    sidebarState.refresh(repo)
                 }
             }
         }
@@ -108,7 +107,7 @@ struct RepoSidebarView: View {
             RenameWorkspaceSheet(workspace: ws, workspaceStore: workspaceStore)
         }
         .sheet(item: $newWorktreeRepo) { repo in
-            NewWorktreeSheet(repo: repo, profileStore: profileStore) { _ in refresh(repo) }
+            NewWorktreeSheet(repo: repo, profileStore: profileStore) { _ in sidebarState.refresh(repo) }
         }
         .sheet(item: $renameTarget) { target in
             RenameWorktreeSheet(target: target) { newBranch in
@@ -117,7 +116,7 @@ struct RepoSidebarView: View {
                     oldBranch: target.worktree.branch,
                     newBranch: newBranch
                 )
-                refresh(target.repo)
+                sidebarState.refresh(target.repo)
             }
         }
         .sheet(item: $configureTarget) { target in
@@ -167,26 +166,6 @@ struct RepoSidebarView: View {
         }
     }
 
-    private func toggle(_ repo: RepoEntry) {
-        if expanded.contains(repo.id) {
-            expanded.remove(repo.id)
-        } else {
-            expanded.insert(repo.id)
-            refresh(repo)
-        }
-    }
-
-    private func toggleAllRepos() {
-        if expanded.isEmpty {
-            for repo in repoStore.repos {
-                expanded.insert(repo.id)
-                refresh(repo)
-            }
-        } else {
-            expanded.removeAll()
-        }
-    }
-
     private func selectWorktree(_ key: WorktreeKey, flags: NSEvent.ModifierFlags) {
         if flags.contains(.shift), let anchor = worktreeAnchor {
             let order = flattenedWorktreeKeys()
@@ -210,33 +189,17 @@ struct RepoSidebarView: View {
 
     private func flattenedWorktreeKeys() -> [WorktreeKey] {
         var result: [WorktreeKey] = []
-        for repo in repoStore.repos where expanded.contains(repo.id) {
-            for wt in worktrees[repo.id] ?? [] {
+        for repo in repoStore.repos where sidebarState.expanded.contains(repo.id) {
+            for wt in sidebarState.worktrees[repo.id] ?? [] {
                 result.append(WorktreeKey(repoID: repo.id, branch: wt.branch))
             }
         }
         return result
     }
 
-    private func refresh(_ repo: RepoEntry) {
-        guard let wm = WorktreeManager(repoRoot: repo.path) else {
-            worktrees[repo.id] = []
-            return
-        }
-        worktrees[repo.id] = wm.listManagedWorktrees()
-    }
-
     private func deleteWorktree(repo: RepoEntry, worktree: Worktree) {
-        guard let wm = WorktreeManager(repoRoot: repo.path) else { return }
-        let url = URL(fileURLWithPath: worktree.path)
-        pinStore.removeWorktree(repoID: repo.id, branch: worktree.branch)
-        workspaceStore.removePanes(repoID: repo.id, worktreeID: worktree.branch)
-        try? wm.removeWorktree(at: url)
-        _ = try? Process.run(
-            URL(fileURLWithPath: "/usr/bin/git"),
-            arguments: ["-C", repo.path.path, "branch", "-D", worktree.branch]
-        )
-        refresh(repo)
+        workspaceStore.deleteWorktree(repo: repo, worktree: worktree, pinStore: pinStore)
+        sidebarState.refresh(repo)
     }
 
     @ViewBuilder
@@ -248,7 +211,7 @@ struct RepoSidebarView: View {
             }
         case .worktree(let repoID, let branch):
             if let repo = repoStore.repos.first(where: { $0.id == repoID }),
-               let wt = (worktrees[repoID] ?? []).first(where: { $0.branch == branch }) {
+               let wt = (sidebarState.worktrees[repoID] ?? []).first(where: { $0.branch == branch }) {
                 worktreeRow(repo: repo, worktree: wt)
             }
         }
@@ -258,9 +221,9 @@ struct RepoSidebarView: View {
     private func repoAndWorktrees(_ repo: RepoEntry) -> some View {
         RepoRow(
             repo: repo,
-            isExpanded: expanded.contains(repo.id),
+            isExpanded: sidebarState.expanded.contains(repo.id),
             isPinned: pinStore.isPinned(.repo(repo.id)),
-            toggle: { toggle(repo) },
+            toggle: { sidebarState.toggle(repo) },
             onSetColor: { repoStore.setColor(id: repo.id, color: $0) },
             onNewWorktree: { newWorktreeRepo = repo },
             onConfigure: { configureRepo = repo },
@@ -274,8 +237,8 @@ struct RepoSidebarView: View {
             }
         )
 
-        if expanded.contains(repo.id) {
-            ForEach(worktrees[repo.id] ?? []) { wt in
+        if sidebarState.expanded.contains(repo.id) {
+            ForEach(sidebarState.worktrees[repo.id] ?? []) { wt in
                 worktreeRow(repo: repo, worktree: wt)
                     .padding(.leading, 20)
             }
@@ -813,39 +776,6 @@ struct TaskListRow: View {
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
         })
-    }
-}
-
-private struct NewWorkspaceSheet: View {
-    let workspaceStore: WorkspaceStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var name: String = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("New Workspace")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Name").font(.caption).foregroundStyle(.secondary)
-                TextField("Bug Fixes", text: $name)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Create") {
-                    _ = workspaceStore.createWorkspace(name: name)
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding(24)
-        .frame(width: 360)
     }
 }
 
