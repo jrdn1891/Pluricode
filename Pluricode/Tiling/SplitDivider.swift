@@ -2,16 +2,10 @@ import SwiftUI
 import AppKit
 
 struct SplitDivider: View {
-    let splitID: UUID
-    let leftIndex: Int
     let direction: TileDirection
-    let available: CGFloat
-    let weights: [Float]
-    let tiling: Tiling
+    let onChanged: (CGFloat) -> Void
+    let onEnded: () -> Void
 
-    private let minFraction: Float = 0.08
-
-    @State private var baseWeights: [Float]?
     @State private var hovering = false
 
     var body: some View {
@@ -37,26 +31,10 @@ struct SplitDivider: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        let base = baseWeights ?? weights
-                        if baseWeights == nil { baseWeights = base }
                         let delta = direction == .horizontal ? value.translation.width : value.translation.height
-                        applyDelta(delta, base: base)
+                        onChanged(delta)
                     }
-                    .onEnded { _ in
-                        baseWeights = nil
-                    }
+                    .onEnded { _ in onEnded() }
             )
-    }
-
-    private func applyDelta(_ delta: CGFloat, base: [Float]) {
-        guard available > 0, base.indices.contains(leftIndex), base.indices.contains(leftIndex + 1) else { return }
-        let fraction = Float(delta / available)
-        let i = leftIndex
-        let combined = base[i] + base[i + 1]
-        let newLeft = max(minFraction, min(combined - minFraction, base[i] + fraction))
-        var next = base
-        next[i] = newLeft
-        next[i + 1] = combined - newLeft
-        tiling.setWeights(splitID: splitID, weights: next)
     }
 }
