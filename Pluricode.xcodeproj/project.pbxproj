@@ -18,6 +18,7 @@
 		4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83868DA08DF195AF66F38C70 /* IdleOverlay.swift */; };
 		5208192AF506608CB772A9C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84B103466B6BA9B7791B4EB8 /* Assets.xcassets */; };
 		56CB18171A578DECD2613656 /* TileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FC19651849CFB42A1D4A3A /* TileNode.swift */; };
+		585484B172F60EB3A21E8D7C /* PinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2701F83AE83DE7286C13ED90 /* PinStore.swift */; };
 		5BFF6AC69093B72FBE9F32BC /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 311D5BA84A083B24731CB565 /* TerminalSession.swift */; };
 		6DBF9A14E662ED45AF58A42C /* WorktreeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259CAD09D9A3D60E24F5B0E1 /* WorktreeManager.swift */; };
 		6EE30230AA44ABEEA156649B /* TaskPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E91297C034C82CF173906F /* TaskPaneView.swift */; };
@@ -46,6 +47,7 @@
 		0E105E5A80CFDC4A1D8A36A8 /* RepoConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoConfig.swift; sourceTree = "<group>"; };
 		19BA3EE7DFFD7B396C3E7007 /* Pluricode.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pluricode.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		259CAD09D9A3D60E24F5B0E1 /* WorktreeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeManager.swift; sourceTree = "<group>"; };
+		2701F83AE83DE7286C13ED90 /* PinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinStore.swift; sourceTree = "<group>"; };
 		311D5BA84A083B24731CB565 /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
 		399DB996A2C342DBEDE780B3 /* AgentProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfile.swift; sourceTree = "<group>"; };
 		434CCFE49A70A2BD13C1FF1D /* AgentProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfileStore.swift; sourceTree = "<group>"; };
@@ -155,6 +157,7 @@
 		D05E9F1DFAAA2D4E739BC72D /* Model */ = {
 			isa = PBXGroup;
 			children = (
+				2701F83AE83DE7286C13ED90 /* PinStore.swift */,
 				0E105E5A80CFDC4A1D8A36A8 /* RepoConfig.swift */,
 				F722E7DD539F6776FA1674BA /* RepoStore.swift */,
 			);
@@ -289,6 +292,7 @@
 				E4B9C115E3094708A1A7036B /* PaneCreationToolbar.swift in Sources */,
 				1FF2534862D523B586A00545 /* PermissionsService.swift in Sources */,
 				93E709A761D2947E0F687A71 /* PermissionsView.swift in Sources */,
+				585484B172F60EB3A21E8D7C /* PinStore.swift in Sources */,
 				97C1C6B70507B356349663B4 /* PluricodeApp.swift in Sources */,
 				0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */,
 				F814E0ED4F9B4CE50E1FC08D /* RepoConfig.swift in Sources */,
