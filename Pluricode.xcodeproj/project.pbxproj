@@ -18,6 +18,7 @@
 		280CCB430242DD94E60CD1A2 /* SidebarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 640330E4FAC0CC5442935F46 /* SidebarState.swift */; };
 		3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95CDC674CDC6FC6D7714CB17 /* Workspace.swift */; };
 		4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83868DA08DF195AF66F38C70 /* IdleOverlay.swift */; };
+		AC11ACAC11ACAC11ACAC11AC /* AttachmentChipsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC11FCFC11FCFC11FCFC11FC /* AttachmentChipsOverlay.swift */; };
 		5208192AF506608CB772A9C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84B103466B6BA9B7791B4EB8 /* Assets.xcassets */; };
 		56CB18171A578DECD2613656 /* TileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FC19651849CFB42A1D4A3A /* TileNode.swift */; };
 		585484B172F60EB3A21E8D7C /* PinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2701F83AE83DE7286C13ED90 /* PinStore.swift */; };
@@ -72,6 +73,7 @@
 		77255FBFCC92A10AB02A025B /* CommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPalette.swift; sourceTree = "<group>"; };
 		7FEE031048801E0886F7EF9F /* StatsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsService.swift; sourceTree = "<group>"; };
 		83868DA08DF195AF66F38C70 /* IdleOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdleOverlay.swift; sourceTree = "<group>"; };
+		FC11FCFC11FCFC11FCFC11FC /* AttachmentChipsOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentChipsOverlay.swift; sourceTree = "<group>"; };
 		84B103466B6BA9B7791B4EB8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		860492197C8C2313E336830D /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
 		861AC6957D983804F39D40DF /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -186,6 +188,7 @@
 		E35867EDF8887AE840D897C9 /* Workspace */ = {
 			isa = PBXGroup;
 			children = (
+				FC11FCFC11FCFC11FCFC11FC /* AttachmentChipsOverlay.swift */,
 				83868DA08DF195AF66F38C70 /* IdleOverlay.swift */,
 				CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */,
 				77173B4968B004C4572C6516 /* PaneCreationToolbar.swift */,
@@ -311,6 +314,7 @@
 				12499E714805F522F4BE1C76 /* AgentDefinition.swift in Sources */,
 				BF48961DAE5F2A9EA6AA6A4C /* AgentProfile.swift in Sources */,
 				92F56CDF222DA4CE74E5AB1D /* AgentProfileStore.swift in Sources */,
+				AC11ACAC11ACAC11ACAC11AC /* AttachmentChipsOverlay.swift in Sources */,
 				F3D1887C447587AFF3CD02F6 /* CommandPalette.swift in Sources */,
 				4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */,
 				0DC403F2FCB7A4D30384AEB7 /* NewWorkspaceSheet.swift in Sources */,

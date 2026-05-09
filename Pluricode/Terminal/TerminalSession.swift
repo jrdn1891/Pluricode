@@ -2,18 +2,27 @@ import AppKit
 import Combine
 import SwiftTerm
 
+struct PendingImageAttachment: Identifiable, Equatable {
+    let id = UUID()
+    let path: String
+    let displayName: String
+    let thumbnail: NSImage?
+}
+
 final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, ObservableObject {
     let nodeID: UUID
     let terminalView: LocalProcessTerminalView
     var worktreePath: String?
     var onProcessTerminated: ((Int32?) -> Void)?
     @Published private(set) var isIdle: Bool = false
+    @Published private(set) var pendingAttachments: [PendingImageAttachment] = []
     private var lastAppliedZoom: Float = 1.0
     private var lastSavedBufferSize: Int = 0
     private var idleWorkItem: DispatchWorkItem?
 
     static let baseFontSize: CGFloat = 13
     static let idleThreshold: TimeInterval = 4.0
+    private static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "heic", "tiff", "tif"]
 
     init(nodeID: UUID) {
         self.nodeID = nodeID
@@ -21,8 +30,33 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         self.terminalView = view
         super.init()
         view.onActivity = { [weak self] in self?.noteActivity() }
+        view.onAttachImage = { [weak self] attachment in self?.attach(attachment) }
+        view.flushAttachments = { [weak self] in self?.flushAttachmentInjection() }
         terminalView.processDelegate = self
         terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize, weight: .regular)
+    }
+
+    static func isImagePath(_ path: String) -> Bool {
+        imageExtensions.contains((path as NSString).pathExtension.lowercased())
+    }
+
+    func removeAttachment(id: UUID) {
+        pendingAttachments.removeAll { $0.id == id }
+    }
+
+    private func attach(_ attachment: PendingImageAttachment) {
+        pendingAttachments.append(attachment)
+    }
+
+    private func flushAttachmentInjection() -> String? {
+        guard !pendingAttachments.isEmpty else { return nil }
+        let joined = pendingAttachments.map { Self.shellEscape($0.path) }.joined(separator: " ")
+        pendingAttachments.removeAll()
+        return " " + joined
+    }
+
+    private static func shellEscape(_ path: String) -> String {
+        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     private func noteActivity() {
@@ -102,13 +136,44 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
 private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     var onActivity: (() -> Void)?
+    var onAttachImage: ((PendingImageAttachment) -> Void)?
+    var flushAttachments: (() -> String?)?
+    private var keyMonitor: Any?
+
+    private let promiseQueue = OperationQueue()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        registerForDraggedTypes(registeredDraggedTypes + [.fileURL, .tiff, .png])
+        let promiseTypes = NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) }
+        registerForDraggedTypes(registeredDraggedTypes + [.fileURL, .tiff, .png] + promiseTypes)
     }
 
     required init?(coder: NSCoder) { super.init(coder: coder) }
+
+    deinit {
+        if let monitor = keyMonitor { NSEvent.removeMonitor(monitor) }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil, keyMonitor == nil {
+            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.interceptReturn(event)
+                return event
+            }
+        } else if window == nil, let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
+    }
+
+    private func interceptReturn(_ event: NSEvent) {
+        guard event.keyCode == 36,
+              !event.modifierFlags.contains(.shift),
+              window?.firstResponder === self,
+              let injection = flushAttachments?() else { return }
+        process?.send(data: Array(injection.utf8)[...])
+    }
 
     override func dataReceived(slice: ArraySlice<UInt8>) {
         super.dataReceived(slice: slice)
@@ -116,31 +181,79 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        droppedPaths(sender).isEmpty ? [] : .copy
+        hasAcceptableDrop(sender) ? .copy : []
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        droppedPaths(sender).isEmpty ? [] : .copy
+        hasAcceptableDrop(sender) ? .copy : []
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        let paths = droppedPaths(sender)
-        guard !paths.isEmpty else { return false }
-        let bytes = Array(paths.map(Self.shellEscape).joined(separator: " ").utf8)
-        process?.send(data: bytes[...])
+        let pb = sender.draggingPasteboard
+        let urls = (pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL])?.filter(\.isFileURL) ?? []
+
+        if !urls.isEmpty {
+            handle(urls: urls)
+            return true
+        }
+
+        if receivePromisedFiles(from: sender) {
+            return true
+        }
+
+        if let image = NSImage(pasteboard: pb), let path = Self.writeTempPNG(image) {
+            handle(urls: [URL(fileURLWithPath: path)])
+            return true
+        }
+        return false
+    }
+
+    private func handle(urls: [URL]) {
+        let imageURLs = urls.filter { TerminalSession.isImagePath($0.path) }
+        let nonImageURLs = urls.filter { !TerminalSession.isImagePath($0.path) }
+        for url in imageURLs {
+            let thumb = NSImage(contentsOfFile: url.path)
+            onAttachImage?(PendingImageAttachment(path: url.path, displayName: url.lastPathComponent, thumbnail: thumb))
+        }
+        if !nonImageURLs.isEmpty {
+            let bytes = Array(nonImageURLs.map { Self.shellEscape($0.path) }.joined(separator: " ").utf8)
+            process?.send(data: bytes[...])
+        }
+    }
+
+    private func receivePromisedFiles(from sender: NSDraggingInfo) -> Bool {
+        var receivers: [NSFilePromiseReceiver] = []
+        sender.enumerateDraggingItems(
+            options: [],
+            for: self,
+            classes: [NSFilePromiseReceiver.self],
+            searchOptions: [:]
+        ) { item, _, _ in
+            if let receiver = item.item as? NSFilePromiseReceiver {
+                receivers.append(receiver)
+            }
+        }
+        guard !receivers.isEmpty else { return false }
+        let destination = URL(fileURLWithPath: NSTemporaryDirectory())
+        for receiver in receivers {
+            receiver.receivePromisedFiles(atDestination: destination, options: [:], operationQueue: promiseQueue) { [weak self] url, error in
+                guard error == nil else { return }
+                DispatchQueue.main.async { self?.handle(urls: [url]) }
+            }
+        }
         return true
     }
 
-    private func droppedPaths(_ sender: NSDraggingInfo) -> [String] {
+    private func hasAcceptableDrop(_ sender: NSDraggingInfo) -> Bool {
         let pb = sender.draggingPasteboard
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
-           !urls.isEmpty {
-            return urls.filter(\.isFileURL).map(\.path)
+           urls.contains(where: \.isFileURL) {
+            return true
         }
-        if let image = NSImage(pasteboard: pb), let path = Self.writeTempPNG(image) {
-            return [path]
+        if pb.canReadObject(forClasses: [NSFilePromiseReceiver.self], options: nil) {
+            return true
         }
-        return []
+        return NSImage(pasteboard: pb) != nil
     }
 
     private static func writeTempPNG(_ image: NSImage) -> String? {
