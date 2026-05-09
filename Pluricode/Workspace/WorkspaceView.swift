@@ -336,6 +336,11 @@ private struct TerminalPaneBody: View {
                             }
                         }
                         .overlay {
+                            if let session = workspace.terminalHosts[tabID]?.session {
+                                AttachmentChipsOverlay(session: session)
+                            }
+                        }
+                        .overlay {
                             if let edge = hoverEdge {
                                 DropZoneOverlay(edge: edge, size: geo.size)
                             }
