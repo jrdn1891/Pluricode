@@ -21,7 +21,6 @@ final class Workspace {
     let repoStore: RepoStore
     let taskListStore: TaskListStore
     let profileStore: AgentProfileStore
-    let statsService: StatsService
     let worktreePaths: WorktreePaths
     let worktreeStatusService: WorktreeStatusService
     var terminalHosts: [UUID: TerminalHost] = [:]
@@ -42,7 +41,6 @@ final class Workspace {
         repoStore: RepoStore,
         taskListStore: TaskListStore,
         profileStore: AgentProfileStore,
-        statsService: StatsService,
         worktreePaths: WorktreePaths,
         worktreeStatusService: WorktreeStatusService
     ) {
@@ -52,7 +50,6 @@ final class Workspace {
         self.repoStore = repoStore
         self.taskListStore = taskListStore
         self.profileStore = profileStore
-        self.statsService = statsService
         self.worktreePaths = worktreePaths
         self.worktreeStatusService = worktreeStatusService
     }
@@ -357,10 +354,6 @@ final class Workspace {
             let content: TabContent = .tasks(listID: listID)
             if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
             else { addPane(content) }
-        case .newStats:
-            let content: TabContent = .stats
-            if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
-            else { addPane(content) }
         case .movePane(let sourceID):
             guard let targetID, sourceID != targetID else { return false }
             if edge == .center {
@@ -402,7 +395,6 @@ final class WorkspaceStore {
     private let repoStore: RepoStore
     private let taskListStore: TaskListStore
     private let profileStore: AgentProfileStore
-    let statsService: StatsService
     let worktreePaths: WorktreePaths
     let worktreeStatusService: WorktreeStatusService
 
@@ -412,7 +404,6 @@ final class WorkspaceStore {
         self.repoStore = repoStore
         self.taskListStore = taskListStore
         self.profileStore = profileStore
-        self.statsService = StatsService(repoStore: repoStore)
         self.worktreePaths = WorktreePaths()
         self.worktreeStatusService = WorktreeStatusService(repoStore: repoStore)
         load()
@@ -432,7 +423,6 @@ final class WorkspaceStore {
             repoStore: repoStore,
             taskListStore: taskListStore,
             profileStore: profileStore,
-            statsService: statsService,
             worktreePaths: worktreePaths,
             worktreeStatusService: worktreeStatusService
         )
@@ -527,7 +517,6 @@ final class WorkspaceStore {
                 repoStore: repoStore,
                 taskListStore: taskListStore,
                 profileStore: profileStore,
-                statsService: statsService,
                 worktreePaths: worktreePaths,
                 worktreeStatusService: worktreeStatusService
             )

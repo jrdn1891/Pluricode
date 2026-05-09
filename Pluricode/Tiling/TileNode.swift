@@ -46,7 +46,6 @@ struct TilingDragPayload: Codable, Transferable, Hashable {
     enum Kind: Codable, Hashable {
         case newTerminal(repoID: UUID, worktreeID: String)
         case newTaskPane(listID: UUID)
-        case newStats
         case movePane(paneID: UUID)
     }
     let kind: Kind
@@ -59,7 +58,6 @@ struct TilingDragPayload: Codable, Transferable, Hashable {
 enum TabContent: Hashable, Codable {
     case terminal(repoID: UUID, worktreeID: String)
     case tasks(listID: UUID)
-    case stats
 }
 
 struct Tab: Identifiable, Hashable, Codable {
