@@ -666,6 +666,11 @@ private struct TerminalExpandedContent: View {
                let repoPath = workspace.repo(id: repoID)?.path.path {
                 TerminalPaneView(tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                     .id(tabID)
+                    .overlay {
+                        if let session = workspace.terminalHosts[tabID]?.session {
+                            AttachmentChipsOverlay(session: session)
+                        }
+                    }
             } else {
                 MissingWorktreeBody(
                     worktreeID: worktreeID,

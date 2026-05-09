@@ -140,9 +140,12 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     var flushAttachments: (() -> String?)?
     private var keyMonitor: Any?
 
+    private let promiseQueue = OperationQueue()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
-        registerForDraggedTypes(registeredDraggedTypes + [.fileURL, .tiff, .png])
+        let promiseTypes = NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) }
+        registerForDraggedTypes(registeredDraggedTypes + [.fileURL, .tiff, .png] + promiseTypes)
     }
 
     required init?(coder: NSCoder) { super.init(coder: coder) }
@@ -190,31 +193,64 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
         let urls = (pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL])?.filter(\.isFileURL) ?? []
 
         if !urls.isEmpty {
-            let imageURLs = urls.filter { TerminalSession.isImagePath($0.path) }
-            let nonImageURLs = urls.filter { !TerminalSession.isImagePath($0.path) }
-            for url in imageURLs {
-                let thumb = NSImage(contentsOfFile: url.path)
-                onAttachImage?(PendingImageAttachment(path: url.path, displayName: url.lastPathComponent, thumbnail: thumb))
-            }
-            if !nonImageURLs.isEmpty {
-                let bytes = Array(nonImageURLs.map { Self.shellEscape($0.path) }.joined(separator: " ").utf8)
-                process?.send(data: bytes[...])
-            }
+            handle(urls: urls)
+            return true
+        }
+
+        if receivePromisedFiles(from: sender) {
             return true
         }
 
         if let image = NSImage(pasteboard: pb), let path = Self.writeTempPNG(image) {
-            let thumb = NSImage(contentsOfFile: path)
-            onAttachImage?(PendingImageAttachment(path: path, displayName: (path as NSString).lastPathComponent, thumbnail: thumb))
+            handle(urls: [URL(fileURLWithPath: path)])
             return true
         }
         return false
+    }
+
+    private func handle(urls: [URL]) {
+        let imageURLs = urls.filter { TerminalSession.isImagePath($0.path) }
+        let nonImageURLs = urls.filter { !TerminalSession.isImagePath($0.path) }
+        for url in imageURLs {
+            let thumb = NSImage(contentsOfFile: url.path)
+            onAttachImage?(PendingImageAttachment(path: url.path, displayName: url.lastPathComponent, thumbnail: thumb))
+        }
+        if !nonImageURLs.isEmpty {
+            let bytes = Array(nonImageURLs.map { Self.shellEscape($0.path) }.joined(separator: " ").utf8)
+            process?.send(data: bytes[...])
+        }
+    }
+
+    private func receivePromisedFiles(from sender: NSDraggingInfo) -> Bool {
+        var receivers: [NSFilePromiseReceiver] = []
+        sender.enumerateDraggingItems(
+            options: [],
+            for: self,
+            classes: [NSFilePromiseReceiver.self],
+            searchOptions: [:]
+        ) { item, _, _ in
+            if let receiver = item.item as? NSFilePromiseReceiver {
+                receivers.append(receiver)
+            }
+        }
+        guard !receivers.isEmpty else { return false }
+        let destination = URL(fileURLWithPath: NSTemporaryDirectory())
+        for receiver in receivers {
+            receiver.receivePromisedFiles(atDestination: destination, options: [:], operationQueue: promiseQueue) { [weak self] url, error in
+                guard error == nil else { return }
+                DispatchQueue.main.async { self?.handle(urls: [url]) }
+            }
+        }
+        return true
     }
 
     private func hasAcceptableDrop(_ sender: NSDraggingInfo) -> Bool {
         let pb = sender.draggingPasteboard
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
            urls.contains(where: \.isFileURL) {
+            return true
+        }
+        if pb.canReadObject(forClasses: [NSFilePromiseReceiver.self], options: nil) {
             return true
         }
         return NSImage(pasteboard: pb) != nil
