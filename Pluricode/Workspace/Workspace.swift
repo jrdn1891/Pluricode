@@ -22,6 +22,8 @@ final class Workspace {
     let taskListStore: TaskListStore
     let profileStore: AgentProfileStore
     let statsService: StatsService
+    let worktreePaths: WorktreePaths
+    let worktreeStatusService: WorktreeStatusService
     var terminalHosts: [UUID: TerminalHost] = [:]
     var pendingDevScripts: [UUID: String] = [:]
     var focusedPaneID: UUID?
@@ -40,7 +42,9 @@ final class Workspace {
         repoStore: RepoStore,
         taskListStore: TaskListStore,
         profileStore: AgentProfileStore,
-        statsService: StatsService
+        statsService: StatsService,
+        worktreePaths: WorktreePaths,
+        worktreeStatusService: WorktreeStatusService
     ) {
         self.id = id
         self.name = name
@@ -49,6 +53,8 @@ final class Workspace {
         self.taskListStore = taskListStore
         self.profileStore = profileStore
         self.statsService = statsService
+        self.worktreePaths = worktreePaths
+        self.worktreeStatusService = worktreeStatusService
     }
 
     deinit {
@@ -184,9 +190,8 @@ final class Workspace {
     func worktreePath(tabID: UUID) -> String? {
         guard let (_, tab) = locateTab(id: tabID),
               case .terminal(let repoID, let worktreeID) = tab.content,
-              let repo = repo(id: repoID),
-              let wm = WorktreeManager(repoRoot: repo.path) else { return nil }
-        return wm.listManagedWorktrees().first { $0.branch == worktreeID }?.path
+              let repo = repo(id: repoID) else { return nil }
+        return worktreePaths.path(forRepoID: repoID, repoPath: repo.path, branch: worktreeID)
     }
 
     func paneDisplayName(worktreeID: String) -> String {
@@ -398,6 +403,8 @@ final class WorkspaceStore {
     private let taskListStore: TaskListStore
     private let profileStore: AgentProfileStore
     let statsService: StatsService
+    let worktreePaths: WorktreePaths
+    let worktreeStatusService: WorktreeStatusService
 
     private static let selectedKey = "selectedWorkspaceID"
 
@@ -406,6 +413,8 @@ final class WorkspaceStore {
         self.taskListStore = taskListStore
         self.profileStore = profileStore
         self.statsService = StatsService(repoStore: repoStore)
+        self.worktreePaths = WorktreePaths()
+        self.worktreeStatusService = WorktreeStatusService(repoStore: repoStore)
         load()
     }
 
@@ -423,7 +432,9 @@ final class WorkspaceStore {
             repoStore: repoStore,
             taskListStore: taskListStore,
             profileStore: profileStore,
-            statsService: statsService
+            statsService: statsService,
+            worktreePaths: worktreePaths,
+            worktreeStatusService: worktreeStatusService
         )
         workspaces.append(ws)
         sort()
@@ -461,6 +472,8 @@ final class WorkspaceStore {
             URL(fileURLWithPath: "/usr/bin/git"),
             arguments: ["-C", repo.path.path, "branch", "-D", worktree.branch]
         )
+        worktreePaths.invalidate(repoID: repo.id)
+        worktreeStatusService.invalidate(repoID: repo.id)
     }
 
     func removePanes(repoID: UUID, worktreeID: String) {
@@ -514,7 +527,9 @@ final class WorkspaceStore {
                 repoStore: repoStore,
                 taskListStore: taskListStore,
                 profileStore: profileStore,
-                statsService: statsService
+                statsService: statsService,
+                worktreePaths: worktreePaths,
+                worktreeStatusService: worktreeStatusService
             )
         }
         sort()

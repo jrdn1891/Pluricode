@@ -385,8 +385,13 @@ private struct PaneHeader: View {
     let onActivate: () -> Void
     let onExpand: () -> Void
     let onClose: () -> Void
-    @State private var isMerged: Bool = false
     @State private var devScript: String?
+
+    private var isMerged: Bool {
+        guard let tab = pane.tabs.first(where: { $0.id == tabID }),
+              case .terminal(let repoID, let worktreeID) = tab.content else { return false }
+        return workspace.worktreeStatusService.status(repoID: repoID, branch: worktreeID).isMerged
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -447,13 +452,6 @@ private struct PaneHeader: View {
         .onTapGesture(perform: onActivate)
         .task(id: tabID) {
             devScript = workspace.devScript(paneID: pane.id)
-            guard let pathString = workspace.worktreePath(tabID: tabID) else { return }
-            let path = URL(fileURLWithPath: pathString)
-            while !Task.isCancelled {
-                let next = await Task.detached { WorktreeManager.isMerged(at: path) }.value
-                if next != isMerged { isMerged = next }
-                try? await Task.sleep(for: .seconds(30))
-            }
         }
         .draggable(TilingDragPayload(kind: .movePane(paneID: pane.id))) {
             HStack(spacing: 6) {

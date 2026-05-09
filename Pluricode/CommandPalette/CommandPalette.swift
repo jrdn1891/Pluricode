@@ -176,27 +176,20 @@ struct CommandPaletteView: View {
     private func scanMergedWorktrees() {
         guard !scanningMerged else { return }
         scanningMerged = true
-        let snapshot = repoStore.repos
-        Task.detached {
-            var matches: [MergedWorktreeMatch] = []
-            for repo in snapshot {
-                guard let wm = WorktreeManager(repoRoot: repo.path) else { continue }
-                for wt in wm.listManagedWorktrees() where !wt.isPrimary {
-                    let url = URL(fileURLWithPath: wt.path)
-                    if WorktreeManager.isMerged(at: url) {
-                        matches.append(MergedWorktreeMatch(
-                            repoID: repo.id,
-                            branch: wt.branch,
-                            path: wt.path
-                        ))
-                    }
-                }
+        let service = workspaceStore.worktreeStatusService
+        let paths = workspaceStore.worktreePaths
+        let repos = repoStore.repos
+        Task { @MainActor in
+            await service.refreshNow()
+            let matches: [MergedWorktreeMatch] = service.mergedKeys().compactMap { key in
+                guard let repo = repos.first(where: { $0.id == key.repoID }),
+                      let path = paths.path(forRepoID: key.repoID, repoPath: repo.path, branch: key.branch)
+                else { return nil }
+                return MergedWorktreeMatch(repoID: key.repoID, branch: key.branch, path: path)
             }
-            await MainActor.run {
-                scanningMerged = false
-                isPresented = false
-                onMergedDeletionFound(matches)
-            }
+            scanningMerged = false
+            isPresented = false
+            onMergedDeletionFound(matches)
         }
     }
 }
