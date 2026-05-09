@@ -121,8 +121,6 @@ private struct TabBody: View {
             )
         case .tasks(let listID):
             TaskPaneBody(pane: pane, tabID: tab.id, listID: listID, workspace: workspace)
-        case .stats:
-            StatsPaneBody(pane: pane, tabID: tab.id, workspace: workspace)
         }
     }
 }
@@ -242,39 +240,6 @@ private struct TaskPaneBody: View {
                 paneID: pane.id,
                 listID: listID,
                 store: workspace.taskListStore,
-                onActivate: { workspace.setFocus(paneID: pane.id) },
-                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
-            )
-            .frame(width: geo.size.width, height: geo.size.height)
-            .overlay {
-                if let edge = hoverEdge {
-                    DropZoneOverlay(edge: edge, size: geo.size)
-                }
-            }
-            .onDrop(
-                of: [.plainText],
-                delegate: PaneDropDelegate(
-                    paneID: pane.id,
-                    workspace: workspace,
-                    size: geo.size,
-                    hoverEdge: $hoverEdge
-                )
-            )
-        }
-    }
-}
-
-private struct StatsPaneBody: View {
-    let pane: Pane
-    let tabID: UUID
-    let workspace: Workspace
-    @State private var hoverEdge: TileEdge?
-
-    var body: some View {
-        GeometryReader { geo in
-            StatsPaneView(
-                paneID: pane.id,
-                service: workspace.statsService,
                 onActivate: { workspace.setFocus(paneID: pane.id) },
                 onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
             )
