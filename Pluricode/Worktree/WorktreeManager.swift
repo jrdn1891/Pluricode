@@ -142,12 +142,6 @@ final class WorktreeManager {
         return Worktree(branch: updated.branch, path: updated.path, head: updated.head, isPrimary: false)
     }
 
-    func uncommittedCount(at path: URL) -> Int {
-        guard let result = try? run("git", args: ["-C", path.path, "status", "--porcelain"]),
-              result.status == 0 else { return 0 }
-        return result.stdout.components(separatedBy: "\n").filter { !$0.isEmpty }.count
-    }
-
     static func isMerged(at path: URL) -> Bool {
         guard let branch = try? run("git", args: [
             "-C", path.path, "rev-parse", "--abbrev-ref", "HEAD"
@@ -178,21 +172,31 @@ final class WorktreeManager {
             }
         }
         if let result = try? run("git", args: [
-            "-C", path.path, "ls-files", "--others", "--exclude-standard"
+            "-C", path.path, "ls-files", "--others", "--exclude-standard", "-z"
         ]), result.status == 0 {
-            for rel in result.stdout.components(separatedBy: "\n") where !rel.isEmpty {
-                guard let stat = try? run("git", args: [
-                    "-C", path.path, "diff", "--no-index", "--numstat", "/dev/null", rel
-                ]), stat.status <= 1 else { continue }
-                for line in stat.stdout.components(separatedBy: "\n") where !line.isEmpty {
-                    let parts = line.split(separator: "\t")
-                    guard parts.count >= 2 else { continue }
-                    adds += Int(parts[0]) ?? 0
-                    dels += Int(parts[1]) ?? 0
-                }
+            let entries = result.stdout.split(separator: "\0", omittingEmptySubsequences: true)
+            for rel in entries.prefix(untrackedFileLimit) {
+                adds += countLines(at: path.appendingPathComponent(String(rel)))
             }
         }
         return DiffStats(additions: adds, deletions: dels)
+    }
+
+    private static let untrackedFileLimit = 500
+    private static let untrackedFileSizeLimit = 5_000_000
+
+    private static func countLines(at url: URL) -> Int {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = (attrs[.size] as? NSNumber)?.intValue,
+              size > 0, size <= untrackedFileSizeLimit else { return 0 }
+        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]) else { return 0 }
+        if data.prefix(8192).contains(0) { return 0 }
+        var count = 0
+        data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            for byte in raw where byte == 0x0A { count += 1 }
+        }
+        if let last = data.last, last != 0x0A { count += 1 }
+        return count
     }
 
     private static func baseCommit(at path: URL) -> String? {

@@ -107,7 +107,11 @@ struct RepoSidebarView: View {
             RenameWorkspaceSheet(workspace: ws, workspaceStore: workspaceStore)
         }
         .sheet(item: $newWorktreeRepo) { repo in
-            NewWorktreeSheet(repo: repo, profileStore: profileStore) { _ in sidebarState.refresh(repo) }
+            NewWorktreeSheet(repo: repo, profileStore: profileStore) { _ in
+                workspaceStore.worktreePaths.invalidate(repoID: repo.id)
+                workspaceStore.worktreeStatusService.invalidate(repoID: repo.id)
+                sidebarState.refresh(repo)
+            }
         }
         .sheet(item: $renameTarget) { target in
             RenameWorktreeSheet(target: target) { newBranch in
@@ -116,6 +120,8 @@ struct RepoSidebarView: View {
                     oldBranch: target.worktree.branch,
                     newBranch: newBranch
                 )
+                workspaceStore.worktreePaths.invalidate(repoID: target.repo.id)
+                workspaceStore.worktreeStatusService.invalidate(repoID: target.repo.id)
                 sidebarState.refresh(target.repo)
             }
         }
@@ -607,9 +613,13 @@ struct WorktreeRow<MenuContent: View>: View {
     let isSelected: Bool
     let onSelect: (NSEvent.ModifierFlags) -> Void
     @ViewBuilder let menuContent: () -> MenuContent
-    @State private var stats: DiffStats = .zero
-    @State private var isMerged: Bool = false
     @State private var isHovered = false
+
+    private var status: WorktreeStatus {
+        workspaceStore.worktreeStatusService.status(repoID: repoID, branch: worktree.branch)
+    }
+    private var stats: DiffStats { status.diff }
+    private var isMerged: Bool { status.isMerged }
 
     private var assignedProfile: AgentProfile? {
         let config = WorktreeConfig.load(at: worktree.path)
@@ -676,23 +686,6 @@ struct WorktreeRow<MenuContent: View>: View {
         .onHover { isHovered = $0 }
         .onTapGesture {
             onSelect(NSEvent.modifierFlags)
-        }
-        .task(id: worktree.path) {
-            let path = URL(fileURLWithPath: worktree.path)
-            while !Task.isCancelled {
-                let next = await Task.detached { WorktreeManager.diffStats(at: path) }.value
-                if next != stats { stats = next }
-                try? await Task.sleep(for: .seconds(3))
-            }
-        }
-        .task(id: worktree.path) {
-            guard !worktree.isPrimary else { return }
-            let path = URL(fileURLWithPath: worktree.path)
-            while !Task.isCancelled {
-                let next = await Task.detached { WorktreeManager.isMerged(at: path) }.value
-                if next != isMerged { isMerged = next }
-                try? await Task.sleep(for: .seconds(30))
-            }
         }
         .onDrag({
             let payload = TilingDragPayload(kind: .newTerminal(repoID: repoID, worktreeID: worktree.branch))
