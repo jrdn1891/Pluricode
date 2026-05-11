@@ -103,15 +103,14 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
     func start(in directory: String? = nil) {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        var env = Array(ProcessInfo.processInfo.environment.map { "\($0.key)=\($0.value)" })
-        if let dir = directory {
-            env.removeAll { $0.hasPrefix("PWD=") }
-            env.append("PWD=\(dir)")
-        }
+        var env = ProcessInfo.processInfo.environment
+        env["TERM"] = "xterm-256color"
+        env["COLORTERM"] = "truecolor"
+        if let dir = directory { env["PWD"] = dir }
         terminalView.startProcess(
             executable: shell,
             args: ["-l"],
-            environment: env,
+            environment: env.map { "\($0.key)=\($0.value)" },
             execName: (shell as NSString).lastPathComponent,
             currentDirectory: directory
         )
