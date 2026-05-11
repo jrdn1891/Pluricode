@@ -9,6 +9,13 @@ struct ProcessResult {
 }
 
 enum ProcessRunner {
+    private static let searchPaths = [
+        "/usr/bin",
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        NSHomeDirectory() + "/.local/bin",
+    ]
+
     static func run(_ executable: String, args: [String], cwd: URL? = nil) throws -> ProcessResult {
         guard let execURL = resolveExecutable(executable) else {
             return ProcessResult(status: 127, stdout: "", stderr: "executable not found: \(executable)")
@@ -17,6 +24,9 @@ enum ProcessRunner {
         process.executableURL = execURL
         process.arguments = args
         if let cwd { process.currentDirectoryURL = cwd }
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = (searchPaths + [env["PATH"]].compactMap { $0 }).joined(separator: ":")
+        process.environment = env
         let stdout = Pipe()
         let stderr = Pipe()
         process.standardOutput = stdout
@@ -34,15 +44,12 @@ enum ProcessRunner {
         if name.contains("/") {
             return URL(fileURLWithPath: name)
         }
-        let candidates = [
-            "/usr/bin/\(name)",
-            "/opt/homebrew/bin/\(name)",
-            "/usr/local/bin/\(name)",
-            NSHomeDirectory() + "/.local/bin/\(name)",
-        ]
         let fm = FileManager.default
-        for path in candidates where fm.isExecutableFile(atPath: path) {
-            return URL(fileURLWithPath: path)
+        for dir in searchPaths {
+            let path = "\(dir)/\(name)"
+            if fm.isExecutableFile(atPath: path) {
+                return URL(fileURLWithPath: path)
+            }
         }
         return nil
     }
