@@ -137,12 +137,16 @@ final class Tiling {
             root = .pane(pane)
             return pane.id
         }
-        let newPane = Pane(content: newContent)
         if edge == .center {
-            root = Self.replace(paneID: paneID, with: newPane, in: current)
-        } else {
-            root = Self.insertSibling(newPane, at: edge, adjacentTo: paneID, in: current)
+            let tab = Tab(content: newContent)
+            root = Self.update(paneID: paneID, in: current) { p in
+                p.tabs.append(tab)
+                p.activeTabID = tab.id
+            }
+            return paneID
         }
+        let newPane = Pane(content: newContent)
+        root = Self.insertSibling(newPane, at: edge, adjacentTo: paneID, in: current)
         return newPane.id
     }
 
@@ -166,12 +170,14 @@ final class Tiling {
         root = Self.insertSibling(source, at: edge, adjacentTo: targetID, in: afterRemoval)
     }
 
-    func swapPanes(a: UUID, b: UUID) {
-        guard a != b, let current = root else { return }
-        guard let paneA = Self.findPaneStruct(id: a, in: current),
-              let paneB = Self.findPaneStruct(id: b, in: current) else { return }
-        let step1 = Self.replace(paneID: a, with: paneB, in: current)
-        root = Self.replace(paneID: b, with: paneA, in: step1)
+    func mergePaneTabs(sourceID: UUID, targetID: UUID) {
+        guard sourceID != targetID, let current = root else { return }
+        guard let source = Self.findPaneStruct(id: sourceID, in: current) else { return }
+        guard let afterRemoval = Self.remove(paneID: sourceID, from: current) else { return }
+        root = Self.update(paneID: targetID, in: afterRemoval) { p in
+            p.tabs.append(contentsOf: source.tabs)
+            p.activeTabID = source.activeTabID
+        }
     }
 
     func updatePane(_ paneID: UUID, _ transform: (inout Pane) -> Void) {
@@ -211,16 +217,6 @@ extension Tiling {
                 return .split(split)
             }
             split.children = split.children.map { insertSibling(newPane, at: edge, adjacentTo: targetID, in: $0) }
-            return .split(split)
-        }
-    }
-
-    static func replace(paneID: UUID, with newPane: Pane, in node: TileNode) -> TileNode {
-        switch node {
-        case .pane(let p):
-            return p.id == paneID ? .pane(newPane) : node
-        case .split(var split):
-            split.children = split.children.map { replace(paneID: paneID, with: newPane, in: $0) }
             return .split(split)
         }
     }
@@ -281,6 +277,56 @@ extension Tiling {
     static func isPane(_ node: TileNode, id: UUID) -> Bool {
         if case .pane(let p) = node, p.id == id { return true }
         return false
+    }
+
+    static func simulateDrop(
+        payload: TilingDragPayload,
+        targetID: UUID?,
+        edge: TileEdge,
+        previewPaneID: UUID,
+        root: TileNode?
+    ) -> (root: TileNode, highlightID: UUID)? {
+        switch payload.kind {
+        case .newTerminal(let repoID, let worktreeID):
+            return simulateAdd(content: .terminal(repoID: repoID, worktreeID: worktreeID),
+                               targetID: targetID, edge: edge, previewPaneID: previewPaneID, root: root)
+        case .newTaskPane(let listID):
+            return simulateAdd(content: .tasks(listID: listID),
+                               targetID: targetID, edge: edge, previewPaneID: previewPaneID, root: root)
+        case .movePane(let sourceID):
+            return simulateMove(sourceID: sourceID, targetID: targetID, edge: edge, root: root)
+        }
+    }
+
+    private static func simulateAdd(content: TabContent, targetID: UUID?, edge: TileEdge, previewPaneID: UUID, root: TileNode?) -> (TileNode, UUID) {
+        let newPane = Pane(id: previewPaneID, tabs: [Tab(content: content)])
+        guard let root else { return (.pane(newPane), previewPaneID) }
+        guard let targetID else {
+            guard let firstID = allPanes(in: root).first?.id else {
+                return (.pane(newPane), previewPaneID)
+            }
+            return (insertSibling(newPane, at: .right, adjacentTo: firstID, in: root), previewPaneID)
+        }
+        if edge == .center {
+            let next = update(paneID: targetID, in: root) { p in
+                p.tabs.append(Tab(content: content))
+            }
+            return (next, targetID)
+        }
+        return (insertSibling(newPane, at: edge, adjacentTo: targetID, in: root), previewPaneID)
+    }
+
+    private static func simulateMove(sourceID: UUID, targetID: UUID?, edge: TileEdge, root: TileNode?) -> (TileNode, UUID)? {
+        guard let root, let targetID, sourceID != targetID else { return nil }
+        guard let source = findPaneStruct(id: sourceID, in: root) else { return nil }
+        guard let afterRemoval = remove(paneID: sourceID, from: root) else { return nil }
+        if edge == .center {
+            let next = update(paneID: targetID, in: afterRemoval) { p in
+                p.tabs.append(contentsOf: source.tabs)
+            }
+            return (next, targetID)
+        }
+        return (insertSibling(source, at: edge, adjacentTo: targetID, in: afterRemoval), sourceID)
     }
 
     static func findPaneStruct(id: UUID, in node: TileNode) -> Pane? {
