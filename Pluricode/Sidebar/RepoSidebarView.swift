@@ -44,7 +44,7 @@ struct RepoSidebarView: View {
 
             Section {
                 ForEach(taskListStore.lists) { list in
-                    TaskListRow(list: list)
+                    TaskListRow(list: list, workspaceStore: workspaceStore)
                         .contextMenu {
                             Button("Rename...") { renameListTarget = list }
                             Divider()
@@ -684,6 +684,7 @@ struct WorktreeRow<MenuContent: View>: View {
         }
         .onDrag({
             let payload = TilingDragPayload(kind: .newTerminal(repoID: repoID, worktreeID: worktree.branch))
+            workspaceStore.selectedWorkspace?.beginDrag(payload)
             let data = (try? JSONEncoder().encode(payload)) ?? Data()
             let string = String(data: data, encoding: .utf8) ?? ""
             return NSItemProvider(object: string as NSString)
@@ -702,6 +703,7 @@ struct WorktreeRow<MenuContent: View>: View {
 
 struct TaskListRow: View {
     let list: TaskList
+    let workspaceStore: WorkspaceStore
 
     var body: some View {
         HStack(spacing: 6) {
@@ -721,6 +723,7 @@ struct TaskListRow: View {
         .padding(.vertical, 1)
         .onDrag({
             let payload = TilingDragPayload(kind: .newTaskPane(listID: list.id))
+            workspaceStore.selectedWorkspace?.beginDrag(payload)
             let data = (try? JSONEncoder().encode(payload)) ?? Data()
             let string = String(data: data, encoding: .utf8) ?? ""
             return NSItemProvider(object: string as NSString)

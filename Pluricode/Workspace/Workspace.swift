@@ -28,6 +28,19 @@ final class Workspace {
     var focusedPaneID: UUID?
     var expandedPaneID: UUID?
     var commandKeyHeld: Bool = false
+    var dragSession: DragSession?
+
+    struct DragHover: Equatable {
+        let paneID: UUID?
+        let edge: TileEdge
+    }
+
+    struct DragSession {
+        let payload: TilingDragPayload
+        let previewPaneID: UUID
+        var hover: DragHover?
+        var isCancelled: Bool = false
+    }
 
     private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var commandHoldTask: DispatchWorkItem?
@@ -343,26 +356,66 @@ final class Workspace {
         Self.findPane(id: id, in: tiling.root)
     }
 
+    func beginDrag(_ payload: TilingDragPayload) {
+        dragSession = DragSession(payload: payload, previewPaneID: UUID())
+    }
+
+    func endDrag() {
+        dragSession = nil
+    }
+
+    func cancelDrag() {
+        guard dragSession != nil else { return }
+        dragSession?.isCancelled = true
+        dragSession?.hover = nil
+    }
+
+    func updateHover(_ hover: DragHover?) {
+        guard var session = dragSession, !session.isCancelled else { return }
+        if session.hover != hover {
+            session.hover = hover
+            dragSession = session
+        }
+    }
+
+    var previewLayout: (root: TileNode, highlightID: UUID)? {
+        guard let session = dragSession, !session.isCancelled, let hover = session.hover else { return nil }
+        return Tiling.simulateDrop(
+            payload: session.payload,
+            targetID: hover.paneID,
+            edge: hover.edge,
+            previewPaneID: session.previewPaneID,
+            root: tiling.root
+        )
+    }
+
     @discardableResult
     func acceptDrop(payload: TilingDragPayload, on targetID: UUID?, edge: TileEdge) -> Bool {
-        switch payload.kind {
-        case .newTerminal(let repoID, let worktreeID):
-            let content: TabContent = .terminal(repoID: repoID, worktreeID: worktreeID)
-            if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
-            else { addPane(content) }
-        case .newTaskPane(let listID):
-            let content: TabContent = .tasks(listID: listID)
-            if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
-            else { addPane(content) }
-        case .movePane(let sourceID):
-            guard let targetID, sourceID != targetID else { return false }
-            if edge == .center {
-                tiling.swapPanes(a: sourceID, b: targetID)
-            } else {
-                tiling.movePane(sourceID: sourceID, to: edge, adjacentTo: targetID)
+        let cancelled = dragSession?.isCancelled ?? false
+        endDrag()
+        if cancelled { return false }
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+            switch payload.kind {
+            case .newTerminal(let repoID, let worktreeID):
+                let content: TabContent = .terminal(repoID: repoID, worktreeID: worktreeID)
+                if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
+                else { addPane(content) }
+            case .newTaskPane(let listID):
+                let content: TabContent = .tasks(listID: listID)
+                if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
+                else { addPane(content) }
+            case .movePane(let sourceID):
+                if let targetID, sourceID != targetID {
+                    if edge == .center {
+                        tiling.mergePaneTabs(sourceID: sourceID, targetID: targetID)
+                        focusedPaneID = targetID
+                    } else {
+                        tiling.movePane(sourceID: sourceID, to: edge, adjacentTo: targetID)
+                        focusedPaneID = sourceID
+                    }
+                    scheduleSave()
+                }
             }
-            focusedPaneID = sourceID
-            scheduleSave()
         }
         return true
     }

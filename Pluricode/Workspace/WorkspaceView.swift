@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct WorkspaceView: View {
     let workspace: Workspace
     @State private var modifierMonitor: Any?
+    @State private var dragMonitor: Any?
     @State private var resignObserver: NSObjectProtocol?
 
     var body: some View {
@@ -22,18 +23,37 @@ struct WorkspaceView: View {
                 workspace.setCommandKeyDown(event.modifierFlags.contains(.command))
                 return event
             }
+            dragMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseUp]) { event in
+                guard workspace.dragSession != nil else { return event }
+                if event.type == .keyDown, event.keyCode == 53 {
+                    workspace.cancelDrag()
+                    return nil
+                }
+                if event.type == .leftMouseUp {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                        workspace.endDrag()
+                    }
+                }
+                return event
+            }
             resignObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.didResignActiveNotification,
                 object: nil,
                 queue: .main
-            ) { _ in workspace.setCommandKeyDown(false) }
+            ) { _ in
+                workspace.setCommandKeyDown(false)
+                workspace.endDrag()
+            }
         }
         .onDisappear {
             if let m = modifierMonitor { NSEvent.removeMonitor(m) }
             modifierMonitor = nil
+            if let m = dragMonitor { NSEvent.removeMonitor(m) }
+            dragMonitor = nil
             if let o = resignObserver { NotificationCenter.default.removeObserver(o) }
             resignObserver = nil
             workspace.setCommandKeyDown(false)
+            workspace.endDrag()
         }
     }
 }
@@ -41,14 +61,102 @@ struct WorkspaceView: View {
 private struct WorkspaceBody: View {
     let workspace: Workspace
 
+    private var isPreviewing: Bool {
+        workspace.previewLayout != nil
+    }
+
     var body: some View {
-        if let root = workspace.tiling.root {
-            TileView(node: root, tiling: workspace.tiling) { pane in
-                WorkspacePane(pane: pane, workspace: workspace)
+        ZStack {
+            if let root = workspace.tiling.root {
+                TileView(node: root, tiling: workspace.tiling) { pane in
+                    WorkspacePane(pane: pane, workspace: workspace)
+                        .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                }
+                .padding(4)
+                .opacity(isPreviewing ? 0.32 : 1)
+                .animation(.easeOut(duration: 0.12), value: isPreviewing)
+            } else {
+                EmptyWorkspace(workspace: workspace)
             }
-            .padding(4)
-        } else {
-            EmptyWorkspace(workspace: workspace)
+
+            if let preview = workspace.previewLayout {
+                GhostLayoutOverlay(
+                    root: preview.root,
+                    highlightID: preview.highlightID,
+                    tiling: workspace.tiling,
+                    workspace: workspace
+                )
+                .padding(4)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
+        }
+    }
+}
+
+private struct GhostLayoutOverlay: View {
+    let root: TileNode
+    let highlightID: UUID
+    let tiling: Tiling
+    let workspace: Workspace
+
+    var body: some View {
+        TileView(node: root, tiling: tiling) { pane in
+            GhostPane(pane: pane, isHighlight: pane.id == highlightID, workspace: workspace)
+        }
+    }
+}
+
+private struct GhostPane: View {
+    let pane: Pane
+    let isHighlight: Bool
+    let workspace: Workspace
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isHighlight ? Color.accentColor.opacity(0.32) : Color.secondary.opacity(0.14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(
+                            isHighlight ? Color.accentColor : Color.secondary.opacity(0.5),
+                            style: StrokeStyle(
+                                lineWidth: isHighlight ? 2 : 1,
+                                dash: isHighlight ? [] : [5, 3]
+                            )
+                        )
+                )
+            HStack(spacing: 6) {
+                if let icon = paneIcon {
+                    Image(systemName: icon)
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                Text(paneTitle)
+                    .font(.system(size: 13, weight: isHighlight ? .semibold : .medium))
+            }
+            .foregroundStyle(isHighlight ? Color.accentColor : .secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule().fill(Color(nsColor: .windowBackgroundColor).opacity(0.8))
+            )
+        }
+        .padding(2)
+    }
+
+    private var paneIcon: String? {
+        switch pane.activeTab.content {
+        case .terminal: return "arrow.triangle.branch"
+        case .tasks: return "checklist"
+        }
+    }
+
+    private var paneTitle: String {
+        switch pane.activeTab.content {
+        case .terminal(_, let worktreeID):
+            return workspace.paneDisplayName(worktreeID: worktreeID)
+        case .tasks(let listID):
+            return workspace.taskListStore.lists.first { $0.id == listID }?.name ?? "Tasks"
         }
     }
 }
@@ -232,7 +340,6 @@ private struct TaskPaneBody: View {
     let tabID: UUID
     let listID: UUID
     let workspace: Workspace
-    @State private var hoverEdge: TileEdge?
 
     var body: some View {
         GeometryReader { geo in
@@ -244,19 +351,9 @@ private struct TaskPaneBody: View {
                 onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
             )
             .frame(width: geo.size.width, height: geo.size.height)
-            .overlay {
-                if let edge = hoverEdge {
-                    DropZoneOverlay(edge: edge, size: geo.size)
-                }
-            }
             .onDrop(
                 of: [.plainText],
-                delegate: PaneDropDelegate(
-                    paneID: pane.id,
-                    workspace: workspace,
-                    size: geo.size,
-                    hoverEdge: $hoverEdge
-                )
+                delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
             )
         }
     }
@@ -268,7 +365,6 @@ private struct TerminalPaneBody: View {
     let repoID: UUID
     let worktreeID: String
     let workspace: Workspace
-    @State private var hoverEdge: TileEdge?
 
     var body: some View {
         let isExpanded = workspace.expandedPaneID == pane.id
@@ -305,19 +401,9 @@ private struct TerminalPaneBody: View {
                                 AttachmentChipsOverlay(session: session)
                             }
                         }
-                        .overlay {
-                            if let edge = hoverEdge {
-                                DropZoneOverlay(edge: edge, size: geo.size)
-                            }
-                        }
                         .onDrop(
                             of: [.plainText],
-                            delegate: PaneDropDelegate(
-                                paneID: pane.id,
-                                workspace: workspace,
-                                size: geo.size,
-                                hoverEdge: $hoverEdge
-                            )
+                            delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
                         )
                 }
             } else {
@@ -328,7 +414,6 @@ private struct TerminalPaneBody: View {
             }
         }
     }
-
 }
 
 private struct ExpandedPanePlaceholder: View {
@@ -423,7 +508,7 @@ private struct PaneHeader: View {
         .task(id: tabID) {
             devScript = workspace.devScript(paneID: pane.id)
         }
-        .draggable(TilingDragPayload(kind: .movePane(paneID: pane.id))) {
+        .draggable(beginMoveDrag()) {
             HStack(spacing: 6) {
                 Image(systemName: isMerged ? "arrow.trianglehead.merge" : "arrow.triangle.branch")
                 Text(title)
@@ -438,6 +523,12 @@ private struct PaneHeader: View {
     private var headerBackground: Color {
         if let repoColor { return repoColor.opacity(0.12) }
         return Color.secondary.opacity(0.1)
+    }
+
+    private func beginMoveDrag() -> TilingDragPayload {
+        let payload = TilingDragPayload(kind: .movePane(paneID: pane.id))
+        workspace.beginDrag(payload)
+        return payload
     }
 }
 
@@ -462,52 +553,43 @@ private struct MissingWorktreeBody: View {
     }
 }
 
-private struct DropZoneOverlay: View {
-    let edge: TileEdge
-    let size: CGSize
-
-    var body: some View {
-        let rect = frame(for: edge, in: size)
-        ZStack(alignment: .topLeading) {
-            Color.clear
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.accentColor.opacity(0.22))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.accentColor, lineWidth: 2)
-                )
-                .frame(width: rect.width, height: rect.height)
-                .offset(x: rect.minX, y: rect.minY)
-        }
-        .frame(width: size.width, height: size.height)
-        .allowsHitTesting(false)
-    }
-
-    private func frame(for edge: TileEdge, in s: CGSize) -> CGRect {
-        switch edge {
-        case .left:   CGRect(x: 0, y: 0, width: s.width / 2, height: s.height)
-        case .right:  CGRect(x: s.width / 2, y: 0, width: s.width / 2, height: s.height)
-        case .top:    CGRect(x: 0, y: 0, width: s.width, height: s.height / 2)
-        case .bottom: CGRect(x: 0, y: s.height / 2, width: s.width, height: s.height / 2)
-        case .center: CGRect(x: 0, y: 0, width: s.width, height: s.height)
-        }
-    }
-}
-
 private struct EmptyWorkspaceDropDelegate: DropDelegate {
     let workspace: Workspace
     @Binding var isTargeted: Bool
 
-    func dropEntered(info: DropInfo) { isTargeted = true }
-    func dropExited(info: DropInfo) { isTargeted = false }
+    func dropEntered(info: DropInfo) {
+        isTargeted = true
+        workspace.updateHover(.init(paneID: nil, edge: .center))
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        if workspace.dragSession?.isCancelled == true {
+            return DropProposal(operation: .forbidden)
+        }
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        isTargeted = false
+        if workspace.dragSession?.hover?.paneID == nil {
+            workspace.updateHover(nil)
+        }
+    }
 
     func performDrop(info: DropInfo) -> Bool {
         isTargeted = false
-        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
+        workspace.updateHover(nil)
+        guard let provider = info.itemProviders(for: [.plainText]).first else {
+            workspace.endDrag()
+            return false
+        }
         provider.loadObject(ofClass: NSString.self) { obj, _ in
             guard let str = obj as? String,
                   let data = str.data(using: .utf8),
-                  let payload = try? JSONDecoder().decode(TilingDragPayload.self, from: data) else { return }
+                  let payload = try? JSONDecoder().decode(TilingDragPayload.self, from: data) else {
+                DispatchQueue.main.async { workspace.endDrag() }
+                return
+            }
             DispatchQueue.main.async {
                 _ = workspace.acceptDrop(payload: payload, on: nil, edge: .center)
             }
@@ -520,29 +602,39 @@ private struct PaneDropDelegate: DropDelegate {
     let paneID: UUID
     let workspace: Workspace
     let size: CGSize
-    @Binding var hoverEdge: TileEdge?
 
     func dropEntered(info: DropInfo) {
-        hoverEdge = TileEdge.zone(for: info.location, in: size)
+        workspace.updateHover(.init(paneID: paneID, edge: TileEdge.zone(for: info.location, in: size)))
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        hoverEdge = TileEdge.zone(for: info.location, in: size)
+        workspace.updateHover(.init(paneID: paneID, edge: TileEdge.zone(for: info.location, in: size)))
+        if workspace.dragSession?.isCancelled == true {
+            return DropProposal(operation: .forbidden)
+        }
         return DropProposal(operation: .move)
     }
 
     func dropExited(info: DropInfo) {
-        hoverEdge = nil
+        if workspace.dragSession?.hover?.paneID == paneID {
+            workspace.updateHover(nil)
+        }
     }
 
     func performDrop(info: DropInfo) -> Bool {
         let edge = TileEdge.zone(for: info.location, in: size)
-        hoverEdge = nil
-        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
+        workspace.updateHover(nil)
+        guard let provider = info.itemProviders(for: [.plainText]).first else {
+            workspace.endDrag()
+            return false
+        }
         provider.loadObject(ofClass: NSString.self) { obj, _ in
             guard let str = obj as? String,
                   let data = str.data(using: .utf8),
-                  let payload = try? JSONDecoder().decode(TilingDragPayload.self, from: data) else { return }
+                  let payload = try? JSONDecoder().decode(TilingDragPayload.self, from: data) else {
+                DispatchQueue.main.async { workspace.endDrag() }
+                return
+            }
             DispatchQueue.main.async {
                 _ = workspace.acceptDrop(payload: payload, on: paneID, edge: edge)
             }
