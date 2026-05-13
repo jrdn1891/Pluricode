@@ -184,7 +184,7 @@ private struct GhostPane: View {
     private var paneTitle: String {
         switch pane.activeTab.content {
         case .terminal(_, let worktreeID):
-            return workspace.paneDisplayName(worktreeID: worktreeID)
+            return worktreeID
         case .tasks(let listID):
             return workspace.taskListStore.lists.first { $0.id == listID }?.name ?? "Tasks"
         }
@@ -403,7 +403,7 @@ private struct TerminalPaneBody: View {
                 pane: pane,
                 tabID: tabID,
                 workspace: workspace,
-                title: workspace.paneDisplayName(worktreeID: worktreeID),
+                title: worktreeID,
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
                 profile: workspace.tabProfile(tabID: tabID),
@@ -738,7 +738,7 @@ private struct TerminalExpandedContent: View {
                 pane: pane,
                 tabID: tabID,
                 workspace: workspace,
-                title: workspace.paneDisplayName(worktreeID: worktreeID),
+                title: worktreeID,
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
                 profile: workspace.tabProfile(tabID: tabID),
