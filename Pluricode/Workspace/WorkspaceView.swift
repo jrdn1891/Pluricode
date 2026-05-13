@@ -406,7 +406,6 @@ private struct TerminalPaneBody: View {
                 title: workspace.paneDisplayName(worktreeID: worktreeID),
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
-                profile: workspace.tabProfile(tabID: tabID),
                 isExpanded: isExpanded,
                 onActivate: { workspace.setFocus(paneID: pane.id) },
                 onExpand: {
@@ -465,7 +464,6 @@ private struct PaneHeader: View {
     let title: String
     let repoName: String?
     let repoColor: Color?
-    let profile: AgentProfile?
     let isExpanded: Bool
     let onActivate: () -> Void
     let onExpand: () -> Void
@@ -494,14 +492,6 @@ private struct PaneHeader: View {
                 .font(.caption)
             Text(title)
                 .font(.system(size: 12, weight: .medium))
-            if let profile {
-                Circle()
-                    .fill(profile.swiftUIColor)
-                    .frame(width: 8, height: 8)
-                Text(profile.name)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
             Spacer()
             if devScript != nil {
                 Button(action: { workspace.runDevScript(paneID: pane.id) }) {
@@ -741,7 +731,6 @@ private struct TerminalExpandedContent: View {
                 title: workspace.paneDisplayName(worktreeID: worktreeID),
                 repoName: workspace.repo(id: repoID)?.name,
                 repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
-                profile: workspace.tabProfile(tabID: tabID),
                 isExpanded: true,
                 onActivate: { workspace.setFocus(paneID: pane.id) },
                 onExpand: { workspace.collapseExpandedPane() },

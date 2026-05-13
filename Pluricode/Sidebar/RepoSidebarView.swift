@@ -2,14 +2,12 @@ import SwiftUI
 
 struct RepoSidebarView: View {
     let repoStore: RepoStore
-    let profileStore: AgentProfileStore
     let taskListStore: TaskListStore
     let workspaceStore: WorkspaceStore
     let pinStore: PinStore
     let sidebarState: SidebarState
     @State private var newWorktreeRepo: RepoEntry?
     @State private var renameTarget: RenameTarget?
-    @State private var configureTarget: RenameTarget?
     @State private var configureRepo: RepoEntry?
     @State private var creatingList = false
     @State private var renameListTarget: TaskList?
@@ -102,7 +100,7 @@ struct RepoSidebarView: View {
             RenameWorkspaceSheet(workspace: ws, workspaceStore: workspaceStore)
         }
         .sheet(item: $newWorktreeRepo) { repo in
-            NewWorktreeSheet(repo: repo, profileStore: profileStore) { _ in
+            NewWorktreeSheet(repo: repo) { _ in
                 workspaceStore.worktreePaths.invalidate(repoID: repo.id)
                 workspaceStore.worktreeStatusService.invalidate(repoID: repo.id)
                 sidebarState.refresh(repo)
@@ -119,9 +117,6 @@ struct RepoSidebarView: View {
                 workspaceStore.worktreeStatusService.invalidate(repoID: target.repo.id)
                 sidebarState.refresh(target.repo)
             }
-        }
-        .sheet(item: $configureTarget) { target in
-            ConfigureWorktreeSheet(target: target, profileStore: profileStore)
         }
         .sheet(item: $configureRepo) { repo in
             ConfigureRepoSheet(repo: repo)
@@ -259,7 +254,6 @@ struct RepoSidebarView: View {
         WorktreeRow(
             repoID: repo.id,
             worktree: wt,
-            profileStore: profileStore,
             workspaceStore: workspaceStore,
             isSelected: selectedWorktrees.contains(WorktreeKey(repoID: repo.id, branch: wt.branch)),
             onSelect: { flags in
@@ -276,9 +270,6 @@ struct RepoSidebarView: View {
                     pinStore.toggle(pin)
                 }
                 Divider()
-                Button("Configure...") {
-                    configureTarget = RenameTarget(repo: repo, worktree: wt)
-                }
                 Button("Rename...") {
                     renameTarget = RenameTarget(repo: repo, worktree: wt)
                 }
@@ -603,7 +594,6 @@ struct RepoRow: View {
 struct WorktreeRow<MenuContent: View>: View {
     let repoID: UUID
     let worktree: Worktree
-    let profileStore: AgentProfileStore
     let workspaceStore: WorkspaceStore
     let isSelected: Bool
     let onSelect: (NSEvent.ModifierFlags) -> Void
@@ -616,30 +606,14 @@ struct WorktreeRow<MenuContent: View>: View {
     private var stats: DiffStats { status.diff }
     private var isMerged: Bool { status.isMerged }
 
-    private var assignedProfile: AgentProfile? {
-        let config = WorktreeConfig.load(at: worktree.path)
-        guard let id = config.agentProfileID else { return nil }
-        return profileStore.profile(id: id)
-    }
-
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: isMerged ? "arrow.trianglehead.merge" : "arrow.triangle.branch")
                 .foregroundStyle(isMerged ? Color.green : Color.secondary)
                 .font(.caption)
             VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(worktree.displayName)
-                        .font(.body)
-                    if let profile = assignedProfile {
-                        Circle()
-                            .fill(profile.swiftUIColor)
-                            .frame(width: 8, height: 8)
-                        Text(profile.name)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                Text(worktree.displayName)
+                    .font(.body)
                 Text(worktree.branch)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -775,33 +749,12 @@ private struct RenameWorkspaceSheet: View {
     }
 }
 
-private struct WorktreeConfigFields: View {
-    @Binding var agentProfileID: UUID?
-    let profileStore: AgentProfileStore
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Agent Profile").font(.caption).foregroundStyle(.secondary)
-            Picker("", selection: $agentProfileID) {
-                Text("None").tag(UUID?.none)
-                ForEach(profileStore.profiles) { profile in
-                    Text(profile.name).tag(UUID?.some(profile.id))
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-        }
-    }
-}
-
 struct NewWorktreeSheet: View {
     let repo: RepoEntry
-    let profileStore: AgentProfileStore
     let onCreated: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
     @State private var baseBranch: String = ""
-    @State private var agentProfileID: UUID?
     @State private var error: String?
     @State private var isCreating = false
 
@@ -824,13 +777,6 @@ struct NewWorktreeSheet: View {
                 TextField("origin/main", text: $baseBranch)
                     .textFieldStyle(.roundedBorder)
             }
-
-            Divider()
-
-            WorktreeConfigFields(
-                agentProfileID: $agentProfileID,
-                profileStore: profileStore
-            )
 
             if let error {
                 Text(error).font(.caption).foregroundStyle(.red)
@@ -864,12 +810,10 @@ struct NewWorktreeSheet: View {
         isCreating = true
         error = nil
         do {
-            let path = try wm.createWorktree(
+            _ = try wm.createWorktree(
                 name: cleanName,
                 baseBranch: baseBranch.isEmpty ? wm.defaultBaseRef() : baseBranch
             )
-            let config = WorktreeConfig(agentProfileID: agentProfileID)
-            config.save(at: path.path)
             onCreated("pluri-\(cleanName)")
             dismiss()
         } catch let WorktreeError.createFailed(message) {
@@ -885,43 +829,6 @@ struct NewWorktreeSheet: View {
         let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-_/.")
         let lowered = raw.lowercased().replacingOccurrences(of: " ", with: "-")
         return String(lowered.unicodeScalars.filter { allowed.contains($0) })
-    }
-}
-
-private struct ConfigureWorktreeSheet: View {
-    let target: RenameTarget
-    let profileStore: AgentProfileStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var agentProfileID: UUID?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Configure \(target.worktree.displayName)")
-                .font(.headline)
-
-            WorktreeConfigFields(
-                agentProfileID: $agentProfileID,
-                profileStore: profileStore
-            )
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Save") { save() }
-                    .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(24)
-        .frame(width: 460)
-        .onAppear {
-            agentProfileID = WorktreeConfig.load(at: target.worktree.path).agentProfileID
-        }
-    }
-
-    private func save() {
-        WorktreeConfig(agentProfileID: agentProfileID).save(at: target.worktree.path)
-        dismiss()
     }
 }
 

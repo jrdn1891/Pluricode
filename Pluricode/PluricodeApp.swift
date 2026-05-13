@@ -3,7 +3,6 @@ import AppKit
 
 struct PluricodeApp: App {
     @State private var repoStore = RepoStore()
-    @State private var profileStore = AgentProfileStore()
     @State private var taskListStore = TaskListStore()
     @State private var workspaceStore: WorkspaceStore
     @State private var pinStore = PinStore()
@@ -17,14 +16,11 @@ struct PluricodeApp: App {
     init() {
         let repos = RepoStore()
         let lists = TaskListStore()
-        let profiles = AgentProfileStore()
         _repoStore = State(initialValue: repos)
         _taskListStore = State(initialValue: lists)
-        _profileStore = State(initialValue: profiles)
         _workspaceStore = State(initialValue: WorkspaceStore(
             repoStore: repos,
-            taskListStore: lists,
-            profileStore: profiles
+            taskListStore: lists
         ))
     }
 
@@ -33,7 +29,6 @@ struct PluricodeApp: App {
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 RepoSidebarView(
                     repoStore: repoStore,
-                    profileStore: profileStore,
                     taskListStore: taskListStore,
                     workspaceStore: workspaceStore,
                     pinStore: pinStore,
@@ -50,8 +45,7 @@ struct PluricodeApp: App {
             }
             .toolbar {
                 PaneCreationToolbar(
-                    workspace: workspaceStore.selectedWorkspace,
-                    profileStore: profileStore
+                    workspace: workspaceStore.selectedWorkspace
                 )
                 ToolbarItemGroup {
                     Picker("Appearance", selection: $appearanceModeRaw) {

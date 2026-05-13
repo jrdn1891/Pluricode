@@ -20,7 +20,6 @@ final class Workspace {
     let tiling: Tiling
     let repoStore: RepoStore
     let taskListStore: TaskListStore
-    let profileStore: AgentProfileStore
     let worktreePaths: WorktreePaths
     let worktreeStatusService: WorktreeStatusService
     var terminalHosts: [UUID: TerminalHost] = [:]
@@ -61,7 +60,6 @@ final class Workspace {
         root: TileNode? = nil,
         repoStore: RepoStore,
         taskListStore: TaskListStore,
-        profileStore: AgentProfileStore,
         worktreePaths: WorktreePaths,
         worktreeStatusService: WorktreeStatusService
     ) {
@@ -70,7 +68,6 @@ final class Workspace {
         self.tiling = Tiling(root: root)
         self.repoStore = repoStore
         self.taskListStore = taskListStore
-        self.profileStore = profileStore
         self.worktreePaths = worktreePaths
         self.worktreeStatusService = worktreeStatusService
     }
@@ -214,13 +211,6 @@ final class Workspace {
 
     func paneDisplayName(worktreeID: String) -> String {
         worktreeID.hasPrefix("pluri-") ? String(worktreeID.dropFirst("pluri-".count)) : worktreeID
-    }
-
-    func tabProfile(tabID: UUID) -> AgentProfile? {
-        guard let path = worktreePath(tabID: tabID) else { return nil }
-        let config = WorktreeConfig.load(at: path)
-        guard let id = config.agentProfileID else { return nil }
-        return profileStore.profile(id: id)
     }
 
     func devScript(paneID: UUID) -> String? {
@@ -474,16 +464,14 @@ final class WorkspaceStore {
 
     private let repoStore: RepoStore
     private let taskListStore: TaskListStore
-    private let profileStore: AgentProfileStore
     let worktreePaths: WorktreePaths
     let worktreeStatusService: WorktreeStatusService
 
     private static let selectedKey = "selectedWorkspaceID"
 
-    init(repoStore: RepoStore, taskListStore: TaskListStore, profileStore: AgentProfileStore) {
+    init(repoStore: RepoStore, taskListStore: TaskListStore) {
         self.repoStore = repoStore
         self.taskListStore = taskListStore
-        self.profileStore = profileStore
         self.worktreePaths = WorktreePaths()
         self.worktreeStatusService = WorktreeStatusService(repoStore: repoStore)
         load()
@@ -502,7 +490,6 @@ final class WorkspaceStore {
             name: finalName,
             repoStore: repoStore,
             taskListStore: taskListStore,
-            profileStore: profileStore,
             worktreePaths: worktreePaths,
             worktreeStatusService: worktreeStatusService
         )
@@ -596,7 +583,6 @@ final class WorkspaceStore {
                 root: snap.root,
                 repoStore: repoStore,
                 taskListStore: taskListStore,
-                profileStore: profileStore,
                 worktreePaths: worktreePaths,
                 worktreeStatusService: worktreeStatusService
             )
