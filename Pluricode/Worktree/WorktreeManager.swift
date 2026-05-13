@@ -18,7 +18,6 @@ final class WorktreeManager {
 
     func createWorktree(name: String, baseBranch: String) throws -> URL {
         let path = worktreeRoot.appendingPathComponent(name)
-        let branchName = "pluri-\(name)"
         if baseBranch.hasPrefix("origin/") {
             _ = try? run("git", args: ["-C", repoRoot.path, "fetch", "origin", "--quiet"])
         }
@@ -26,7 +25,7 @@ final class WorktreeManager {
             "-C", repoRoot.path,
             "worktree", "add",
             path.path,
-            "-b", branchName,
+            "-b", name,
             baseBranch
         ])
         if result.status != 0 {
@@ -112,8 +111,7 @@ final class WorktreeManager {
     }
 
     func renameWorktree(oldBranch: String, newName: String) throws -> Worktree {
-        let newBranch = "pluri-\(newName)"
-        guard newBranch != oldBranch else {
+        guard newName != oldBranch else {
             let info = try listWorktrees().first { $0.branch == oldBranch }
             guard let info else { throw WorktreeError.createFailed("worktree not found") }
             return Worktree(branch: info.branch, path: info.path, head: info.head, isPrimary: false)
@@ -132,12 +130,12 @@ final class WorktreeManager {
             }
         }
 
-        let rename = try run("git", args: ["-C", repoRoot.path, "branch", "-m", oldBranch, newBranch])
+        let rename = try run("git", args: ["-C", repoRoot.path, "branch", "-m", oldBranch, newName])
         if rename.status != 0 {
             throw WorktreeError.createFailed(rename.stderr)
         }
 
-        let updated = try listWorktrees().first { $0.branch == newBranch }
+        let updated = try listWorktrees().first { $0.branch == newName }
         guard let updated else { throw WorktreeError.createFailed("rename failed to resolve") }
         return Worktree(branch: updated.branch, path: updated.path, head: updated.head, isPrimary: false)
     }

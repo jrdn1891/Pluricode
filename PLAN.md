@@ -24,7 +24,7 @@ Goal: observe and manage multiple terminals running in parallel, each scoped to 
 ```
 Worktree                                 // one per managed worktree under a repo
   id            = branch name            // stable identifier; derives path via git
-  displayName   = branch with pluri- prefix stripped
+  displayName   = branch
   path          = from git worktree list
   branch        = from git
   head          = from git
@@ -71,7 +71,7 @@ Each milestone has a checklist. Tick items as completed across sessions.
 - [x] `RepoSidebarView`: replace flat repo list with a `DisclosureGroup` per repo; expanded state shows the managed worktrees underneath.
 - [x] "New Worktree" row under each repo opens an inline sheet: name input + base branch picker (defaults to repo's default branch).
 - [x] Context menu on a worktree row: Show in Finder, Delete (confirm dialog, runs `git worktree remove --force`).
-- [x] Rename worktree: double-click row → inline edit; calls `git branch -m pluri-old pluri-new` and `git worktree move` if needed.
+- [x] Rename worktree: double-click row → inline edit; calls `git branch -m old new` and `git worktree move` if needed.
 - [x] Selecting a worktree row does not open anything yet — wire-up happens in M3.
 - [x] Build and run: create/list/delete worktrees from the sidebar; old canvas still functions.
 
