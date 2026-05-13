@@ -69,6 +69,9 @@ struct RepoSidebarView: View {
                 ForEach(repoStore.repos) { repo in
                     repoAndWorktrees(repo)
                 }
+                .onMove { source, destination in
+                    repoStore.moveRepo(from: source, to: destination)
+                }
             } header: {
                 RepoSectionHeader(
                     anyExpanded: !sidebarState.expanded.isEmpty,
