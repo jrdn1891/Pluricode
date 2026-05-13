@@ -106,6 +106,11 @@ final class RepoStore {
         save()
     }
 
+    func moveRepo(from source: IndexSet, to destination: Int) {
+        repos.move(fromOffsets: source, toOffset: destination)
+        save()
+    }
+
     func save() {
         guard let data = try? JSONEncoder().encode(repos) else { return }
         UserDefaults.standard.set(data, forKey: Self.reposKey)
