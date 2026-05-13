@@ -209,10 +209,6 @@ final class Workspace {
         return worktreePaths.path(forRepoID: repoID, repoPath: repo.path, branch: worktreeID)
     }
 
-    func paneDisplayName(worktreeID: String) -> String {
-        worktreeID.hasPrefix("pluri-") ? String(worktreeID.dropFirst("pluri-".count)) : worktreeID
-    }
-
     func devScript(paneID: UUID) -> String? {
         guard let pane = pane(id: paneID),
               case .terminal(let repoID, _) = pane.activeTab.content,
@@ -250,7 +246,7 @@ final class Workspace {
     func tabLabel(_ tab: Tab, fallback: String) -> String {
         if let name = tab.name, !name.isEmpty { return name }
         if case .terminal(_, let worktreeID) = tab.content {
-            return paneDisplayName(worktreeID: worktreeID)
+            return worktreeID
         }
         return fallback
     }

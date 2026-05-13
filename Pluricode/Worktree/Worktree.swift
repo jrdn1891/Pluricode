@@ -8,7 +8,5 @@ struct Worktree: Identifiable, Hashable {
 
     var id: String { path }
 
-    var displayName: String {
-        branch.hasPrefix("pluri-") ? String(branch.dropFirst("pluri-".count)) : branch
-    }
+    var displayName: String { branch }
 }

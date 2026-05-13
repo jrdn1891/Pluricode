@@ -67,6 +67,9 @@ struct RepoSidebarView: View {
                 ForEach(repoStore.repos) { repo in
                     repoAndWorktrees(repo)
                 }
+                .onMove { source, destination in
+                    repoStore.moveRepo(from: source, to: destination)
+                }
             } header: {
                 RepoSectionHeader(
                     anyExpanded: !sidebarState.expanded.isEmpty,
@@ -767,9 +770,6 @@ struct NewWorktreeSheet: View {
                 Text("Name").font(.caption).foregroundStyle(.secondary)
                 TextField("frontend-fix", text: $name)
                     .textFieldStyle(.roundedBorder)
-                Text("Branch will be `pluri-\(sanitized(name))`")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -814,7 +814,7 @@ struct NewWorktreeSheet: View {
                 name: cleanName,
                 baseBranch: baseBranch.isEmpty ? wm.defaultBaseRef() : baseBranch
             )
-            onCreated("pluri-\(cleanName)")
+            onCreated(cleanName)
             dismiss()
         } catch let WorktreeError.createFailed(message) {
             error = message
@@ -906,9 +906,6 @@ private struct RenameWorktreeSheet: View {
                 Text("Name").font(.caption).foregroundStyle(.secondary)
                 TextField("name", text: $name)
                     .textFieldStyle(.roundedBorder)
-                Text("Branch will be `pluri-\(sanitized(name))`")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             if let error {
