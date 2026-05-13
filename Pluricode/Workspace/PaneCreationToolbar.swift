@@ -2,27 +2,23 @@ import SwiftUI
 
 struct PaneCreationToolbar: ToolbarContent {
     let workspace: Workspace?
-    let profileStore: AgentProfileStore
 
     var body: some ToolbarContent {
         ToolbarItemGroup {
             PaneCreationButton(
                 workspace: workspace,
-                profileStore: profileStore,
                 action: .addNew,
                 systemImage: "plus",
                 help: "New Pane"
             )
             PaneCreationButton(
                 workspace: workspace,
-                profileStore: profileStore,
                 action: .splitRight,
                 systemImage: "rectangle.split.2x1",
                 help: "Split Vertically"
             )
             PaneCreationButton(
                 workspace: workspace,
-                profileStore: profileStore,
                 action: .splitDown,
                 systemImage: "rectangle.split.1x2",
                 help: "Split Horizontally"
@@ -33,7 +29,6 @@ struct PaneCreationToolbar: ToolbarContent {
 
 private struct PaneCreationButton: View {
     let workspace: Workspace?
-    let profileStore: AgentProfileStore
     let action: Workspace.PaneCreationAction
     let systemImage: String
     let help: String
@@ -51,7 +46,6 @@ private struct PaneCreationButton: View {
             if let workspace {
                 PaneCreationPopover(
                     workspace: workspace,
-                    profileStore: profileStore,
                     action: action,
                     onComplete: { showing = false }
                 )
@@ -62,7 +56,6 @@ private struct PaneCreationButton: View {
 
 private struct PaneCreationPopover: View {
     let workspace: Workspace
-    let profileStore: AgentProfileStore
     let action: Workspace.PaneCreationAction
     let onComplete: () -> Void
     @State private var worktreesByRepo: [UUID: [Worktree]] = [:]
@@ -89,7 +82,7 @@ private struct PaneCreationPopover: View {
         .frame(width: 280, height: 360)
         .onAppear(perform: loadAll)
         .sheet(item: $newWorktreeRepo) { repo in
-            NewWorktreeSheet(repo: repo, profileStore: profileStore) { branch in
+            NewWorktreeSheet(repo: repo) { branch in
                 workspace.performPaneCreation(
                     action,
                     content: .terminal(repoID: repo.id, worktreeID: branch)

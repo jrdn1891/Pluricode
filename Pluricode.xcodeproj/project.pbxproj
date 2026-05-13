@@ -10,7 +10,6 @@
 		06326AFE850E788295307D48 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742F16B907FA39DBB0114F60 /* Theme.swift */; };
 		0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A3E23A2A5CE1735F8D522D /* ProcessRunner.swift */; };
 		0DC403F2FCB7A4D30384AEB7 /* NewWorkspaceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */; };
-		12499E714805F522F4BE1C76 /* AgentDefinition.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8BA666B2ABB6AD5B0A5F5F9 /* AgentDefinition.swift */; };
 		149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E37A72F9CD0A1326611CB3C /* Worktree.swift */; };
 		19997BD2F3D31B49597027C8 /* SplitDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E043050E27961C20DFE8E3 /* SplitDivider.swift */; };
 		1FF2534862D523B586A00545 /* PermissionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A3591F4D52D920EBF984E5 /* PermissionsService.swift */; };
@@ -24,18 +23,14 @@
 		5BFF6AC69093B72FBE9F32BC /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 311D5BA84A083B24731CB565 /* TerminalSession.swift */; };
 		6DBF9A14E662ED45AF58A42C /* WorktreeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259CAD09D9A3D60E24F5B0E1 /* WorktreeManager.swift */; };
 		6EE30230AA44ABEEA156649B /* TaskPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E91297C034C82CF173906F /* TaskPaneView.swift */; };
-		7AEB7738F050CE6E6B9CE0DD /* RoleInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D39B96E03CF14069B1DB20 /* RoleInjector.swift */; };
 		7C59C92DEE6916476A4B02AA /* TerminalHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDC77F2E641969738B4482B5 /* TerminalHost.swift */; };
 		80543F030E8942BE861D585D /* RepoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F722E7DD539F6776FA1674BA /* RepoStore.swift */; };
 		923F4EE4762F7511C958407D /* WorktreeStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6723A6A2AD807D7B9378D1 /* WorktreeStatusService.swift */; };
-		92F56CDF222DA4CE74E5AB1D /* AgentProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434CCFE49A70A2BD13C1FF1D /* AgentProfileStore.swift */; };
 		93E709A761D2947E0F687A71 /* PermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860492197C8C2313E336830D /* PermissionsView.swift */; };
 		97C1C6B70507B356349663B4 /* PluricodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC246AB1895B3F4814510E30 /* PluricodeApp.swift */; };
 		99EAA5BA43DBEFF39BC75180 /* TaskListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79713EC727834622CEEF2EF /* TaskListStore.swift */; };
 		A7474169AFC652EE29ABF746 /* AttachmentChipsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */; };
-		BF48961DAE5F2A9EA6AA6A4C /* AgentProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 399DB996A2C342DBEDE780B3 /* AgentProfile.swift */; };
 		CAFE3849F50A463074800322 /* RepoSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */; };
-		CC3364EDF4F89D228E06ED1B /* WorktreeConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9042F7DC7ABD401886AA8DEE /* WorktreeConfig.swift */; };
 		DCDE0298F6E0858E03064C01 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861AC6957D983804F39D40DF /* main.swift */; };
 		E4B9C115E3094708A1A7036B /* PaneCreationToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77173B4968B004C4572C6516 /* PaneCreationToolbar.swift */; };
 		E4DA8CFC22DCB7A91DEC0918 /* TileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718374F2B635E5413EA4CC56 /* TileView.swift */; };
@@ -54,11 +49,8 @@
 		259CAD09D9A3D60E24F5B0E1 /* WorktreeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeManager.swift; sourceTree = "<group>"; };
 		2701F83AE83DE7286C13ED90 /* PinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinStore.swift; sourceTree = "<group>"; };
 		311D5BA84A083B24731CB565 /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
-		399DB996A2C342DBEDE780B3 /* AgentProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfile.swift; sourceTree = "<group>"; };
-		434CCFE49A70A2BD13C1FF1D /* AgentProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfileStore.swift; sourceTree = "<group>"; };
 		45E91297C034C82CF173906F /* TaskPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPaneView.swift; sourceTree = "<group>"; };
 		567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentChipsOverlay.swift; sourceTree = "<group>"; };
-		63D39B96E03CF14069B1DB20 /* RoleInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleInjector.swift; sourceTree = "<group>"; };
 		640330E4FAC0CC5442935F46 /* SidebarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarState.swift; sourceTree = "<group>"; };
 		648929BD87FF1ACCA8C36AD0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		67FC19651849CFB42A1D4A3A /* TileNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileNode.swift; sourceTree = "<group>"; };
@@ -73,13 +65,11 @@
 		84B103466B6BA9B7791B4EB8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		860492197C8C2313E336830D /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
 		861AC6957D983804F39D40DF /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		9042F7DC7ABD401886AA8DEE /* WorktreeConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeConfig.swift; sourceTree = "<group>"; };
 		95CDC674CDC6FC6D7714CB17 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
 		9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoSidebarView.swift; sourceTree = "<group>"; };
 		9E37A72F9CD0A1326611CB3C /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
 		A3AB0523B2C998E6BDF6FDB3 /* TerminalPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPaneView.swift; sourceTree = "<group>"; };
 		BDC77F2E641969738B4482B5 /* TerminalHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalHost.swift; sourceTree = "<group>"; };
-		C8BA666B2ABB6AD5B0A5F5F9 /* AgentDefinition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDefinition.swift; sourceTree = "<group>"; };
 		CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewWorkspaceSheet.swift; sourceTree = "<group>"; };
 		D79713EC727834622CEEF2EF /* TaskListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListStore.swift; sourceTree = "<group>"; };
 		F1AE508972402DF38CAFBF8F /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
@@ -160,17 +150,6 @@
 			path = Tiling;
 			sourceTree = "<group>";
 		};
-		B2AD17D5A2136B05FE7F5DB7 /* Agent */ = {
-			isa = PBXGroup;
-			children = (
-				C8BA666B2ABB6AD5B0A5F5F9 /* AgentDefinition.swift */,
-				399DB996A2C342DBEDE780B3 /* AgentProfile.swift */,
-				434CCFE49A70A2BD13C1FF1D /* AgentProfileStore.swift */,
-				63D39B96E03CF14069B1DB20 /* RoleInjector.swift */,
-			);
-			path = Agent;
-			sourceTree = "<group>";
-		};
 		D05E9F1DFAAA2D4E739BC72D /* Model */ = {
 			isa = PBXGroup;
 			children = (
@@ -203,7 +182,6 @@
 			children = (
 				69A3E23A2A5CE1735F8D522D /* ProcessRunner.swift */,
 				9E37A72F9CD0A1326611CB3C /* Worktree.swift */,
-				9042F7DC7ABD401886AA8DEE /* WorktreeConfig.swift */,
 				259CAD09D9A3D60E24F5B0E1 /* WorktreeManager.swift */,
 				7556EAC17FAC433C26ED641C /* WorktreePaths.swift */,
 				0F6723A6A2AD807D7B9378D1 /* WorktreeStatusService.swift */,
@@ -220,7 +198,6 @@
 				FCC7BCD7DE9AEC025D52DBD4 /* Pluricode.entitlements */,
 				FC246AB1895B3F4814510E30 /* PluricodeApp.swift */,
 				742F16B907FA39DBB0114F60 /* Theme.swift */,
-				B2AD17D5A2136B05FE7F5DB7 /* Agent */,
 				145B0E32D3C6D3E615657E49 /* CommandPalette */,
 				D05E9F1DFAAA2D4E739BC72D /* Model */,
 				4003EE5707EC74A3735B719F /* Permissions */,
@@ -305,9 +282,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				12499E714805F522F4BE1C76 /* AgentDefinition.swift in Sources */,
-				BF48961DAE5F2A9EA6AA6A4C /* AgentProfile.swift in Sources */,
-				92F56CDF222DA4CE74E5AB1D /* AgentProfileStore.swift in Sources */,
 				A7474169AFC652EE29ABF746 /* AttachmentChipsOverlay.swift in Sources */,
 				F3D1887C447587AFF3CD02F6 /* CommandPalette.swift in Sources */,
 				4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */,
@@ -321,7 +295,6 @@
 				F814E0ED4F9B4CE50E1FC08D /* RepoConfig.swift in Sources */,
 				CAFE3849F50A463074800322 /* RepoSidebarView.swift in Sources */,
 				80543F030E8942BE861D585D /* RepoStore.swift in Sources */,
-				7AEB7738F050CE6E6B9CE0DD /* RoleInjector.swift in Sources */,
 				280CCB430242DD94E60CD1A2 /* SidebarState.swift in Sources */,
 				19997BD2F3D31B49597027C8 /* SplitDivider.swift in Sources */,
 				99EAA5BA43DBEFF39BC75180 /* TaskListStore.swift in Sources */,
@@ -335,7 +308,6 @@
 				3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */,
 				E8CCF649FB23C81F5E17E9FF /* WorkspaceView.swift in Sources */,
 				149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */,
-				CC3364EDF4F89D228E06ED1B /* WorktreeConfig.swift in Sources */,
 				6DBF9A14E662ED45AF58A42C /* WorktreeManager.swift in Sources */,
 				F316793F6D2BBED79B212686 /* WorktreePaths.swift in Sources */,
 				923F4EE4762F7511C958407D /* WorktreeStatusService.swift in Sources */,

@@ -6,7 +6,6 @@ final class TerminalHost {
     let containerView: NSView
     let worktreePath: String
     let repoPath: String
-    let profileStore: AgentProfileStore
     let extraStartupScript: String?
     private var hasStarted = false
 
@@ -14,13 +13,11 @@ final class TerminalHost {
         tabID: UUID,
         worktreePath: String,
         repoPath: String,
-        profileStore: AgentProfileStore,
         extraStartupScript: String? = nil
     ) {
         self.tabID = tabID
         self.worktreePath = worktreePath
         self.repoPath = repoPath
-        self.profileStore = profileStore
         self.extraStartupScript = extraStartupScript
         self.session = TerminalSession(nodeID: tabID)
         session.worktreePath = worktreePath
@@ -43,13 +40,6 @@ final class TerminalHost {
     func startIfNeeded(scrollbackDir: URL?) {
         guard !hasStarted else { return }
         hasStarted = true
-
-        let worktreeConfig = WorktreeConfig.load(at: worktreePath)
-        if let profileID = worktreeConfig.agentProfileID,
-           let profile = profileStore.profile(id: profileID) {
-            let agent = AgentDefinition.builtins.first { $0.name == profile.agentDefinition } ?? .claudeCode
-            ProfileInjector.inject(profile: profile, method: agent.roleInjection, worktreePath: worktreePath)
-        }
 
         if let scrollbackDir {
             session.restoreScrollback(from: scrollbackDir)

@@ -24,7 +24,6 @@ struct TerminalPaneView: NSViewRepresentable {
             tabID: tabID,
             worktreePath: worktreePath,
             repoPath: repoPath,
-            profileStore: workspace.profileStore,
             extraStartupScript: workspace.consumePendingDevScript(tabID: tabID)
         )
         workspace.terminalHosts[tabID] = host
