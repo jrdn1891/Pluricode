@@ -61,8 +61,26 @@ struct WorkspaceView: View {
 private struct WorkspaceBody: View {
     let workspace: Workspace
 
+    private var dragPreview: (root: TileNode, highlightedIDs: Set<UUID>)? {
+        workspace.previewLayout.map { ($0.root, [$0.highlightID]) }
+    }
+
+    private var resizePreview: (root: TileNode, highlightedIDs: Set<UUID>)? {
+        workspace.resizePreview
+    }
+
     private var isPreviewing: Bool {
-        workspace.previewLayout != nil
+        dragPreview != nil || resizePreview != nil
+    }
+
+    private var resizeReporter: ResizeReporter {
+        ResizeReporter(
+            begin: { splitID, direction, weights, highlighted in
+                workspace.beginResize(splitID: splitID, direction: direction, weights: weights, highlightedPaneIDs: highlighted)
+            },
+            change: { weights in workspace.updateResize(weights: weights) },
+            end: { workspace.endResize() }
+        )
     }
 
     var body: some View {
@@ -75,14 +93,15 @@ private struct WorkspaceBody: View {
                 .padding(4)
                 .opacity(isPreviewing ? 0.32 : 1)
                 .animation(.easeOut(duration: 0.12), value: isPreviewing)
+                .environment(\.resizeReporter, resizeReporter)
             } else {
                 EmptyWorkspace(workspace: workspace)
             }
 
-            if let preview = workspace.previewLayout {
+            if let preview = dragPreview {
                 GhostLayoutOverlay(
                     root: preview.root,
-                    highlightID: preview.highlightID,
+                    highlightedIDs: preview.highlightedIDs,
                     tiling: workspace.tiling,
                     workspace: workspace
                 )
@@ -90,19 +109,30 @@ private struct WorkspaceBody: View {
                 .allowsHitTesting(false)
                 .transition(.opacity)
             }
+
+            if let preview = resizePreview {
+                GhostLayoutOverlay(
+                    root: preview.root,
+                    highlightedIDs: preview.highlightedIDs,
+                    tiling: workspace.tiling,
+                    workspace: workspace
+                )
+                .padding(4)
+                .allowsHitTesting(false)
+            }
         }
     }
 }
 
 private struct GhostLayoutOverlay: View {
     let root: TileNode
-    let highlightID: UUID
+    let highlightedIDs: Set<UUID>
     let tiling: Tiling
     let workspace: Workspace
 
     var body: some View {
         TileView(node: root, tiling: tiling) { pane in
-            GhostPane(pane: pane, isHighlight: pane.id == highlightID, workspace: workspace)
+            GhostPane(pane: pane, isHighlight: highlightedIDs.contains(pane.id), workspace: workspace)
         }
     }
 }

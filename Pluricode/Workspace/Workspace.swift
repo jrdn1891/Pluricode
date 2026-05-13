@@ -29,6 +29,7 @@ final class Workspace {
     var expandedPaneID: UUID?
     var commandKeyHeld: Bool = false
     var dragSession: DragSession?
+    var resizeSession: ResizeSession?
 
     struct DragHover: Equatable {
         let paneID: UUID?
@@ -40,6 +41,13 @@ final class Workspace {
         let previewPaneID: UUID
         var hover: DragHover?
         var isCancelled: Bool = false
+    }
+
+    struct ResizeSession {
+        let splitID: UUID
+        let direction: TileDirection
+        var weights: [Float]
+        let highlightedPaneIDs: Set<UUID>
     }
 
     private var saveTask: Task<Void, Never>?
@@ -387,6 +395,25 @@ final class Workspace {
             previewPaneID: session.previewPaneID,
             root: tiling.root
         )
+    }
+
+    func beginResize(splitID: UUID, direction: TileDirection, weights: [Float], highlightedPaneIDs: Set<UUID>) {
+        resizeSession = ResizeSession(splitID: splitID, direction: direction, weights: weights, highlightedPaneIDs: highlightedPaneIDs)
+    }
+
+    func updateResize(weights: [Float]) {
+        guard var session = resizeSession else { return }
+        session.weights = weights
+        resizeSession = session
+    }
+
+    func endResize() {
+        resizeSession = nil
+    }
+
+    var resizePreview: (root: TileNode, highlightedIDs: Set<UUID>)? {
+        guard let session = resizeSession, let root = tiling.root else { return nil }
+        return (Tiling.setWeights(splitID: session.splitID, weights: session.weights, in: root), session.highlightedPaneIDs)
     }
 
     @discardableResult

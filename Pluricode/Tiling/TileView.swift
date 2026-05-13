@@ -1,5 +1,22 @@
 import SwiftUI
 
+struct ResizeReporter {
+    var begin: (UUID, TileDirection, [Float], Set<UUID>) -> Void
+    var change: ([Float]) -> Void
+    var end: () -> Void
+}
+
+private struct ResizeReporterKey: EnvironmentKey {
+    static let defaultValue: ResizeReporter? = nil
+}
+
+extension EnvironmentValues {
+    var resizeReporter: ResizeReporter? {
+        get { self[ResizeReporterKey.self] }
+        set { self[ResizeReporterKey.self] = newValue }
+    }
+}
+
 struct TileView<Content: View>: View {
     let node: TileNode
     let tiling: Tiling
@@ -23,6 +40,7 @@ private struct SplitContainer<Content: View>: View {
     private let dividerThickness: CGFloat = 6
     private let minFraction: Float = 0.08
 
+    @Environment(\.resizeReporter) private var reporter
     @State private var dragWeights: [Float]?
 
     var body: some View {
@@ -30,27 +48,16 @@ private struct SplitContainer<Content: View>: View {
             let total = split.direction == .horizontal ? geo.size.width : geo.size.height
             let available = max(0, total - CGFloat(split.children.count - 1) * dividerThickness)
 
-            ZStack {
-                liveStack(available: available)
-                if let dragWeights {
-                    maskStack(weights: dragWeights, available: available)
-                        .allowsHitTesting(false)
-                }
+            if split.direction == .horizontal {
+                HStack(spacing: 0) { children(available: available) }
+            } else {
+                VStack(spacing: 0) { children(available: available) }
             }
         }
     }
 
     @ViewBuilder
-    private func liveStack(available: CGFloat) -> some View {
-        if split.direction == .horizontal {
-            HStack(spacing: 0) { liveChildren(available: available) }
-        } else {
-            VStack(spacing: 0) { liveChildren(available: available) }
-        }
-    }
-
-    @ViewBuilder
-    private func liveChildren(available: CGFloat) -> some View {
+    private func children(available: CGFloat) -> some View {
         ForEach(Array(split.children.enumerated()), id: \.element.id) { index, child in
             TileView(node: child, tiling: tiling, content: content)
                 .frame(
@@ -71,35 +78,6 @@ private struct SplitContainer<Content: View>: View {
         }
     }
 
-    @ViewBuilder
-    private func maskStack(weights: [Float], available: CGFloat) -> some View {
-        Group {
-            if split.direction == .horizontal {
-                HStack(spacing: 0) { maskChildren(weights: weights, available: available) }
-            } else {
-                VStack(spacing: 0) { maskChildren(weights: weights, available: available) }
-            }
-        }
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    @ViewBuilder
-    private func maskChildren(weights: [Float], available: CGFloat) -> some View {
-        ForEach(Array(split.children.enumerated()), id: \.element.id) { index, child in
-            MaskTile()
-                .frame(
-                    width: split.direction == .horizontal ? available * CGFloat(weights[index]) : nil,
-                    height: split.direction == .vertical ? available * CGFloat(weights[index]) : nil
-                )
-            if index < split.children.count - 1 {
-                Color.clear.frame(
-                    width: split.direction == .horizontal ? dividerThickness : nil,
-                    height: split.direction == .vertical ? dividerThickness : nil
-                )
-            }
-        }
-    }
-
     private func updateDrag(leftIndex: Int, delta: CGFloat, available: CGFloat) {
         guard available > 0,
               split.weights.indices.contains(leftIndex),
@@ -110,6 +88,15 @@ private struct SplitContainer<Content: View>: View {
         var next = split.weights
         next[leftIndex] = newLeft
         next[leftIndex + 1] = combined - newLeft
+        if dragWeights == nil {
+            let highlighted = Set(
+                Tiling.allPanes(in: split.children[leftIndex]).map(\.id)
+                + Tiling.allPanes(in: split.children[leftIndex + 1]).map(\.id)
+            )
+            reporter?.begin(split.id, split.direction, next, highlighted)
+        } else {
+            reporter?.change(next)
+        }
         dragWeights = next
     }
 
@@ -118,16 +105,6 @@ private struct SplitContainer<Content: View>: View {
             tiling.setWeights(splitID: split.id, weights: dragWeights)
         }
         dragWeights = nil
-    }
-}
-
-private struct MaskTile: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(Color(nsColor: .windowBackgroundColor))
-            .overlay {
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
-            }
+        reporter?.end()
     }
 }
