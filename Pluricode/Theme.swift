@@ -75,13 +75,17 @@ struct Theme {
         isDark ? .white : NSColor(red: 0.13, green: 0.13, blue: 0.15, alpha: 1)
     }
 
-    var terminalPalette: [SwiftTerm.Color]? {
-        guard isDark else { return nil }
-        return [
+    var terminalPalette: [SwiftTerm.Color] {
+        isDark ? [
             rgb(0x1D1F21), rgb(0xCC6666), rgb(0xB5BD68), rgb(0xF0C674),
             rgb(0x81A2BE), rgb(0xB294BB), rgb(0x8ABEB7), rgb(0xC5C8C6),
             rgb(0x666666), rgb(0xD54E53), rgb(0xB9CA4A), rgb(0xE7C547),
             rgb(0x7AA6DA), rgb(0xC397D8), rgb(0x70C0B1), rgb(0xEAEAEA),
+        ] : [
+            rgb(0x4D4D4C), rgb(0xC82829), rgb(0x718C00), rgb(0xEAB700),
+            rgb(0x4271AE), rgb(0x8959A8), rgb(0x3E999F), rgb(0xD6D6D6),
+            rgb(0x8E908C), rgb(0xF5871F), rgb(0x8AB42C), rgb(0xF4BF4F),
+            rgb(0x6B91D0), rgb(0xA37ABA), rgb(0x66B5BB), rgb(0xFFFFFF),
         ]
     }
 }
