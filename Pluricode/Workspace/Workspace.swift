@@ -24,6 +24,8 @@ final class Workspace {
     let worktreeStatusService: WorktreeStatusService
     var terminalHosts: [UUID: TerminalHost] = [:]
     var pendingDevScripts: [UUID: String] = [:]
+    var stubTabs: [UUID: UUID] = [:]
+    @ObservationIgnored weak var store: WorkspaceStore?
     var focusedPaneID: UUID?
     var expandedPaneID: UUID?
     var commandKeyHeld: Bool = false
@@ -188,6 +190,19 @@ final class Workspace {
             host.teardown()
         }
         pendingDevScripts.removeValue(forKey: tabID)
+        stubTabs.removeValue(forKey: tabID)
+    }
+
+    func markStub(tabID: UUID, targetWorkspaceID: UUID) {
+        stubTabs[tabID] = targetWorkspaceID
+    }
+
+    func detachHost(tabID: UUID) -> TerminalHost? {
+        terminalHosts.removeValue(forKey: tabID)
+    }
+
+    func adoptHost(_ host: TerminalHost, tabID: UUID) {
+        terminalHosts[tabID] = host
     }
 
     func consumePendingDevScript(tabID: UUID) -> String? {
@@ -410,9 +425,18 @@ final class Workspace {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
             switch payload.kind {
             case .newTerminal(let repoID, let worktreeID):
-                let content: TabContent = .terminal(repoID: repoID, worktreeID: worktreeID)
-                if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
-                else { addPane(content) }
+                let transferred = store?.transferLiveHost(
+                    repoID: repoID,
+                    branch: worktreeID,
+                    target: self,
+                    targetPaneID: targetID,
+                    edge: edge
+                ) ?? false
+                if !transferred {
+                    let content: TabContent = .terminal(repoID: repoID, worktreeID: worktreeID)
+                    if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
+                    else { addPane(content) }
+                }
             case .newTaskPane(let listID):
                 let content: TabContent = .tasks(listID: listID)
                 if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
@@ -489,12 +513,57 @@ final class WorkspaceStore {
             worktreePaths: worktreePaths,
             worktreeStatusService: worktreeStatusService
         )
+        ws.store = self
         workspaces.append(ws)
         sort()
         ws.save()
         selectedWorkspaceID = ws.id
         saveSelection()
         return ws
+    }
+
+    func transferLiveHost(
+        repoID: UUID,
+        branch: String,
+        target: Workspace,
+        targetPaneID: UUID?,
+        edge: TileEdge
+    ) -> Bool {
+        guard let match = findLiveHost(repoID: repoID, branch: branch),
+              match.workspace !== target else { return false }
+        let source = match.workspace
+        guard let host = source.detachHost(tabID: match.tabID) else { return false }
+        source.markStub(tabID: match.tabID, targetWorkspaceID: target.id)
+
+        let content: TabContent = .terminal(repoID: repoID, worktreeID: branch)
+        if let targetPaneID {
+            target.splitPane(paneID: targetPaneID, edge: edge, content: content)
+        } else {
+            target.addPane(content)
+        }
+        guard let newPaneID = target.focusedPaneID,
+              let newPane = target.pane(id: newPaneID) else {
+            source.adoptHost(host, tabID: match.tabID)
+            source.stubTabs.removeValue(forKey: match.tabID)
+            return false
+        }
+        target.adoptHost(host, tabID: newPane.activeTabID)
+        return true
+    }
+
+    private func findLiveHost(repoID: UUID, branch: String) -> (workspace: Workspace, tabID: UUID)? {
+        for ws in workspaces {
+            for pane in ws.tiling.panes {
+                for tab in pane.tabs {
+                    guard case .terminal(let r, let b) = tab.content,
+                          r == repoID, b == branch,
+                          ws.terminalHosts[tab.id] != nil,
+                          ws.stubTabs[tab.id] == nil else { continue }
+                    return (ws, tab.id)
+                }
+            }
+        }
+        return nil
     }
 
     func renameWorkspace(id: UUID, name: String) {
@@ -573,7 +642,7 @@ final class WorkspaceStore {
             }
 
         workspaces = snapshots.map { snap in
-            Workspace(
+            let ws = Workspace(
                 id: snap.id,
                 name: snap.name,
                 root: snap.root,
@@ -582,6 +651,8 @@ final class WorkspaceStore {
                 worktreePaths: worktreePaths,
                 worktreeStatusService: worktreeStatusService
             )
+            ws.store = self
+            return ws
         }
         sort()
 

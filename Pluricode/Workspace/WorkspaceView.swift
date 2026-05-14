@@ -416,6 +416,12 @@ private struct TerminalPaneBody: View {
             )
             if isExpanded {
                 ExpandedPanePlaceholder()
+            } else if let targetID = workspace.stubTabs[tabID] {
+                SessionMovedBody(
+                    worktreeID: worktreeID,
+                    targetWorkspaceName: workspace.store?.workspaces.first { $0.id == targetID }?.name,
+                    onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+                )
             } else if let path = workspace.worktreePath(tabID: tabID), let repoPath = workspace.repo(id: repoID)?.path.path {
                 GeometryReader { geo in
                     TerminalPaneView(tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
@@ -736,7 +742,13 @@ private struct TerminalExpandedContent: View {
                 onExpand: { workspace.collapseExpandedPane() },
                 onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
             )
-            if let path = workspace.worktreePath(tabID: tabID),
+            if let targetID = workspace.stubTabs[tabID] {
+                SessionMovedBody(
+                    worktreeID: worktreeID,
+                    targetWorkspaceName: workspace.store?.workspaces.first { $0.id == targetID }?.name,
+                    onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+                )
+            } else if let path = workspace.worktreePath(tabID: tabID),
                let repoPath = workspace.repo(id: repoID)?.path.path {
                 TerminalPaneView(tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                     .id(tabID)
@@ -752,5 +764,35 @@ private struct TerminalExpandedContent: View {
                 )
             }
         }
+    }
+}
+
+private struct SessionMovedBody: View {
+    let worktreeID: String
+    let targetWorkspaceName: String?
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "arrow.up.forward.app")
+                .font(.system(size: 30))
+                .foregroundStyle(.tint)
+            Text("Session moved")
+                .font(.headline)
+            Text(detailText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Remove Pane", role: .destructive, action: onRemove)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    private var detailText: String {
+        if let name = targetWorkspaceName {
+            return "`\(worktreeID)` is now running in \(name)."
+        }
+        return "`\(worktreeID)` is now running in another workspace."
     }
 }
