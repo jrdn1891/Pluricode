@@ -17,6 +17,7 @@
 		280CCB430242DD94E60CD1A2 /* SidebarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 640330E4FAC0CC5442935F46 /* SidebarState.swift */; };
 		3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95CDC674CDC6FC6D7714CB17 /* Workspace.swift */; };
 		4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83868DA08DF195AF66F38C70 /* IdleOverlay.swift */; };
+		4FB6C595C0CDBF7CFD164C21 /* TerminalSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73E8B37818B718BE8D743D3 /* TerminalSettings.swift */; };
 		5208192AF506608CB772A9C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84B103466B6BA9B7791B4EB8 /* Assets.xcassets */; };
 		56CB18171A578DECD2613656 /* TileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FC19651849CFB42A1D4A3A /* TileNode.swift */; };
 		585484B172F60EB3A21E8D7C /* PinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2701F83AE83DE7286C13ED90 /* PinStore.swift */; };
@@ -29,6 +30,7 @@
 		93E709A761D2947E0F687A71 /* PermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860492197C8C2313E336830D /* PermissionsView.swift */; };
 		97C1C6B70507B356349663B4 /* PluricodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC246AB1895B3F4814510E30 /* PluricodeApp.swift */; };
 		99EAA5BA43DBEFF39BC75180 /* TaskListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79713EC727834622CEEF2EF /* TaskListStore.swift */; };
+		9BA48262D7C491D52BC53471 /* TerminalSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868643F98C559E20E51603B7 /* TerminalSettingsView.swift */; };
 		A7474169AFC652EE29ABF746 /* AttachmentChipsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */; };
 		CAFE3849F50A463074800322 /* RepoSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */; };
 		DCDE0298F6E0858E03064C01 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861AC6957D983804F39D40DF /* main.swift */; };
@@ -65,12 +67,14 @@
 		84B103466B6BA9B7791B4EB8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		860492197C8C2313E336830D /* PermissionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsView.swift; sourceTree = "<group>"; };
 		861AC6957D983804F39D40DF /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		868643F98C559E20E51603B7 /* TerminalSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSettingsView.swift; sourceTree = "<group>"; };
 		95CDC674CDC6FC6D7714CB17 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
 		9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoSidebarView.swift; sourceTree = "<group>"; };
 		9E37A72F9CD0A1326611CB3C /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
 		A3AB0523B2C998E6BDF6FDB3 /* TerminalPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPaneView.swift; sourceTree = "<group>"; };
 		BDC77F2E641969738B4482B5 /* TerminalHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalHost.swift; sourceTree = "<group>"; };
 		CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewWorkspaceSheet.swift; sourceTree = "<group>"; };
+		D73E8B37818B718BE8D743D3 /* TerminalSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSettings.swift; sourceTree = "<group>"; };
 		D79713EC727834622CEEF2EF /* TaskListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListStore.swift; sourceTree = "<group>"; };
 		F1AE508972402DF38CAFBF8F /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
 		F722E7DD539F6776FA1674BA /* RepoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoStore.swift; sourceTree = "<group>"; };
@@ -102,6 +106,8 @@
 			isa = PBXGroup;
 			children = (
 				311D5BA84A083B24731CB565 /* TerminalSession.swift */,
+				D73E8B37818B718BE8D743D3 /* TerminalSettings.swift */,
+				868643F98C559E20E51603B7 /* TerminalSettingsView.swift */,
 			);
 			path = Terminal;
 			sourceTree = "<group>";
@@ -302,6 +308,8 @@
 				7C59C92DEE6916476A4B02AA /* TerminalHost.swift in Sources */,
 				E8973038D7B03AFD54029DEF /* TerminalPaneView.swift in Sources */,
 				5BFF6AC69093B72FBE9F32BC /* TerminalSession.swift in Sources */,
+				4FB6C595C0CDBF7CFD164C21 /* TerminalSettings.swift in Sources */,
+				9BA48262D7C491D52BC53471 /* TerminalSettingsView.swift in Sources */,
 				06326AFE850E788295307D48 /* Theme.swift in Sources */,
 				56CB18171A578DECD2613656 /* TileNode.swift in Sources */,
 				E4DA8CFC22DCB7A91DEC0918 /* TileView.swift in Sources */,

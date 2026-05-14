@@ -118,7 +118,12 @@ struct PluricodeApp: App {
         }
 
         Settings {
-            PermissionsView()
+            TabView {
+                PermissionsView()
+                    .tabItem { Label("Permissions", systemImage: "lock.shield") }
+                TerminalSettingsView()
+                    .tabItem { Label("Terminal", systemImage: "terminal") }
+            }
         }
     }
 

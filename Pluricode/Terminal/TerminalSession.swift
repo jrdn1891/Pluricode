@@ -22,6 +22,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
     static let baseFontSize: CGFloat = 13
     static let idleThreshold: TimeInterval = 4.0
+    static let scrollbackLines: Int = 20_000
     private static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "heic", "tiff", "tif"]
 
     init(nodeID: UUID) {
@@ -34,6 +35,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         view.flushAttachments = { [weak self] in self?.flushAttachmentInjection() }
         terminalView.processDelegate = self
         terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize, weight: .regular)
+        terminalView.changeScrollback(Self.scrollbackLines)
     }
 
     static func isImagePath(_ path: String) -> Bool {
@@ -96,9 +98,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     func updateColors(theme: Theme) {
         terminalView.nativeBackgroundColor = theme.terminalBackground
         terminalView.nativeForegroundColor = theme.terminalForeground
-        if let palette = theme.terminalPalette {
-            terminalView.installColors(palette)
-        }
+        terminalView.installColors(theme.terminalPalette)
     }
 
     func start(in directory: String? = nil) {
@@ -138,6 +138,7 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     var onAttachImage: ((PendingImageAttachment) -> Void)?
     var flushAttachments: (() -> String?)?
     private var keyMonitor: Any?
+    private var metalCancellable: AnyCancellable?
 
     private let promiseQueue = OperationQueue()
 
@@ -145,6 +146,8 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
         super.init(frame: frame)
         let promiseTypes = NSFilePromiseReceiver.readableDraggedTypes.map { NSPasteboard.PasteboardType($0) }
         registerForDraggedTypes(registeredDraggedTypes + [.fileURL, .tiff, .png] + promiseTypes)
+        metalCancellable = TerminalSettings.shared.$useMetalRenderer
+            .sink { [weak self] _ in self?.applyMetalRenderer() }
     }
 
     required init?(coder: NSCoder) { super.init(coder: coder) }
@@ -164,6 +167,12 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
             NSEvent.removeMonitor(monitor)
             keyMonitor = nil
         }
+        applyMetalRenderer()
+    }
+
+    private func applyMetalRenderer() {
+        guard window != nil else { return }
+        try? setUseMetal(TerminalSettings.shared.useMetalRenderer)
     }
 
     private func interceptReturn(_ event: NSEvent) {
