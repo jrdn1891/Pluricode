@@ -25,6 +25,8 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     static let scrollbackLines: Int = 20_000
     private static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "heic", "tiff", "tif"]
 
+    var onFocus: (() -> Void)?
+
     init(nodeID: UUID) {
         self.nodeID = nodeID
         let view = ActivityAwareTerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 270))
@@ -33,6 +35,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         view.onActivity = { [weak self] in self?.noteActivity() }
         view.onAttachImage = { [weak self] attachment in self?.attach(attachment) }
         view.flushAttachments = { [weak self] in self?.flushAttachmentInjection() }
+        view.onMouseDown = { [weak self] in self?.onFocus?() }
         terminalView.processDelegate = self
         terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize, weight: .regular)
         terminalView.changeScrollback(Self.scrollbackLines)
@@ -137,7 +140,9 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     var onActivity: (() -> Void)?
     var onAttachImage: ((PendingImageAttachment) -> Void)?
     var flushAttachments: (() -> String?)?
+    var onMouseDown: (() -> Void)?
     private var keyMonitor: Any?
+    private var mouseMonitor: Any?
     private var metalCancellable: AnyCancellable?
 
     private let promiseQueue = OperationQueue()
@@ -154,20 +159,41 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
 
     deinit {
         if let monitor = keyMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = mouseMonitor { NSEvent.removeMonitor(monitor) }
     }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window != nil, keyMonitor == nil {
-            keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.interceptReturn(event)
-                return event
+        if window != nil {
+            if keyMonitor == nil {
+                keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                    self?.interceptReturn(event)
+                    return event
+                }
             }
-        } else if window == nil, let monitor = keyMonitor {
-            NSEvent.removeMonitor(monitor)
+            if mouseMonitor == nil {
+                mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+                    self?.captureFocusIfHit(event)
+                    return event
+                }
+            }
+        } else {
+            if let monitor = keyMonitor { NSEvent.removeMonitor(monitor) }
             keyMonitor = nil
+            if let monitor = mouseMonitor { NSEvent.removeMonitor(monitor) }
+            mouseMonitor = nil
         }
         applyMetalRenderer()
+    }
+
+    private func captureFocusIfHit(_ event: NSEvent) {
+        guard let window, event.window === window else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(point) else { return }
+        if window.firstResponder !== self {
+            window.makeFirstResponder(self)
+        }
+        onMouseDown?()
     }
 
     private func applyMetalRenderer() {
