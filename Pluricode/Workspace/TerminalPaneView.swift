@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 
 struct TerminalPaneView: NSViewRepresentable {
+    let paneID: UUID
     let tabID: UUID
     let worktreePath: String
     let repoPath: String
@@ -15,7 +16,11 @@ struct TerminalPaneView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        hostForTab().applyTheme(Theme(from: NSApp.effectiveAppearance))
+        let host = hostForTab()
+        host.applyTheme(Theme(from: NSApp.effectiveAppearance))
+        host.session.onFocus = { [weak workspace, paneID] in
+            workspace?.setFocus(paneID: paneID)
+        }
     }
 
     private func hostForTab() -> TerminalHost {

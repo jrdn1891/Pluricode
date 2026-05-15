@@ -424,7 +424,7 @@ private struct TerminalPaneBody: View {
                 )
             } else if let path = workspace.worktreePath(tabID: tabID), let repoPath = workspace.repo(id: repoID)?.path.path {
                 GeometryReader { geo in
-                    TerminalPaneView(tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+                    TerminalPaneView(paneID: pane.id, tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                         .id(tabID)
                         .overlay {
                             if let session = workspace.terminalHosts[tabID]?.session {
@@ -750,7 +750,7 @@ private struct TerminalExpandedContent: View {
                 )
             } else if let path = workspace.worktreePath(tabID: tabID),
                let repoPath = workspace.repo(id: repoID)?.path.path {
-                TerminalPaneView(tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+                TerminalPaneView(paneID: pane.id, tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                     .id(tabID)
                     .overlay {
                         if let session = workspace.terminalHosts[tabID]?.session {
