@@ -32,11 +32,21 @@ enum ProcessRunner {
         process.standardOutput = stdout
         process.standardError = stderr
         try process.run()
+        var outData = Data()
+        var errData = Data()
+        let group = DispatchGroup()
+        DispatchQueue.global().async(group: group) {
+            outData = stdout.fileHandleForReading.readDataToEndOfFile()
+        }
+        DispatchQueue.global().async(group: group) {
+            errData = stderr.fileHandleForReading.readDataToEndOfFile()
+        }
         process.waitUntilExit()
+        group.wait()
         return ProcessResult(
             status: process.terminationStatus,
-            stdout: String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "",
-            stderr: String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            stdout: String(data: outData, encoding: .utf8) ?? "",
+            stderr: String(data: errData, encoding: .utf8) ?? ""
         )
     }
 
