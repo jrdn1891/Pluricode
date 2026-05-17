@@ -112,7 +112,8 @@ struct CommandPaletteView: View {
                             ForEach(Array(items.enumerated()), id: \.element.id) { idx, action in
                                 PaletteRow(
                                     action: action,
-                                    isSelected: idx == selection
+                                    isSelected: idx == selection,
+                                    shortcutNumber: idx < 9 ? idx + 1 : nil
                                 ) {
                                     selection = idx
                                     runSelection()
@@ -135,7 +136,8 @@ struct CommandPaletteView: View {
         .background(KeyEventCatcher(
             onMoveUp: { move(-1) },
             onMoveDown: { move(1) },
-            onCancel: { isPresented = false }
+            onCancel: { isPresented = false },
+            onShortcut: { runIndex($0) }
         ))
         .onChange(of: query) { _, _ in selection = 0 }
         .onAppear { queryFocused = true }
@@ -151,6 +153,13 @@ struct CommandPaletteView: View {
         let items = filtered
         guard items.indices.contains(selection) else { return }
         execute(items[selection])
+    }
+
+    private func runIndex(_ idx: Int) {
+        let items = filtered
+        guard items.indices.contains(idx) else { return }
+        selection = idx
+        execute(items[idx])
     }
 
     private func execute(_ action: PaletteAction) {
@@ -197,6 +206,7 @@ struct CommandPaletteView: View {
 private struct PaletteRow: View {
     let action: PaletteAction
     let isSelected: Bool
+    let shortcutNumber: Int?
     let onTap: () -> Void
     @State private var hovered = false
 
@@ -209,6 +219,9 @@ private struct PaletteRow: View {
                 Text(action.title)
                     .foregroundStyle(isSelected ? Color.white : Color.primary)
                 Spacer()
+                if let n = shortcutNumber {
+                    ShortcutBadge(label: "⌘\(n)", isSelected: isSelected)
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
@@ -224,16 +237,35 @@ private struct PaletteRow: View {
     }
 }
 
+private struct ShortcutBadge: View {
+    let label: String
+    let isSelected: Bool
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 11, weight: .medium, design: .rounded))
+            .foregroundStyle(isSelected ? Color.white : Color.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isSelected ? Color.white.opacity(0.2) : Color.gray.opacity(0.18))
+            )
+    }
+}
+
 private struct KeyEventCatcher: NSViewRepresentable {
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
     let onCancel: () -> Void
+    let onShortcut: (Int) -> Void
 
     func makeNSView(context: Context) -> NSView {
         let view = CatcherView()
         view.onMoveUp = onMoveUp
         view.onMoveDown = onMoveDown
         view.onCancel = onCancel
+        view.onShortcut = onShortcut
         return view
     }
 
@@ -242,12 +274,14 @@ private struct KeyEventCatcher: NSViewRepresentable {
         v.onMoveUp = onMoveUp
         v.onMoveDown = onMoveDown
         v.onCancel = onCancel
+        v.onShortcut = onShortcut
     }
 
     final class CatcherView: NSView {
         var onMoveUp: (() -> Void)?
         var onMoveDown: (() -> Void)?
         var onCancel: (() -> Void)?
+        var onShortcut: ((Int) -> Void)?
         private var monitor: Any?
 
         override func viewDidMoveToWindow() {
@@ -255,10 +289,18 @@ private struct KeyEventCatcher: NSViewRepresentable {
             if window != nil, monitor == nil {
                 monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                     guard let self, self.window != nil else { return event }
+                    if event.modifierFlags.contains(.command),
+                       let chars = event.charactersIgnoringModifiers,
+                       chars.count == 1,
+                       let digit = Int(chars),
+                       (1...9).contains(digit) {
+                        self.onShortcut?(digit - 1)
+                        return nil
+                    }
                     switch event.keyCode {
-                    case 126: self.onMoveUp?(); return nil    // up
-                    case 125: self.onMoveDown?(); return nil  // down
-                    case 53:  self.onCancel?(); return nil    // esc
+                    case 126: self.onMoveUp?(); return nil
+                    case 125: self.onMoveDown?(); return nil
+                    case 53:  self.onCancel?(); return nil
                     default: return event
                     }
                 }
