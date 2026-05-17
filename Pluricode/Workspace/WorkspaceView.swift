@@ -178,6 +178,7 @@ private struct GhostPane: View {
         switch pane.activeTab.content {
         case .terminal: return "arrow.triangle.branch"
         case .tasks: return "checklist"
+        case .widget(let kind): return kind.systemImage
         }
     }
 
@@ -187,6 +188,8 @@ private struct GhostPane: View {
             return worktreeID
         case .tasks(let listID):
             return workspace.taskListStore.lists.first { $0.id == listID }?.name ?? "Tasks"
+        case .widget(let kind):
+            return kind.label
         }
     }
 }
@@ -259,6 +262,31 @@ private struct TabBody: View {
             )
         case .tasks(let listID):
             TaskPaneBody(pane: pane, tabID: tab.id, listID: listID, workspace: workspace)
+        case .widget(.localHosts):
+            WidgetPaneBody(pane: pane, tabID: tab.id, workspace: workspace)
+        }
+    }
+}
+
+private struct WidgetPaneBody: View {
+    let pane: Pane
+    let tabID: UUID
+    let workspace: Workspace
+
+    var body: some View {
+        GeometryReader { geo in
+            LocalHostsWidgetView(
+                paneID: pane.id,
+                tabID: tabID,
+                workspace: workspace,
+                onActivate: { workspace.setFocus(paneID: pane.id) },
+                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+            )
+            .frame(width: geo.size.width, height: geo.size.height)
+            .onDrop(
+                of: [.plainText],
+                delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
+            )
         }
     }
 }
@@ -424,7 +452,7 @@ private struct TerminalPaneBody: View {
                 )
             } else if let path = workspace.worktreePath(tabID: tabID), let repoPath = workspace.repo(id: repoID)?.path.path {
                 GeometryReader { geo in
-                    TerminalPaneView(paneID: pane.id, tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+                    TerminalPaneView(paneID: pane.id, tabID: tabID, repoID: repoID, worktreeID: worktreeID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                         .id(tabID)
                         .overlay {
                             if let session = workspace.terminalHosts[tabID]?.session {
@@ -750,7 +778,7 @@ private struct TerminalExpandedContent: View {
                 )
             } else if let path = workspace.worktreePath(tabID: tabID),
                let repoPath = workspace.repo(id: repoID)?.path.path {
-                TerminalPaneView(paneID: pane.id, tabID: tabID, worktreePath: path, repoPath: repoPath, workspace: workspace)
+                TerminalPaneView(paneID: pane.id, tabID: tabID, repoID: repoID, worktreeID: worktreeID, worktreePath: path, repoPath: repoPath, workspace: workspace)
                     .id(tabID)
                     .overlay {
                         if let session = workspace.terminalHosts[tabID]?.session {

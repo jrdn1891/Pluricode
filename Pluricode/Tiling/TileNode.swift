@@ -46,6 +46,7 @@ struct TilingDragPayload: Codable, Transferable, Hashable {
     enum Kind: Codable, Hashable {
         case newTerminal(repoID: UUID, worktreeID: String)
         case newTaskPane(listID: UUID)
+        case newWidget(WidgetKind)
         case movePane(paneID: UUID)
     }
     let kind: Kind
@@ -55,9 +56,26 @@ struct TilingDragPayload: Codable, Transferable, Hashable {
     }
 }
 
+enum WidgetKind: String, Hashable, Codable {
+    case localHosts
+
+    var label: String {
+        switch self {
+        case .localHosts: "Local Hosts"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .localHosts: "network"
+        }
+    }
+}
+
 enum TabContent: Hashable, Codable {
     case terminal(repoID: UUID, worktreeID: String)
     case tasks(listID: UUID)
+    case widget(WidgetKind)
 }
 
 struct Tab: Identifiable, Hashable, Codable {
@@ -292,6 +310,9 @@ extension Tiling {
                                targetID: targetID, edge: edge, previewPaneID: previewPaneID, root: root)
         case .newTaskPane(let listID):
             return simulateAdd(content: .tasks(listID: listID),
+                               targetID: targetID, edge: edge, previewPaneID: previewPaneID, root: root)
+        case .newWidget(let kind):
+            return simulateAdd(content: .widget(kind),
                                targetID: targetID, edge: edge, previewPaneID: previewPaneID, root: root)
         case .movePane(let sourceID):
             return simulateMove(sourceID: sourceID, targetID: targetID, edge: edge, root: root)

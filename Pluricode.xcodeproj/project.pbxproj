@@ -32,6 +32,8 @@
 		99EAA5BA43DBEFF39BC75180 /* TaskListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79713EC727834622CEEF2EF /* TaskListStore.swift */; };
 		9BA48262D7C491D52BC53471 /* TerminalSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868643F98C559E20E51603B7 /* TerminalSettingsView.swift */; };
 		A7474169AFC652EE29ABF746 /* AttachmentChipsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */; };
+		AFE23BE23AAB889F92202451 /* LocalHostRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49CBB28DBEB1E236A8D06740 /* LocalHostRegistry.swift */; };
+		C878C31C08E33B2454F9E6DE /* LocalHostsWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D4FD99941538CCD095F8FC /* LocalHostsWidgetView.swift */; };
 		CAFE3849F50A463074800322 /* RepoSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */; };
 		DCDE0298F6E0858E03064C01 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861AC6957D983804F39D40DF /* main.swift */; };
 		E4B9C115E3094708A1A7036B /* PaneCreationToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77173B4968B004C4572C6516 /* PaneCreationToolbar.swift */; };
@@ -52,6 +54,7 @@
 		2701F83AE83DE7286C13ED90 /* PinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinStore.swift; sourceTree = "<group>"; };
 		311D5BA84A083B24731CB565 /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
 		45E91297C034C82CF173906F /* TaskPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPaneView.swift; sourceTree = "<group>"; };
+		49CBB28DBEB1E236A8D06740 /* LocalHostRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHostRegistry.swift; sourceTree = "<group>"; };
 		567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentChipsOverlay.swift; sourceTree = "<group>"; };
 		640330E4FAC0CC5442935F46 /* SidebarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarState.swift; sourceTree = "<group>"; };
 		648929BD87FF1ACCA8C36AD0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -69,6 +72,7 @@
 		861AC6957D983804F39D40DF /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		868643F98C559E20E51603B7 /* TerminalSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSettingsView.swift; sourceTree = "<group>"; };
 		95CDC674CDC6FC6D7714CB17 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
+		98D4FD99941538CCD095F8FC /* LocalHostsWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHostsWidgetView.swift; sourceTree = "<group>"; };
 		9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoSidebarView.swift; sourceTree = "<group>"; };
 		9E37A72F9CD0A1326611CB3C /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
 		A3AB0523B2C998E6BDF6FDB3 /* TerminalPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPaneView.swift; sourceTree = "<group>"; };
@@ -171,6 +175,8 @@
 			children = (
 				567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */,
 				83868DA08DF195AF66F38C70 /* IdleOverlay.swift */,
+				49CBB28DBEB1E236A8D06740 /* LocalHostRegistry.swift */,
+				98D4FD99941538CCD095F8FC /* LocalHostsWidgetView.swift */,
 				CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */,
 				77173B4968B004C4572C6516 /* PaneCreationToolbar.swift */,
 				D79713EC727834622CEEF2EF /* TaskListStore.swift */,
@@ -291,6 +297,8 @@
 				A7474169AFC652EE29ABF746 /* AttachmentChipsOverlay.swift in Sources */,
 				F3D1887C447587AFF3CD02F6 /* CommandPalette.swift in Sources */,
 				4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */,
+				AFE23BE23AAB889F92202451 /* LocalHostRegistry.swift in Sources */,
+				C878C31C08E33B2454F9E6DE /* LocalHostsWidgetView.swift in Sources */,
 				0DC403F2FCB7A4D30384AEB7 /* NewWorkspaceSheet.swift in Sources */,
 				E4B9C115E3094708A1A7036B /* PaneCreationToolbar.swift in Sources */,
 				1FF2534862D523B586A00545 /* PermissionsService.swift in Sources */,
