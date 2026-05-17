@@ -14,11 +14,15 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     let terminalView: LocalProcessTerminalView
     var worktreePath: String?
     var onProcessTerminated: ((Int32?) -> Void)?
+    var onLocalHostDiscovered: ((URL) -> Void)?
     @Published private(set) var isIdle: Bool = false
     @Published private(set) var pendingAttachments: [PendingImageAttachment] = []
     private var lastAppliedZoom: Float = 1.0
     private var lastSavedBufferSize: Int = 0
     private var idleWorkItem: DispatchWorkItem?
+    private lazy var hostDetector: LocalHostDetector = LocalHostDetector { [weak self] url in
+        self?.onLocalHostDiscovered?(url)
+    }
 
     static let baseFontSize: CGFloat = 13
     static let idleThreshold: TimeInterval = 4.0
@@ -33,6 +37,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         self.terminalView = view
         super.init()
         view.onActivity = { [weak self] in self?.noteActivity() }
+        view.onRawData = { [weak self] slice in self?.hostDetector.feed(slice) }
         view.onAttachImage = { [weak self] attachment in self?.attach(attachment) }
         view.flushAttachments = { [weak self] in self?.flushAttachmentInjection() }
         view.onMouseDown = { [weak self] in self?.onFocus?() }
@@ -138,6 +143,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
 private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     var onActivity: (() -> Void)?
+    var onRawData: ((ArraySlice<UInt8>) -> Void)?
     var onAttachImage: ((PendingImageAttachment) -> Void)?
     var flushAttachments: (() -> String?)?
     var onMouseDown: (() -> Void)?
@@ -212,6 +218,7 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     override func dataReceived(slice: ArraySlice<UInt8>) {
         super.dataReceived(slice: slice)
         onActivity?()
+        onRawData?(slice)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {

@@ -4,6 +4,8 @@ import AppKit
 struct TerminalPaneView: NSViewRepresentable {
     let paneID: UUID
     let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
     let worktreePath: String
     let repoPath: String
     let workspace: Workspace
@@ -29,7 +31,17 @@ struct TerminalPaneView: NSViewRepresentable {
             tabID: tabID,
             worktreePath: worktreePath,
             repoPath: repoPath,
-            extraStartupScript: workspace.consumePendingDevScript(tabID: tabID)
+            extraStartupScript: workspace.consumePendingDevScript(tabID: tabID),
+            onLocalHostDiscovered: { [weak workspace, tabID, repoID, worktreeID] url in
+                guard let workspace, let store = workspace.store else { return }
+                store.localHostRegistry.record(
+                    workspaceID: workspace.id,
+                    tabID: tabID,
+                    url: url,
+                    repoID: repoID,
+                    branch: worktreeID
+                )
+            }
         )
         workspace.terminalHosts[tabID] = host
         return host

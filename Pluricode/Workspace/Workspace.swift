@@ -191,6 +191,7 @@ final class Workspace {
         }
         pendingDevScripts.removeValue(forKey: tabID)
         stubTabs.removeValue(forKey: tabID)
+        store?.localHostRegistry.remove(tabID: tabID)
     }
 
     func markStub(tabID: UUID, targetWorkspaceID: UUID) {
@@ -260,10 +261,11 @@ final class Workspace {
 
     func tabLabel(_ tab: Tab, fallback: String) -> String {
         if let name = tab.name, !name.isEmpty { return name }
-        if case .terminal(_, let worktreeID) = tab.content {
-            return worktreeID
+        switch tab.content {
+        case .terminal(_, let worktreeID): return worktreeID
+        case .widget(let kind): return kind.label
+        case .tasks: return fallback
         }
-        return fallback
     }
 
     private func locateTab(id tabID: UUID) -> (Pane, Tab)? {
@@ -441,6 +443,10 @@ final class Workspace {
                 let content: TabContent = .tasks(listID: listID)
                 if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
                 else { addPane(content) }
+            case .newWidget(let kind):
+                let content: TabContent = .widget(kind)
+                if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
+                else { addPane(content) }
             case .movePane(let sourceID):
                 if let targetID, sourceID != targetID {
                     if edge == .center {
@@ -486,6 +492,9 @@ final class WorkspaceStore {
     private let taskListStore: TaskListStore
     let worktreePaths: WorktreePaths
     let worktreeStatusService: WorktreeStatusService
+    let localHostRegistry: LocalHostRegistry
+
+    var repos: [RepoEntry] { repoStore.repos }
 
     private static let selectedKey = "selectedWorkspaceID"
 
@@ -494,6 +503,7 @@ final class WorkspaceStore {
         self.taskListStore = taskListStore
         self.worktreePaths = WorktreePaths()
         self.worktreeStatusService = WorktreeStatusService(repoStore: repoStore)
+        self.localHostRegistry = LocalHostRegistry()
         load()
     }
 
@@ -577,6 +587,7 @@ final class WorkspaceStore {
             ws.isDeleted = true
         }
         workspaces.removeAll { $0.id == id }
+        localHostRegistry.remove(workspaceID: id)
         let url = Workspace.workspacesDir.appendingPathComponent("\(id.uuidString).json")
         try? FileManager.default.removeItem(at: url)
         if selectedWorkspaceID == id {

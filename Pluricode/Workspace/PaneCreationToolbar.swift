@@ -71,6 +71,7 @@ private struct PaneCreationPopover: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
+                        widgetSection
                         ForEach(workspace.repoStore.repos) { repo in
                             repoSection(repo)
                         }
@@ -89,6 +90,30 @@ private struct PaneCreationPopover: View {
                 )
                 onComplete()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var widgetSection: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "square.grid.2x2")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            Text("Widgets")
+                .font(.system(size: 12, weight: .semibold))
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 6)
+        .padding(.bottom, 2)
+
+        PaneCreationRow(
+            icon: WidgetKind.localHosts.systemImage,
+            title: WidgetKind.localHosts.label,
+            subtitle: "Browser links from running dev servers"
+        ) {
+            workspace.performPaneCreation(action, content: .widget(.localHosts))
+            onComplete()
         }
     }
 

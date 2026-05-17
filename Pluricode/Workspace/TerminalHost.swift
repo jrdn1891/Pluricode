@@ -13,7 +13,8 @@ final class TerminalHost {
         tabID: UUID,
         worktreePath: String,
         repoPath: String,
-        extraStartupScript: String? = nil
+        extraStartupScript: String? = nil,
+        onLocalHostDiscovered: ((URL) -> Void)? = nil
     ) {
         self.tabID = tabID
         self.worktreePath = worktreePath
@@ -21,6 +22,7 @@ final class TerminalHost {
         self.extraStartupScript = extraStartupScript
         self.session = TerminalSession(nodeID: tabID)
         session.worktreePath = worktreePath
+        session.onLocalHostDiscovered = onLocalHostDiscovered
         session.updateColors(theme: Theme(from: NSApp.effectiveAppearance))
 
         let container = NSView()
