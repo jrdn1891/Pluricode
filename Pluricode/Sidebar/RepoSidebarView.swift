@@ -13,7 +13,7 @@ struct RepoSidebarView: View {
     @State private var renameListTarget: TaskList?
     @State private var creatingWorkspace = false
     @State private var renameWorkspaceTarget: Workspace?
-    @State private var pendingDelete: PendingDelete?
+    @State private var pendingConfirmation: ConfirmationPrompt?
     @State private var selectedWorktrees: Set<WorktreeKey> = []
     @State private var worktreeAnchor: WorktreeKey?
 
@@ -33,7 +33,14 @@ struct RepoSidebarView: View {
                         .contextMenu {
                             Button("Rename...") { renameWorkspaceTarget = ws }
                             Divider()
-                            Button("Delete", role: .destructive) { pendingDelete = .workspace(ws) }
+                            Button("Delete", role: .destructive) {
+                                pendingConfirmation = .destructive(
+                                    title: "Delete workspace \(ws.name)?",
+                                    message: "Panes are removed from the canvas. Worktrees and task lists are untouched."
+                                ) {
+                                    workspaceStore.removeWorkspace(id: ws.id)
+                                }
+                            }
                         }
                 }
             } header: {
@@ -46,7 +53,17 @@ struct RepoSidebarView: View {
                         .contextMenu {
                             Button("Rename...") { renameListTarget = list }
                             Divider()
-                            Button("Delete", role: .destructive) { pendingDelete = .taskList(list) }
+                            Button("Delete", role: .destructive) {
+                                let count = list.items.count
+                                pendingConfirmation = .destructive(
+                                    title: "Delete list \(list.name)?",
+                                    message: count == 0
+                                        ? "The list is empty. This cannot be undone."
+                                        : "This will delete \(count) task\(count == 1 ? "" : "s")."
+                                ) {
+                                    taskListStore.removeList(id: list.id)
+                                }
+                            }
                         }
                 }
             } header: {
@@ -130,39 +147,7 @@ struct RepoSidebarView: View {
         .sheet(item: $renameListTarget) { list in
             RenameTaskListSheet(store: taskListStore, list: list)
         }
-        .alert(item: $pendingDelete) { item in
-            switch item {
-            case .worktree(let repo, let wt):
-                return Alert(
-                    title: Text("Delete \(wt.displayName)?"),
-                    message: Text("This runs `git worktree remove --force` and deletes the branch `\(wt.branch)`."),
-                    primaryButton: .destructive(Text("Delete")) {
-                        deleteWorktree(repo: repo, worktree: wt)
-                    },
-                    secondaryButton: .cancel()
-                )
-            case .taskList(let list):
-                return Alert(
-                    title: Text("Delete list \(list.name)?"),
-                    message: Text(list.items.isEmpty
-                        ? "The list is empty. This cannot be undone."
-                        : "This will delete \(list.items.count) task\(list.items.count == 1 ? "" : "s")."),
-                    primaryButton: .destructive(Text("Delete")) {
-                        taskListStore.removeList(id: list.id)
-                    },
-                    secondaryButton: .cancel()
-                )
-            case .workspace(let ws):
-                return Alert(
-                    title: Text("Delete workspace \(ws.name)?"),
-                    message: Text("Panes are removed from the canvas. Worktrees and task lists are untouched."),
-                    primaryButton: .destructive(Text("Delete")) {
-                        workspaceStore.removeWorkspace(id: ws.id)
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
-        }
+        .confirmation($pendingConfirmation)
     }
 
     private func selectWorktree(_ key: WorktreeKey, flags: NSEvent.ModifierFlags) {
@@ -281,7 +266,12 @@ struct RepoSidebarView: View {
                 }
                 Divider()
                 Button("Delete", role: .destructive) {
-                    pendingDelete = .worktree(repo: repo, worktree: wt)
+                    pendingConfirmation = .destructive(
+                        title: "Delete \(wt.displayName)?",
+                        message: "This runs `git worktree remove --force` and deletes the branch `\(wt.branch)`."
+                    ) {
+                        deleteWorktree(repo: repo, worktree: wt)
+                    }
                 }
             }
         }
@@ -386,27 +376,56 @@ private struct ColorPickerPopover: View {
     let current: RepoColor?
     let resolved: RepoColor
     let onSelect: (RepoColor?) -> Void
+    let onDismiss: () -> Void
+    @State private var highlight: Int = 0
+
+    private var choices: [RepoColor?] {
+        [nil] + RepoColor.allCases
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ColorPickerRow(
-                title: "Automatic",
-                swatch: resolved.swiftUIColor,
-                dashed: true,
-                selected: current == nil
-            ) { onSelect(nil) }
-            Divider().padding(.vertical, 4)
-            ForEach(RepoColor.allCases, id: \.self) { c in
-                ColorPickerRow(
-                    title: c.label,
-                    swatch: c.swiftUIColor,
-                    dashed: false,
-                    selected: current == c
-                ) { onSelect(c) }
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(choices.enumerated()), id: \.offset) { idx, choice in
+                    if idx == 1 {
+                        Divider().padding(.vertical, 4)
+                    }
+                    ColorPickerRow(
+                        title: choice?.label ?? "Automatic",
+                        swatch: (choice ?? resolved).swiftUIColor,
+                        dashed: choice == nil,
+                        selected: current == choice,
+                        highlighted: idx == highlight
+                    ) { onSelect(choice) }
+                }
             }
+            .padding(6)
+            KeyHintBar(hints: [
+                ("↑↓", "Navigate"),
+                ("⏎", "Select"),
+                ("⎋", "Close")
+            ])
         }
-        .padding(6)
-        .frame(width: 160)
+        .frame(width: 180)
+        .background(KeyboardCatcher(
+            onMoveUp: { move(-1) },
+            onMoveDown: { move(1) },
+            onReturn: { commit() },
+            onEscape: onDismiss
+        ))
+        .onAppear {
+            highlight = choices.firstIndex(where: { $0 == current }) ?? 0
+        }
+    }
+
+    private func move(_ delta: Int) {
+        let count = choices.count
+        highlight = ((highlight + delta) % count + count) % count
+    }
+
+    private func commit() {
+        guard choices.indices.contains(highlight) else { return }
+        onSelect(choices[highlight])
     }
 }
 
@@ -415,6 +434,7 @@ private struct ColorPickerRow: View {
     let swatch: Color
     let dashed: Bool
     let selected: Bool
+    let highlighted: Bool
     let action: () -> Void
     @State private var hovered = false
 
@@ -440,25 +460,17 @@ private struct ColorPickerRow: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .contentShape(Rectangle())
-            .background(hovered ? Color.accentColor.opacity(0.25) : Color.clear)
+            .background(background)
             .cornerRadius(4)
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
     }
-}
 
-private enum PendingDelete: Identifiable {
-    case worktree(repo: RepoEntry, worktree: Worktree)
-    case taskList(TaskList)
-    case workspace(Workspace)
-
-    var id: String {
-        switch self {
-        case .worktree(let repo, let wt): return "wt:\(repo.id.uuidString):\(wt.id)"
-        case .taskList(let list): return "tl:\(list.id)"
-        case .workspace(let ws): return "ws:\(ws.id)"
-        }
+    private var background: Color {
+        if highlighted { return Color.accentColor.opacity(0.35) }
+        if hovered { return Color.accentColor.opacity(0.2) }
+        return Color.clear
     }
 }
 
@@ -526,11 +538,13 @@ struct RepoRow: View {
             .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
                 ColorPickerPopover(
                     current: repo.color,
-                    resolved: repo.resolvedColor
-                ) { color in
-                    onSetColor(color)
-                    showColorPicker = false
-                }
+                    resolved: repo.resolvedColor,
+                    onSelect: { color in
+                        onSetColor(color)
+                        showColorPicker = false
+                    },
+                    onDismiss: { showColorPicker = false }
+                )
             }
 
             Text(repo.name)

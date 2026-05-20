@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 enum PaletteAction: Identifiable, Hashable {
     case toggleSidebar
@@ -133,11 +132,11 @@ struct CommandPaletteView: View {
             }
         }
         .frame(width: 480)
-        .background(KeyEventCatcher(
+        .background(KeyboardCatcher(
             onMoveUp: { move(-1) },
             onMoveDown: { move(1) },
-            onCancel: { isPresented = false },
-            onShortcut: { runIndex($0) }
+            onEscape: { isPresented = false },
+            onCommandDigit: { runIndex($0) }
         ))
         .onChange(of: query) { _, _ in selection = 0 }
         .onAppear { queryFocused = true }
@@ -254,64 +253,3 @@ private struct ShortcutBadge: View {
     }
 }
 
-private struct KeyEventCatcher: NSViewRepresentable {
-    let onMoveUp: () -> Void
-    let onMoveDown: () -> Void
-    let onCancel: () -> Void
-    let onShortcut: (Int) -> Void
-
-    func makeNSView(context: Context) -> NSView {
-        let view = CatcherView()
-        view.onMoveUp = onMoveUp
-        view.onMoveDown = onMoveDown
-        view.onCancel = onCancel
-        view.onShortcut = onShortcut
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        guard let v = nsView as? CatcherView else { return }
-        v.onMoveUp = onMoveUp
-        v.onMoveDown = onMoveDown
-        v.onCancel = onCancel
-        v.onShortcut = onShortcut
-    }
-
-    final class CatcherView: NSView {
-        var onMoveUp: (() -> Void)?
-        var onMoveDown: (() -> Void)?
-        var onCancel: (() -> Void)?
-        var onShortcut: ((Int) -> Void)?
-        private var monitor: Any?
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            if window != nil, monitor == nil {
-                monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                    guard let self, self.window != nil else { return event }
-                    if event.modifierFlags.contains(.command),
-                       let chars = event.charactersIgnoringModifiers,
-                       chars.count == 1,
-                       let digit = Int(chars),
-                       (1...9).contains(digit) {
-                        self.onShortcut?(digit - 1)
-                        return nil
-                    }
-                    switch event.keyCode {
-                    case 126: self.onMoveUp?(); return nil
-                    case 125: self.onMoveDown?(); return nil
-                    case 53:  self.onCancel?(); return nil
-                    default: return event
-                    }
-                }
-            } else if window == nil, let m = monitor {
-                NSEvent.removeMonitor(m)
-                monitor = nil
-            }
-        }
-
-        deinit {
-            if let m = monitor { NSEvent.removeMonitor(m) }
-        }
-    }
-}

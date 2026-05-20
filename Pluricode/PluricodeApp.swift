@@ -10,7 +10,7 @@ struct PluricodeApp: App {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showPalette = false
     @State private var creatingWorkspace = false
-    @State private var pendingMergedDeletion: MergedDeletionRequest?
+    @State private var pendingConfirmation: ConfirmationPrompt?
     @AppStorage("appearanceMode") private var appearanceModeRaw = AppearanceMode.system.rawValue
 
     init() {
@@ -80,31 +80,14 @@ struct PluricodeApp: App {
                     sidebarState: sidebarState,
                     onCreateWorkspace: { creatingWorkspace = true },
                     onMergedDeletionFound: { matches in
-                        pendingMergedDeletion = MergedDeletionRequest(matches: matches)
+                        pendingConfirmation = mergedDeletionPrompt(matches)
                     }
                 )
             }
             .sheet(isPresented: $creatingWorkspace) {
                 NewWorkspaceSheet(workspaceStore: workspaceStore)
             }
-            .alert(item: $pendingMergedDeletion) { request in
-                if request.matches.isEmpty {
-                    return Alert(
-                        title: Text("No Merged Worktrees"),
-                        message: Text("All worktrees still have open or unmerged PRs."),
-                        dismissButton: .default(Text("OK"))
-                    )
-                }
-                let names = request.matches.map { $0.branch }.joined(separator: ", ")
-                return Alert(
-                    title: Text("Delete \(request.matches.count) merged worktree\(request.matches.count == 1 ? "" : "s")?"),
-                    message: Text("Removes worktrees and deletes their branches:\n\(names)"),
-                    primaryButton: .destructive(Text("Delete")) {
-                        runMergedDeletion(request.matches)
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
+            .confirmation($pendingConfirmation)
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
@@ -127,6 +110,23 @@ struct PluricodeApp: App {
         }
     }
 
+    private func mergedDeletionPrompt(_ matches: [MergedWorktreeMatch]) -> ConfirmationPrompt {
+        if matches.isEmpty {
+            return .info(
+                title: "No Merged Worktrees",
+                message: "All worktrees still have open or unmerged PRs."
+            )
+        }
+        let names = matches.map(\.branch).joined(separator: ", ")
+        let count = matches.count
+        return .destructive(
+            title: "Delete \(count) merged worktree\(count == 1 ? "" : "s")?",
+            message: "Removes worktrees and deletes their branches:\n\(names)"
+        ) {
+            runMergedDeletion(matches)
+        }
+    }
+
     private func runMergedDeletion(_ matches: [MergedWorktreeMatch]) {
         var affectedRepos: Set<UUID> = []
         for match in matches {
@@ -141,11 +141,6 @@ struct PluricodeApp: App {
             }
         }
     }
-}
-
-private struct MergedDeletionRequest: Identifiable {
-    let id = UUID()
-    let matches: [MergedWorktreeMatch]
 }
 
 struct PaneCommands: View {
