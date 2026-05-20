@@ -60,6 +60,50 @@ private struct PaneCreationPopover: View {
     let onComplete: () -> Void
     @State private var worktreesByRepo: [UUID: [Worktree]] = [:]
     @State private var newWorktreeRepo: RepoEntry?
+    @State private var highlight: Int = 0
+
+    private enum Item: Identifiable {
+        case widget(WidgetKind)
+        case worktree(repo: RepoEntry, worktree: Worktree)
+        case newWorktree(RepoEntry)
+
+        var id: String {
+            switch self {
+            case .widget(let k): "w:\(k.rawValue)"
+            case .worktree(let r, let wt): "wt:\(r.id):\(wt.id)"
+            case .newWorktree(let r): "nw:\(r.id)"
+            }
+        }
+    }
+
+    private struct Section: Identifiable {
+        let id: String
+        let header: Header
+        let items: [Item]
+
+        enum Header {
+            case widgets
+            case repo(RepoEntry)
+        }
+    }
+
+    private var sections: [Section] {
+        var result: [Section] = [
+            Section(id: "widgets", header: .widgets, items: [.widget(.localHosts)])
+        ]
+        for repo in workspace.repoStore.repos {
+            var items: [Item] = (worktreesByRepo[repo.id] ?? []).map {
+                .worktree(repo: repo, worktree: $0)
+            }
+            items.append(.newWorktree(repo))
+            result.append(Section(id: "repo:\(repo.id)", header: .repo(repo), items: items))
+        }
+        return result
+    }
+
+    private var items: [Item] {
+        sections.flatMap(\.items)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -69,18 +113,35 @@ private struct PaneCreationPopover: View {
                     .foregroundStyle(.secondary)
                     .padding(16)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        widgetSection
-                        ForEach(workspace.repoStore.repos) { repo in
-                            repoSection(repo)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 2) {
+                            ForEach(sections) { section in
+                                sectionView(section)
+                            }
                         }
+                        .padding(.vertical, 6)
                     }
-                    .padding(.vertical, 6)
+                    .onChange(of: highlight) { _, _ in
+                        let all = items
+                        guard all.indices.contains(highlight) else { return }
+                        proxy.scrollTo(all[highlight].id, anchor: .center)
+                    }
                 }
+                KeyHintBar(hints: [
+                    ("↑↓", "Navigate"),
+                    ("⏎", "Open"),
+                    ("⎋", "Close")
+                ])
             }
         }
         .frame(width: 280, height: 360)
+        .background(KeyboardCatcher(
+            onMoveUp: { move(-1) },
+            onMoveDown: { move(1) },
+            onReturn: { commit() },
+            onEscape: onComplete
+        ))
         .onAppear(perform: loadAll)
         .sheet(item: $newWorktreeRepo) { repo in
             NewWorktreeSheet(repo: repo) { branch in
@@ -94,65 +155,93 @@ private struct PaneCreationPopover: View {
     }
 
     @ViewBuilder
-    private var widgetSection: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "square.grid.2x2")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-            Text("Widgets")
-                .font(.system(size: 12, weight: .semibold))
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
-        .padding(.bottom, 2)
-
-        PaneCreationRow(
-            icon: WidgetKind.localHosts.systemImage,
-            title: WidgetKind.localHosts.label,
-            subtitle: "Browser links from running dev servers"
-        ) {
-            workspace.performPaneCreation(action, content: .widget(.localHosts))
-            onComplete()
+    private func sectionView(_ section: Section) -> some View {
+        sectionHeader(section.header)
+        ForEach(section.items) { item in
+            row(item)
+                .id(item.id)
         }
     }
 
     @ViewBuilder
-    private func repoSection(_ repo: RepoEntry) -> some View {
+    private func sectionHeader(_ header: Section.Header) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: "folder.fill")
-                .foregroundStyle(repo.resolvedColor.swiftUIColor)
-                .font(.caption)
-            Text(repo.name)
-                .font(.system(size: 12, weight: .semibold))
+            switch header {
+            case .widgets:
+                Image(systemName: "square.grid.2x2")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                Text("Widgets")
+                    .font(.system(size: 12, weight: .semibold))
+            case .repo(let repo):
+                Image(systemName: "folder.fill")
+                    .foregroundStyle(repo.resolvedColor.swiftUIColor)
+                    .font(.caption)
+                Text(repo.name)
+                    .font(.system(size: 12, weight: .semibold))
+            }
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.top, 6)
         .padding(.bottom, 2)
+    }
 
-        ForEach(worktreesByRepo[repo.id] ?? []) { wt in
+    @ViewBuilder
+    private func row(_ item: Item) -> some View {
+        let highlighted = items.firstIndex(where: { $0.id == item.id }) == highlight
+        switch item {
+        case .widget(let kind):
+            PaneCreationRow(
+                icon: kind.systemImage,
+                title: kind.label,
+                subtitle: "Browser links from running dev servers",
+                highlighted: highlighted
+            ) { run(item) }
+        case .worktree(_, let wt):
             PaneCreationRow(
                 icon: "arrow.triangle.branch",
                 title: wt.displayName,
-                subtitle: wt.branch
-            ) {
-                workspace.performPaneCreation(
-                    action,
-                    content: .terminal(repoID: repo.id, worktreeID: wt.branch)
-                )
-                onComplete()
-            }
+                subtitle: wt.branch,
+                highlighted: highlighted
+            ) { run(item) }
+        case .newWorktree:
+            PaneCreationRow(
+                icon: "plus.circle",
+                title: "New Worktree…",
+                subtitle: nil,
+                muted: true,
+                highlighted: highlighted
+            ) { run(item) }
         }
+    }
 
-        PaneCreationRow(
-            icon: "plus.circle",
-            title: "New Worktree…",
-            subtitle: nil,
-            muted: true
-        ) {
+    private func run(_ item: Item) {
+        switch item {
+        case .widget(let kind):
+            workspace.performPaneCreation(action, content: .widget(kind))
+            onComplete()
+        case .worktree(let repo, let wt):
+            workspace.performPaneCreation(
+                action,
+                content: .terminal(repoID: repo.id, worktreeID: wt.branch)
+            )
+            onComplete()
+        case .newWorktree(let repo):
             newWorktreeRepo = repo
         }
+    }
+
+    private func move(_ delta: Int) {
+        let count = items.count
+        guard count > 0 else { return }
+        highlight = ((highlight + delta) % count + count) % count
+    }
+
+    private func commit() {
+        let all = items
+        guard all.indices.contains(highlight) else { return }
+        run(all[highlight])
     }
 
     private func loadAll() {
@@ -171,6 +260,7 @@ private struct PaneCreationRow: View {
     let title: String
     var subtitle: String? = nil
     var muted: Bool = false
+    let highlighted: Bool
     let onTap: () -> Void
     @State private var hovered = false
 
@@ -196,9 +286,15 @@ private struct PaneCreationRow: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 4)
             .contentShape(Rectangle())
-            .background(hovered ? Color.accentColor.opacity(0.15) : Color.clear)
+            .background(background)
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
+    }
+
+    private var background: Color {
+        if highlighted { return Color.accentColor.opacity(0.25) }
+        if hovered { return Color.accentColor.opacity(0.15) }
+        return Color.clear
     }
 }
