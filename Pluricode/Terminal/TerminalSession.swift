@@ -20,6 +20,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     private var lastAppliedZoom: Float = 1.0
     private var lastSavedBufferSize: Int = 0
     private var idleWorkItem: DispatchWorkItem?
+    private var isHovering: Bool = false
     private lazy var hostDetector: LocalHostDetector = LocalHostDetector { [weak self] url in
         self?.onLocalHostDiscovered?(url)
     }
@@ -41,6 +42,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         view.onAttachImage = { [weak self] attachment in self?.attach(attachment) }
         view.flushAttachments = { [weak self] in self?.flushAttachmentInjection() }
         view.onMouseDown = { [weak self] in self?.onFocus?() }
+        view.onHoverChange = { [weak self] hovering in self?.setHovering(hovering) }
         terminalView.processDelegate = self
         terminalView.font = NSFont.monospacedSystemFont(ofSize: Self.baseFontSize, weight: .regular)
         terminalView.changeScrollback(Self.scrollbackLines)
@@ -72,9 +74,23 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     private func noteActivity() {
         if isIdle { isIdle = false }
         idleWorkItem?.cancel()
+        idleWorkItem = nil
+        guard !isHovering else { return }
         let item = DispatchWorkItem { [weak self] in self?.isIdle = true }
         idleWorkItem = item
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.idleThreshold, execute: item)
+    }
+
+    private func setHovering(_ hovering: Bool) {
+        guard isHovering != hovering else { return }
+        isHovering = hovering
+        if hovering {
+            if isIdle { isIdle = false }
+            idleWorkItem?.cancel()
+            idleWorkItem = nil
+        } else {
+            noteActivity()
+        }
     }
 
     func sendStartupScript(_ script: String) {
@@ -147,8 +163,11 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     var onAttachImage: ((PendingImageAttachment) -> Void)?
     var flushAttachments: (() -> String?)?
     var onMouseDown: (() -> Void)?
+    var onHoverChange: ((Bool) -> Void)?
     private var keyMonitor: Any?
     private var mouseMonitor: Any?
+    private var hoverTrackingArea: NSTrackingArea?
+    private lazy var hoverObserver = HoverObserver { [weak self] hovering in self?.onHoverChange?(hovering) }
     private var metalCancellable: AnyCancellable?
 
     private let promiseQueue = OperationQueue()
@@ -183,11 +202,24 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
                     return event
                 }
             }
+            if hoverTrackingArea == nil {
+                let area = NSTrackingArea(
+                    rect: .zero,
+                    options: [.mouseEnteredAndExited, .inVisibleRect, .activeInActiveApp],
+                    owner: hoverObserver,
+                    userInfo: nil
+                )
+                addTrackingArea(area)
+                hoverTrackingArea = area
+            }
         } else {
             if let monitor = keyMonitor { NSEvent.removeMonitor(monitor) }
             keyMonitor = nil
             if let monitor = mouseMonitor { NSEvent.removeMonitor(monitor) }
             mouseMonitor = nil
+            if let area = hoverTrackingArea { removeTrackingArea(area) }
+            hoverTrackingArea = nil
+            onHoverChange?(false)
         }
         applyMetalRenderer()
     }
@@ -199,6 +231,7 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
         if window.firstResponder !== self {
             window.makeFirstResponder(self)
         }
+        onActivity?()
         onMouseDown?()
     }
 
@@ -309,4 +342,18 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     private static func shellEscape(_ path: String) -> String {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
+}
+
+private final class HoverObserver: NSResponder {
+    private let callback: (Bool) -> Void
+
+    init(callback: @escaping (Bool) -> Void) {
+        self.callback = callback
+        super.init()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func mouseEntered(with event: NSEvent) { callback(true) }
+    override func mouseExited(with event: NSEvent) { callback(false) }
 }
