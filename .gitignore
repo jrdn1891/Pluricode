@@ -3,6 +3,7 @@
 *.xcodeproj/project.xcworkspace/xcuserdata/
 DerivedData/
 .build/
+build/
 .pluricode/
 *.swp
 .mcp.json
