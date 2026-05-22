@@ -82,7 +82,8 @@ final class Workspace {
 
     static var rootDir: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return support.appendingPathComponent("Pluricode", isDirectory: true)
+        let name = Bundle.main.bundleIdentifier ?? "Pluricode"
+        return support.appendingPathComponent(name, isDirectory: true)
     }
 
     static var workspacesDir: URL {

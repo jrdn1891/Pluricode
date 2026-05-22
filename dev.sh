@@ -1,5 +1,19 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 cd "$(dirname "$0")"
-xcodebuild -project Pluricode.xcodeproj -scheme Pluricode -configuration Debug -destination 'platform=macOS,arch=arm64' CONFIGURATION_BUILD_DIR="$PWD/build" build -quiet
-open -n build/Pluricode.app
+
+DEV_BUNDLE_ID="com.pluricode.app.dev"
+SIGN_ID="${PLURICODE_DEV_SIGN_ID:-Apple Development: Gabriel Jourdan (C6AJQN787F)}"
+BUILD_DIR="$PWD/build/dev"
+APP="$BUILD_DIR/Pluricode.app"
+
+xcodebuild -project Pluricode.xcodeproj -scheme Pluricode -configuration Debug \
+  -destination 'platform=macOS,arch=arm64' \
+  CONFIGURATION_BUILD_DIR="$BUILD_DIR" \
+  PRODUCT_BUNDLE_IDENTIFIER="$DEV_BUNDLE_ID" \
+  build -quiet
+
+/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'Pluricode Dev'" "$APP/Contents/Info.plist"
+codesign --force --deep --sign "$SIGN_ID" "$APP"
+
+open -n "$APP"
