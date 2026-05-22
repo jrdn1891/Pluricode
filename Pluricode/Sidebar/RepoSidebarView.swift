@@ -106,12 +106,17 @@ struct RepoSidebarView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            Button(action: pickFolder) {
-                Label("Add Repository", systemImage: "plus")
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                Divider()
+                Button(action: pickFolder) {
+                    Label("Add Repository", systemImage: "plus")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderless)
+                .padding()
             }
-            .buttonStyle(.borderless)
-            .padding()
+            .background(.bar)
         }
         .sheet(isPresented: $creatingWorkspace) {
             NewWorkspaceSheet(workspaceStore: workspaceStore)
