@@ -4,24 +4,21 @@ final class TerminalHost {
     let tabID: UUID
     let session: TerminalSession
     let containerView: NSView
-    let worktreePath: String
-    let repoPath: String
-    let extraStartupScript: String?
+    let cwd: String
+    let startupScript: String?
     private var hasStarted = false
 
     init(
         tabID: UUID,
-        worktreePath: String,
-        repoPath: String,
-        extraStartupScript: String? = nil,
+        cwd: String,
+        startupScript: String? = nil,
         onLocalHostDiscovered: ((URL) -> Void)? = nil
     ) {
         self.tabID = tabID
-        self.worktreePath = worktreePath
-        self.repoPath = repoPath
-        self.extraStartupScript = extraStartupScript
+        self.cwd = cwd
+        self.startupScript = startupScript
         self.session = TerminalSession(nodeID: tabID)
-        session.worktreePath = worktreePath
+        session.worktreePath = cwd
         session.onLocalHostDiscovered = onLocalHostDiscovered
         session.updateColors(theme: Theme(from: NSApp.effectiveAppearance))
 
@@ -46,11 +43,9 @@ final class TerminalHost {
         if let scrollbackDir {
             session.restoreScrollback(from: scrollbackDir)
         }
-        session.start(in: worktreePath)
+        session.start(in: cwd)
 
-        if let extra = extraStartupScript, !extra.isEmpty {
-            session.sendStartupScript(extra)
-        } else if let script = RepoConfig.load(at: repoPath).startupScript, !script.isEmpty {
+        if let script = startupScript, !script.isEmpty {
             session.sendStartupScript(script)
         }
     }

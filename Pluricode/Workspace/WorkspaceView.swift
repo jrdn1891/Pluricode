@@ -177,6 +177,7 @@ private struct GhostPane: View {
     private var paneIcon: String? {
         switch pane.activeTab.content {
         case .terminal: return "arrow.triangle.branch"
+        case .shell: return "folder"
         case .tasks: return "checklist"
         case .widget(let kind): return kind.systemImage
         }
@@ -186,6 +187,8 @@ private struct GhostPane: View {
         switch pane.activeTab.content {
         case .terminal(_, let worktreeID):
             return worktreeID
+        case .shell(let cwd):
+            return cwd.lastPathComponent
         case .tasks(let listID):
             return workspace.taskListStore.lists.first { $0.id == listID }?.name ?? "Tasks"
         case .widget(let kind):
@@ -260,6 +263,8 @@ private struct TabBody: View {
                 worktreeID: worktreeID,
                 workspace: workspace
             )
+        case .shell(let cwd):
+            ShellPaneBody(pane: pane, tabID: tab.id, cwd: cwd, workspace: workspace)
         case .tasks(let listID):
             TaskPaneBody(pane: pane, tabID: tab.id, listID: listID, workspace: workspace)
         case .widget(.localHosts):
@@ -476,6 +481,151 @@ private struct TerminalPaneBody: View {
                 )
             }
         }
+    }
+}
+
+private struct ShellPaneBody: View {
+    let pane: Pane
+    let tabID: UUID
+    let cwd: URL
+    let workspace: Workspace
+
+    var body: some View {
+        let isExpanded = workspace.expandedPaneID == pane.id
+        VStack(spacing: 0) {
+            ShellPaneHeader(
+                pane: pane,
+                workspace: workspace,
+                cwd: cwd,
+                isExpanded: isExpanded,
+                onActivate: { workspace.setFocus(paneID: pane.id) },
+                onExpand: {
+                    if isExpanded { workspace.collapseExpandedPane() }
+                    else { workspace.expandPane(paneID: pane.id) }
+                },
+                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+            )
+            if isExpanded {
+                ExpandedPanePlaceholder()
+            } else if FileManager.default.fileExists(atPath: cwd.path) {
+                GeometryReader { geo in
+                    ShellPaneView(paneID: pane.id, tabID: tabID, cwd: cwd, workspace: workspace)
+                        .id(tabID)
+                        .overlay {
+                            if let session = workspace.terminalHosts[tabID]?.session {
+                                IdleOverlay(session: session)
+                            }
+                        }
+                        .overlay {
+                            if let session = workspace.terminalHosts[tabID]?.session {
+                                AttachmentChipsOverlay(session: session)
+                            }
+                        }
+                        .onDrop(
+                            of: [.plainText],
+                            delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
+                        )
+                }
+            } else {
+                MissingFolderBody(
+                    cwd: cwd,
+                    onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+                )
+            }
+        }
+    }
+}
+
+private struct ShellPaneHeader: View {
+    let pane: Pane
+    let workspace: Workspace
+    let cwd: URL
+    let isExpanded: Bool
+    let onActivate: () -> Void
+    let onExpand: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "folder")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            Text(cwd.lastPathComponent)
+                .font(.system(size: 12, weight: .medium))
+            Text(parentPath)
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+                .lineLimit(1)
+                .truncationMode(.head)
+            Spacer()
+            Button(action: onExpand) {
+                Image(systemName: isExpanded
+                    ? "arrow.down.right.and.arrow.up.left"
+                    : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(isExpanded ? "Collapse" : "Expand")
+            if !isExpanded {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.1))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onActivate)
+        .draggable(beginMoveDrag()) {
+            HStack(spacing: 6) {
+                Image(systemName: "folder")
+                Text(cwd.lastPathComponent)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    private var parentPath: String {
+        let parent = cwd.deletingLastPathComponent().path
+        let home = NSHomeDirectory()
+        if parent == home { return "~" }
+        if parent.hasPrefix(home + "/") { return "~" + parent.dropFirst(home.count) }
+        return parent
+    }
+
+    private func beginMoveDrag() -> TilingDragPayload {
+        let payload = TilingDragPayload(kind: .movePane(paneID: pane.id))
+        workspace.beginDrag(payload)
+        return payload
+    }
+}
+
+private struct MissingFolderBody: View {
+    let cwd: URL
+    let onRemove: () -> Void
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 30))
+                .foregroundStyle(.orange)
+            Text("Folder `\(cwd.path)` not found")
+                .font(.headline)
+            Text("It may have been deleted or renamed.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Remove Pane", role: .destructive, action: onRemove)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
     }
 }
 
@@ -725,8 +875,22 @@ private struct ExpandedPaneCard: View {
     let workspace: Workspace
 
     var body: some View {
-        if let pane = workspace.pane(id: paneID),
-           case .terminal(let repoID, let worktreeID) = pane.activeTab.content {
+        if let pane = workspace.pane(id: paneID) {
+            content(for: pane)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.35), radius: 30, y: 10)
+        }
+    }
+
+    @ViewBuilder
+    private func content(for pane: Pane) -> some View {
+        switch pane.activeTab.content {
+        case .terminal(let repoID, let worktreeID):
             TerminalExpandedContent(
                 pane: pane,
                 tabID: pane.activeTabID,
@@ -734,18 +898,16 @@ private struct ExpandedPaneCard: View {
                 worktreeID: worktreeID,
                 workspace: workspace
             )
-            .background(cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+        case .shell(let cwd):
+            ShellExpandedContent(
+                pane: pane,
+                tabID: pane.activeTabID,
+                cwd: cwd,
+                workspace: workspace
             )
-            .shadow(color: .black.opacity(0.35), radius: 30, y: 10)
+        case .tasks, .widget:
+            EmptyView()
         }
-    }
-
-    private var cardBackground: Color {
-        Color(nsColor: .windowBackgroundColor)
     }
 }
 
@@ -788,6 +950,41 @@ private struct TerminalExpandedContent: View {
             } else {
                 MissingWorktreeBody(
                     worktreeID: worktreeID,
+                    onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+                )
+            }
+        }
+    }
+}
+
+private struct ShellExpandedContent: View {
+    let pane: Pane
+    let tabID: UUID
+    let cwd: URL
+    let workspace: Workspace
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ShellPaneHeader(
+                pane: pane,
+                workspace: workspace,
+                cwd: cwd,
+                isExpanded: true,
+                onActivate: { workspace.setFocus(paneID: pane.id) },
+                onExpand: { workspace.collapseExpandedPane() },
+                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+            )
+            if FileManager.default.fileExists(atPath: cwd.path) {
+                ShellPaneView(paneID: pane.id, tabID: tabID, cwd: cwd, workspace: workspace)
+                    .id(tabID)
+                    .overlay {
+                        if let session = workspace.terminalHosts[tabID]?.session {
+                            AttachmentChipsOverlay(session: session)
+                        }
+                    }
+            } else {
+                MissingFolderBody(
+                    cwd: cwd,
                     onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
                 )
             }
