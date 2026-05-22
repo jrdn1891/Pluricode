@@ -109,11 +109,19 @@ struct RepoSidebarView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 Divider()
-                Button(action: pickFolder) {
-                    Label("Add Repository", systemImage: "plus")
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    Button(action: pickFolder) {
+                        Label("Add Repository", systemImage: "plus")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.borderless)
+
+                    SettingsLink {
+                        Image(systemName: "gearshape")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Settings (⌘,)")
                 }
-                .buttonStyle(.borderless)
                 .padding()
             }
             .background(.bar)
