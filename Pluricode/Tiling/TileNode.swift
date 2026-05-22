@@ -45,6 +45,7 @@ enum TileEdge {
 struct TilingDragPayload: Codable, Transferable, Hashable {
     enum Kind: Codable, Hashable {
         case newTerminal(repoID: UUID, worktreeID: String)
+        case newShell(cwd: URL)
         case newTaskPane(listID: UUID)
         case newWidget(WidgetKind)
         case movePane(paneID: UUID)
@@ -74,6 +75,7 @@ enum WidgetKind: String, Hashable, Codable {
 
 enum TabContent: Hashable, Codable {
     case terminal(repoID: UUID, worktreeID: String)
+    case shell(cwd: URL)
     case tasks(listID: UUID)
     case widget(WidgetKind)
 }
@@ -307,6 +309,9 @@ extension Tiling {
         switch payload.kind {
         case .newTerminal(let repoID, let worktreeID):
             return simulateAdd(content: .terminal(repoID: repoID, worktreeID: worktreeID),
+                               targetID: targetID, edge: edge, previewPaneID: previewPaneID, root: root)
+        case .newShell(let cwd):
+            return simulateAdd(content: .shell(cwd: cwd),
                                targetID: targetID, edge: edge, previewPaneID: previewPaneID, root: root)
         case .newTaskPane(let listID):
             return simulateAdd(content: .tasks(listID: listID),

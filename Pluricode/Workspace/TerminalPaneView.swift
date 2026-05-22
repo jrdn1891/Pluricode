@@ -27,11 +27,12 @@ struct TerminalPaneView: NSViewRepresentable {
 
     private func hostForTab() -> TerminalHost {
         if let existing = workspace.terminalHosts[tabID] { return existing }
+        let startup = workspace.consumePendingDevScript(tabID: tabID)
+            ?? RepoConfig.load(at: repoPath).startupScript
         let host = TerminalHost(
             tabID: tabID,
-            worktreePath: worktreePath,
-            repoPath: repoPath,
-            extraStartupScript: workspace.consumePendingDevScript(tabID: tabID),
+            cwd: worktreePath,
+            startupScript: startup,
             onLocalHostDiscovered: { [weak workspace, tabID, repoID, worktreeID] url in
                 guard let workspace, let store = workspace.store else { return }
                 store.localHostRegistry.record(
@@ -43,6 +44,34 @@ struct TerminalPaneView: NSViewRepresentable {
                 )
             }
         )
+        workspace.terminalHosts[tabID] = host
+        return host
+    }
+}
+
+struct ShellPaneView: NSViewRepresentable {
+    let paneID: UUID
+    let tabID: UUID
+    let cwd: URL
+    let workspace: Workspace
+
+    func makeNSView(context: Context) -> NSView {
+        let host = hostForTab()
+        host.startIfNeeded(scrollbackDir: workspace.scrollbackDir)
+        return host.containerView
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        let host = hostForTab()
+        host.applyTheme(Theme(from: NSApp.effectiveAppearance))
+        host.session.onFocus = { [weak workspace, paneID] in
+            workspace?.setFocus(paneID: paneID)
+        }
+    }
+
+    private func hostForTab() -> TerminalHost {
+        if let existing = workspace.terminalHosts[tabID] { return existing }
+        let host = TerminalHost(tabID: tabID, cwd: cwd.path, startupScript: nil)
         workspace.terminalHosts[tabID] = host
         return host
     }

@@ -263,6 +263,7 @@ final class Workspace {
         if let name = tab.name, !name.isEmpty { return name }
         switch tab.content {
         case .terminal(_, let worktreeID): return worktreeID
+        case .shell(let cwd): return cwd.lastPathComponent
         case .widget(let kind): return kind.label
         case .tasks: return fallback
         }
@@ -302,8 +303,10 @@ final class Workspace {
 
     var terminalPanes: [Pane] {
         tiling.panes.filter {
-            if case .terminal = $0.activeTab.content { return true }
-            return false
+            switch $0.activeTab.content {
+            case .terminal, .shell: return true
+            case .tasks, .widget: return false
+            }
         }
     }
 
@@ -439,6 +442,10 @@ final class Workspace {
                     if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
                     else { addPane(content) }
                 }
+            case .newShell(let cwd):
+                let content: TabContent = .shell(cwd: cwd)
+                if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
+                else { addPane(content) }
             case .newTaskPane(let listID):
                 let content: TabContent = .tasks(listID: listID)
                 if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }

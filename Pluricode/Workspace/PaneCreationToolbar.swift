@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct PaneCreationToolbar: ToolbarContent {
     let workspace: Workspace?
@@ -64,12 +65,16 @@ private struct PaneCreationPopover: View {
 
     private enum Item: Identifiable {
         case widget(WidgetKind)
+        case shell(cwd: URL, label: String)
+        case chooseFolder
         case worktree(repo: RepoEntry, worktree: Worktree)
         case newWorktree(RepoEntry)
 
         var id: String {
             switch self {
             case .widget(let k): "w:\(k.rawValue)"
+            case .shell(let cwd, _): "s:\(cwd.path)"
+            case .chooseFolder: "cf"
             case .worktree(let r, let wt): "wt:\(r.id):\(wt.id)"
             case .newWorktree(let r): "nw:\(r.id)"
             }
@@ -83,13 +88,19 @@ private struct PaneCreationPopover: View {
 
         enum Header {
             case widgets
+            case terminal
             case repo(RepoEntry)
         }
     }
 
     private var sections: [Section] {
+        let home = FileManager.default.homeDirectoryForCurrentUser
         var result: [Section] = [
-            Section(id: "widgets", header: .widgets, items: [.widget(.localHosts)])
+            Section(id: "widgets", header: .widgets, items: [.widget(.localHosts)]),
+            Section(id: "terminal", header: .terminal, items: [
+                .shell(cwd: home, label: "Home"),
+                .chooseFolder
+            ])
         ]
         for repo in workspace.repoStore.repos {
             var items: [Item] = (worktreesByRepo[repo.id] ?? []).map {
@@ -107,33 +118,26 @@ private struct PaneCreationPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if workspace.repoStore.repos.isEmpty {
-                Text("Add a repository from the sidebar first.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(16)
-            } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 2) {
-                            ForEach(sections) { section in
-                                sectionView(section)
-                            }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(sections) { section in
+                            sectionView(section)
                         }
-                        .padding(.vertical, 6)
                     }
-                    .onChange(of: highlight) { _, _ in
-                        let all = items
-                        guard all.indices.contains(highlight) else { return }
-                        proxy.scrollTo(all[highlight].id, anchor: .center)
-                    }
+                    .padding(.vertical, 6)
                 }
-                KeyHintBar(hints: [
-                    ("↑↓", "Navigate"),
-                    ("⏎", "Open"),
-                    ("⎋", "Close")
-                ])
+                .onChange(of: highlight) { _, _ in
+                    let all = items
+                    guard all.indices.contains(highlight) else { return }
+                    proxy.scrollTo(all[highlight].id, anchor: .center)
+                }
             }
+            KeyHintBar(hints: [
+                ("↑↓", "Navigate"),
+                ("⏎", "Open"),
+                ("⎋", "Close")
+            ])
         }
         .frame(width: 280, height: 360)
         .background(KeyboardCatcher(
@@ -173,6 +177,12 @@ private struct PaneCreationPopover: View {
                     .font(.caption)
                 Text("Widgets")
                     .font(.system(size: 12, weight: .semibold))
+            case .terminal:
+                Image(systemName: "terminal")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                Text("Terminal")
+                    .font(.system(size: 12, weight: .semibold))
             case .repo(let repo):
                 Image(systemName: "folder.fill")
                     .foregroundStyle(repo.resolvedColor.swiftUIColor)
@@ -198,6 +208,21 @@ private struct PaneCreationPopover: View {
                 subtitle: "Browser links from running dev servers",
                 highlighted: highlighted
             ) { run(item) }
+        case .shell(let cwd, let label):
+            PaneCreationRow(
+                icon: "folder",
+                title: label,
+                subtitle: cwd.path,
+                highlighted: highlighted
+            ) { run(item) }
+        case .chooseFolder:
+            PaneCreationRow(
+                icon: "folder.badge.plus",
+                title: "Choose Folder…",
+                subtitle: nil,
+                muted: true,
+                highlighted: highlighted
+            ) { run(item) }
         case .worktree(_, let wt):
             PaneCreationRow(
                 icon: "arrow.triangle.branch",
@@ -221,6 +246,11 @@ private struct PaneCreationPopover: View {
         case .widget(let kind):
             workspace.performPaneCreation(action, content: .widget(kind))
             onComplete()
+        case .shell(let cwd, _):
+            workspace.performPaneCreation(action, content: .shell(cwd: cwd))
+            onComplete()
+        case .chooseFolder:
+            chooseFolder()
         case .worktree(let repo, let wt):
             workspace.performPaneCreation(
                 action,
@@ -230,6 +260,17 @@ private struct PaneCreationPopover: View {
         case .newWorktree(let repo):
             newWorktreeRepo = repo
         }
+    }
+
+    private func chooseFolder() {
+        onComplete()
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        workspace.performPaneCreation(action, content: .shell(cwd: url))
     }
 
     private func move(_ delta: Int) {
