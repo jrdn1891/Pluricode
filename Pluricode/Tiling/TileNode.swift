@@ -8,7 +8,7 @@ enum TileDirection: String, Codable {
     case vertical
 }
 
-enum TileEdge {
+enum TileEdge: String, Codable {
     case top, bottom, left, right, center
 
     var direction: TileDirection {
@@ -114,6 +114,18 @@ struct Pane: Identifiable, Hashable, Codable {
     }
 }
 
+struct RestoreHint: Hashable, Codable {
+    let siblingPaneID: UUID?
+    let edge: TileEdge
+}
+
+struct MinimizedPane: Identifiable, Hashable, Codable {
+    let pane: Pane
+    let hint: RestoreHint
+    let minimizedAt: Date
+    var id: UUID { pane.id }
+}
+
 struct Split: Identifiable, Hashable, Codable {
     let id: UUID
     var direction: TileDirection
@@ -197,6 +209,22 @@ final class Tiling {
         root = Self.update(paneID: targetID, in: afterRemoval) { p in
             p.tabs.append(contentsOf: source.tabs)
             p.activeTabID = source.activeTabID
+        }
+    }
+
+    func reinsertPane(_ pane: Pane, near siblingID: UUID?, edge: TileEdge) {
+        guard let existingRoot = root else {
+            root = .pane(pane)
+            return
+        }
+        if let siblingID, Self.findPaneStruct(id: siblingID, in: existingRoot) != nil {
+            root = Self.insertSibling(pane, at: edge, adjacentTo: siblingID, in: existingRoot)
+            return
+        }
+        if let firstID = Self.allPanes(in: existingRoot).first?.id {
+            root = Self.insertSibling(pane, at: .right, adjacentTo: firstID, in: existingRoot)
+        } else {
+            root = .pane(pane)
         }
     }
 
@@ -353,6 +381,32 @@ extension Tiling {
             return (next, targetID)
         }
         return (insertSibling(source, at: edge, adjacentTo: targetID, in: afterRemoval), sourceID)
+    }
+
+    static func captureRestoreHint(for paneID: UUID, in node: TileNode?) -> RestoreHint {
+        guard let node, let hint = findHint(paneID: paneID, in: node) else {
+            return RestoreHint(siblingPaneID: nil, edge: .right)
+        }
+        return hint
+    }
+
+    private static func findHint(paneID: UUID, in node: TileNode) -> RestoreHint? {
+        guard case .split(let split) = node else { return nil }
+        if let idx = split.children.firstIndex(where: { isPane($0, id: paneID) }) {
+            let preferLeft = idx > 0
+            let siblingNode = preferLeft ? split.children[idx - 1] : split.children[idx + 1]
+            let siblingID = allPanes(in: siblingNode).first?.id
+            let edge: TileEdge
+            switch split.direction {
+            case .horizontal: edge = preferLeft ? .right : .left
+            case .vertical: edge = preferLeft ? .bottom : .top
+            }
+            return RestoreHint(siblingPaneID: siblingID, edge: edge)
+        }
+        for child in split.children {
+            if let hint = findHint(paneID: paneID, in: child) { return hint }
+        }
+        return nil
     }
 
     static func findPaneStruct(id: UUID, in node: TileNode) -> Pane? {

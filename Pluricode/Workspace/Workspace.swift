@@ -25,6 +25,7 @@ final class Workspace {
     var terminalHosts: [UUID: TerminalHost] = [:]
     var pendingDevScripts: [UUID: String] = [:]
     var stubTabs: [UUID: UUID] = [:]
+    var minimizedPanes: [MinimizedPane] = []
     @ObservationIgnored weak var store: WorkspaceStore?
     var focusedPaneID: UUID?
     var expandedPaneID: UUID?
@@ -60,6 +61,7 @@ final class Workspace {
         id: UUID = UUID(),
         name: String,
         root: TileNode? = nil,
+        minimizedPanes: [MinimizedPane] = [],
         repoStore: RepoStore,
         taskListStore: TaskListStore,
         worktreePaths: WorktreePaths,
@@ -68,6 +70,7 @@ final class Workspace {
         self.id = id
         self.name = name
         self.tiling = Tiling(root: root)
+        self.minimizedPanes = minimizedPanes
         self.repoStore = repoStore
         self.taskListStore = taskListStore
         self.worktreePaths = worktreePaths
@@ -107,7 +110,7 @@ final class Workspace {
     func save() {
         guard !isDeleted else { return }
         try? FileManager.default.createDirectory(at: Self.workspacesDir, withIntermediateDirectories: true)
-        let snapshot = WorkspaceSnapshot(id: id, name: name, root: tiling.root)
+        let snapshot = WorkspaceSnapshot(id: id, name: name, root: tiling.root, minimizedPanes: minimizedPanes)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(snapshot) {
@@ -144,6 +147,40 @@ final class Workspace {
     func splitPane(paneID: UUID, edge: TileEdge, content: TabContent) {
         let id = tiling.split(paneID: paneID, edge: edge, newContent: content)
         focusedPaneID = id
+        scheduleSave()
+    }
+
+    func canMinimize(paneID: UUID) -> Bool {
+        pane(id: paneID) != nil && tiling.panes.count > 1
+    }
+
+    func minimizePane(paneID: UUID) {
+        guard let pane = pane(id: paneID), canMinimize(paneID: paneID) else { return }
+        let hint = Tiling.captureRestoreHint(for: paneID, in: tiling.root)
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+            tiling.remove(paneID: paneID)
+            minimizedPanes.append(MinimizedPane(pane: pane, hint: hint, minimizedAt: Date()))
+        }
+        if focusedPaneID == paneID { focusedPaneID = tiling.panes.first?.id }
+        if expandedPaneID == paneID { expandedPaneID = nil }
+        scheduleSave()
+    }
+
+    func restoreMinimizedPane(paneID: UUID) {
+        guard let idx = minimizedPanes.firstIndex(where: { $0.pane.id == paneID }) else { return }
+        let item = minimizedPanes[idx]
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+            minimizedPanes.remove(at: idx)
+            tiling.reinsertPane(item.pane, near: item.hint.siblingPaneID, edge: item.hint.edge)
+        }
+        focusedPaneID = paneID
+        scheduleSave()
+    }
+
+    func closeMinimizedPane(paneID: UUID) {
+        guard let idx = minimizedPanes.firstIndex(where: { $0.pane.id == paneID }) else { return }
+        let item = minimizedPanes.remove(at: idx)
+        for tab in item.pane.tabs { teardownTab(tab.id) }
         scheduleSave()
     }
 
@@ -489,6 +526,22 @@ struct WorkspaceSnapshot: Codable {
     var id: UUID
     var name: String
     var root: TileNode?
+    var minimizedPanes: [MinimizedPane]
+
+    init(id: UUID, name: String, root: TileNode?, minimizedPanes: [MinimizedPane] = []) {
+        self.id = id
+        self.name = name
+        self.root = root
+        self.minimizedPanes = minimizedPanes
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.root = try c.decodeIfPresent(TileNode.self, forKey: .root)
+        self.minimizedPanes = try c.decodeIfPresent([MinimizedPane].self, forKey: .minimizedPanes) ?? []
+    }
 }
 
 @Observable
@@ -629,6 +682,15 @@ final class WorkspaceStore {
             for (paneID, tabID) in targets {
                 ws.closeTab(paneID: paneID, tabID: tabID)
             }
+            let minimizedTargets = ws.minimizedPanes.filter { item in
+                item.pane.tabs.contains { tab in
+                    if case .terminal(let r, let w) = tab.content { return r == repoID && w == worktreeID }
+                    return false
+                }
+            }
+            for item in minimizedTargets {
+                ws.closeMinimizedPane(paneID: item.pane.id)
+            }
         }
     }
 
@@ -665,6 +727,7 @@ final class WorkspaceStore {
                 id: snap.id,
                 name: snap.name,
                 root: snap.root,
+                minimizedPanes: snap.minimizedPanes,
                 repoStore: repoStore,
                 taskListStore: taskListStore,
                 worktreePaths: worktreePaths,

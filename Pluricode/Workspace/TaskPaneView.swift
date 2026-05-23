@@ -15,6 +15,7 @@ struct TaskPaneView: View {
     let listID: UUID
     let store: TaskListStore
     let onActivate: () -> Void
+    let onMinimize: (() -> Void)?
     let onClose: () -> Void
     @State private var draftText: String = ""
     @FocusState private var draftFocused: Bool
@@ -33,6 +34,7 @@ struct TaskPaneView: View {
                     totalCount: list.items.count,
                     onActivate: onActivate,
                     onClearCompleted: { store.clearCompleted(listID: listID) },
+                    onMinimize: onMinimize,
                     onClose: onClose
                 )
 
@@ -173,6 +175,7 @@ private struct TaskPaneHeader: View {
     let totalCount: Int
     let onActivate: () -> Void
     let onClearCompleted: () -> Void
+    let onMinimize: (() -> Void)?
     let onClose: () -> Void
 
     var body: some View {
@@ -197,6 +200,16 @@ private struct TaskPaneHeader: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .frame(width: 20)
+
+            if let onMinimize {
+                Button(action: onMinimize) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Minimize pane")
+            }
 
             Button(action: onClose) {
                 Image(systemName: "xmark")

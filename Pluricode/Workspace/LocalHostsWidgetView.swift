@@ -6,6 +6,7 @@ struct LocalHostsWidgetView: View {
     let tabID: UUID
     let workspace: Workspace
     let onActivate: () -> Void
+    let onMinimize: (() -> Void)?
     let onClose: () -> Void
 
     private var entries: [LocalHostEntry] {
@@ -20,6 +21,7 @@ struct LocalHostsWidgetView: View {
                 paneID: paneID,
                 count: entries.count,
                 onActivate: onActivate,
+                onMinimize: onMinimize,
                 onClose: onClose
             )
             if entries.isEmpty {
@@ -42,6 +44,7 @@ private struct LocalHostsHeader: View {
     let paneID: UUID
     let count: Int
     let onActivate: () -> Void
+    let onMinimize: (() -> Void)?
     let onClose: () -> Void
 
     var body: some View {
@@ -57,6 +60,15 @@ private struct LocalHostsHeader: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if let onMinimize {
+                Button(action: onMinimize) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Minimize pane")
+            }
             Button(action: onClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .semibold))
