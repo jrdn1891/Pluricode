@@ -10,13 +10,17 @@ struct WorkspaceView: View {
 
     var body: some View {
         ZStack {
-            WorkspaceBody(workspace: workspace)
+            VStack(spacing: 0) {
+                WorkspaceBody(workspace: workspace)
+                MinimizedPaneBar(workspace: workspace)
+            }
             if let id = workspace.expandedPaneID {
                 ExpandedPaneOverlay(paneID: id, workspace: workspace)
                     .transition(.opacity)
             }
         }
         .animation(.easeOut(duration: 0.15), value: workspace.expandedPaneID)
+        .animation(.easeOut(duration: 0.18), value: workspace.minimizedPanes.map(\.id))
         .focusedSceneValue(\.workspace, workspace)
         .onAppear {
             modifierMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
@@ -285,6 +289,9 @@ private struct WidgetPaneBody: View {
                 tabID: tabID,
                 workspace: workspace,
                 onActivate: { workspace.setFocus(paneID: pane.id) },
+                onMinimize: workspace.canMinimize(paneID: pane.id)
+                    ? { workspace.minimizePane(paneID: pane.id) }
+                    : nil,
                 onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
             )
             .frame(width: geo.size.width, height: geo.size.height)
@@ -411,6 +418,9 @@ private struct TaskPaneBody: View {
                 listID: listID,
                 store: workspace.taskListStore,
                 onActivate: { workspace.setFocus(paneID: pane.id) },
+                onMinimize: workspace.canMinimize(paneID: pane.id)
+                    ? { workspace.minimizePane(paneID: pane.id) }
+                    : nil,
                 onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
             )
             .frame(width: geo.size.width, height: geo.size.height)
@@ -567,6 +577,15 @@ private struct ShellPaneHeader: View {
             }
             .buttonStyle(.plain)
             .help(isExpanded ? "Collapse" : "Expand")
+            if !isExpanded, workspace.canMinimize(paneID: pane.id) {
+                Button(action: { workspace.minimizePane(paneID: pane.id) }) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Minimize pane")
+            }
             if !isExpanded {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
@@ -695,6 +714,15 @@ private struct PaneHeader: View {
             }
             .buttonStyle(.plain)
             .help(isExpanded ? "Collapse" : "Expand")
+            if !isExpanded, workspace.canMinimize(paneID: pane.id) {
+                Button(action: { workspace.minimizePane(paneID: pane.id) }) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Minimize pane")
+            }
             if !isExpanded {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
@@ -844,6 +872,81 @@ private struct PaneDropDelegate: DropDelegate {
             }
         }
         return true
+    }
+}
+
+private struct MinimizedPaneBar: View {
+    let workspace: Workspace
+
+    var body: some View {
+        if !workspace.minimizedPanes.isEmpty {
+            HStack(spacing: 6) {
+                ForEach(workspace.minimizedPanes) { item in
+                    MinimizedPaneChip(item: item, workspace: workspace)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.secondary.opacity(0.08))
+            .overlay(alignment: .top) {
+                Divider()
+            }
+        }
+    }
+}
+
+private struct MinimizedPaneChip: View {
+    let item: MinimizedPane
+    let workspace: Workspace
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+            Button(action: { workspace.closeMinimizedPane(paneID: item.id) }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .opacity(hovering ? 1 : 0)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.secondary.opacity(hovering ? 0.22 : 0.16))
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { workspace.restoreMinimizedPane(paneID: item.id) }
+        .onHover { hovering = $0 }
+        .help("Click to restore · × to close")
+    }
+
+    private var icon: String {
+        switch item.pane.activeTab.content {
+        case .terminal: "arrow.triangle.branch"
+        case .shell: "folder"
+        case .tasks: "checklist"
+        case .widget(let kind): kind.systemImage
+        }
+    }
+
+    private var label: String {
+        let tab = item.pane.activeTab
+        if let name = tab.name, !name.isEmpty { return name }
+        switch tab.content {
+        case .terminal(_, let worktreeID): return worktreeID
+        case .shell(let cwd): return cwd.lastPathComponent
+        case .tasks(let listID): return workspace.taskListStore.list(id: listID)?.name ?? "Tasks"
+        case .widget(let kind): return kind.label
+        }
     }
 }
 
