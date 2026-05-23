@@ -157,8 +157,10 @@ final class Workspace {
     func minimizePane(paneID: UUID) {
         guard let pane = pane(id: paneID), canMinimize(paneID: paneID) else { return }
         let hint = Tiling.captureRestoreHint(for: paneID, in: tiling.root)
-        tiling.remove(paneID: paneID)
-        minimizedPanes.append(MinimizedPane(pane: pane, hint: hint, minimizedAt: Date()))
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+            tiling.remove(paneID: paneID)
+            minimizedPanes.append(MinimizedPane(pane: pane, hint: hint, minimizedAt: Date()))
+        }
         if focusedPaneID == paneID { focusedPaneID = tiling.panes.first?.id }
         if expandedPaneID == paneID { expandedPaneID = nil }
         scheduleSave()
@@ -166,8 +168,11 @@ final class Workspace {
 
     func restoreMinimizedPane(paneID: UUID) {
         guard let idx = minimizedPanes.firstIndex(where: { $0.pane.id == paneID }) else { return }
-        let item = minimizedPanes.remove(at: idx)
-        tiling.reinsertPane(item.pane, near: item.hint.siblingPaneID, edge: item.hint.edge)
+        let item = minimizedPanes[idx]
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+            minimizedPanes.remove(at: idx)
+            tiling.reinsertPane(item.pane, near: item.hint.siblingPaneID, edge: item.hint.edge)
+        }
         focusedPaneID = paneID
         scheduleSave()
     }

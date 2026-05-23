@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct WorkspaceView: View {
     let workspace: Workspace
+    @Namespace private var minimizeNS
     @State private var modifierMonitor: Any?
     @State private var dragMonitor: Any?
     @State private var resignObserver: NSObjectProtocol?
@@ -11,8 +12,8 @@ struct WorkspaceView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                WorkspaceBody(workspace: workspace)
-                MinimizedPaneBar(workspace: workspace)
+                WorkspaceBody(workspace: workspace, ns: minimizeNS)
+                MinimizedPaneBar(workspace: workspace, ns: minimizeNS)
             }
             if let id = workspace.expandedPaneID {
                 ExpandedPaneOverlay(paneID: id, workspace: workspace)
@@ -20,7 +21,6 @@ struct WorkspaceView: View {
             }
         }
         .animation(.easeOut(duration: 0.15), value: workspace.expandedPaneID)
-        .animation(.easeOut(duration: 0.18), value: workspace.minimizedPanes.map(\.id))
         .focusedSceneValue(\.workspace, workspace)
         .onAppear {
             modifierMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
@@ -64,6 +64,7 @@ struct WorkspaceView: View {
 
 private struct WorkspaceBody: View {
     let workspace: Workspace
+    let ns: Namespace.ID
 
     private var dragPreview: (root: TileNode, highlightedIDs: Set<UUID>)? {
         workspace.previewLayout.map { ($0.root, [$0.highlightID]) }
@@ -91,7 +92,7 @@ private struct WorkspaceBody: View {
         ZStack {
             if let root = workspace.tiling.root {
                 TileView(node: root, tiling: workspace.tiling) { pane in
-                    WorkspacePane(pane: pane, workspace: workspace)
+                    WorkspacePane(pane: pane, workspace: workspace, ns: ns)
                         .transition(.opacity.combined(with: .scale(scale: 0.94)))
                 }
                 .padding(4)
@@ -235,6 +236,7 @@ private struct EmptyWorkspace: View {
 private struct WorkspacePane: View {
     let pane: Pane
     let workspace: Workspace
+    let ns: Namespace.ID
 
     var body: some View {
         PaneFrame {
@@ -245,6 +247,7 @@ private struct WorkspacePane: View {
                 TabBody(pane: pane, workspace: workspace)
             }
         }
+        .matchedGeometryEffect(id: pane.id, in: ns, isSource: true)
         .overlay {
             QuickSwitchOverlay(paneID: pane.id, workspace: workspace)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -877,12 +880,14 @@ private struct PaneDropDelegate: DropDelegate {
 
 private struct MinimizedPaneBar: View {
     let workspace: Workspace
+    let ns: Namespace.ID
 
     var body: some View {
         if !workspace.minimizedPanes.isEmpty {
             HStack(spacing: 6) {
                 ForEach(workspace.minimizedPanes) { item in
-                    MinimizedPaneChip(item: item, workspace: workspace)
+                    MinimizedPaneChip(item: item, workspace: workspace, ns: ns)
+                        .transition(.opacity)
                 }
                 Spacer(minLength: 0)
             }
@@ -899,6 +904,7 @@ private struct MinimizedPaneBar: View {
 private struct MinimizedPaneChip: View {
     let item: MinimizedPane
     let workspace: Workspace
+    let ns: Namespace.ID
     @State private var hovering = false
 
     var body: some View {
@@ -923,6 +929,7 @@ private struct MinimizedPaneChip: View {
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.secondary.opacity(hovering ? 0.22 : 0.16))
         )
+        .matchedGeometryEffect(id: item.id, in: ns, isSource: false)
         .contentShape(Rectangle())
         .onTapGesture { workspace.restoreMinimizedPane(paneID: item.id) }
         .onHover { hovering = $0 }
