@@ -420,6 +420,7 @@ private struct TaskPaneBody: View {
                 paneID: pane.id,
                 listID: listID,
                 store: workspace.taskListStore,
+                workspace: workspace,
                 onActivate: { workspace.setFocus(paneID: pane.id) },
                 onMinimize: workspace.canMinimize(paneID: pane.id)
                     ? { workspace.minimizePane(paneID: pane.id) }
