@@ -101,7 +101,7 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     func sendMarkup(note: String, imagePath: String) {
         let escaped = Self.shellEscape(imagePath)
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        let line = (trimmed.isEmpty ? escaped : "\(trimmed) \(escaped)") + "\n"
+        let line = (trimmed.isEmpty ? escaped : "\(trimmed) \(escaped)") + "\r"
         terminalView.process?.send(data: Array(line.utf8)[...])
     }
 

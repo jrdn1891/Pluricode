@@ -685,14 +685,15 @@ private struct MarkupCommentField: View {
     let agentAvailable: Bool
     let onSend: () -> Void
     let onCancel: () -> Void
-    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
-            TextField("Describe the issue…", text: $host.markupNote)
-                .textFieldStyle(.plain)
-                .focused($focused)
-                .onSubmit { if agentAvailable { onSend() } }
+            MarkupNoteField(
+                text: $host.markupNote,
+                focusToken: host.markupRects.count,
+                onSubmit: { if agentAvailable { onSend() } },
+                onCancel: onCancel
+            )
             if agentAvailable {
                 Image(systemName: "return")
                     .font(.system(size: 10, weight: .semibold))
@@ -709,8 +710,73 @@ private struct MarkupCommentField: View {
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
-        .onAppear { focused = true }
-        .onExitCommand(perform: onCancel)
+    }
+}
+
+private struct MarkupNoteField: NSViewRepresentable {
+    @Binding var text: String
+    let focusToken: Int
+    let onSubmit: () -> Void
+    let onCancel: () -> Void
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = FocusGrabbingTextField()
+        field.delegate = context.coordinator
+        field.placeholderString = "Describe the issue…"
+        field.isBordered = false
+        field.isBezeled = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = .systemFont(ofSize: 13)
+        field.usesSingleLineMode = true
+        field.cell?.wraps = false
+        field.cell?.isScrollable = true
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return field
+    }
+
+    func updateNSView(_ field: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if field.stringValue != text { field.stringValue = text }
+        if context.coordinator.focusToken != focusToken {
+            context.coordinator.focusToken = focusToken
+            DispatchQueue.main.async { [weak field] in
+                field?.window?.makeFirstResponder(field)
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: MarkupNoteField
+        var focusToken: Int?
+
+        init(_ parent: MarkupNoteField) { self.parent = parent }
+
+        func controlTextDidChange(_ note: Notification) {
+            guard let field = note.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            switch selector {
+            case #selector(NSResponder.insertNewline(_:)): parent.onSubmit(); return true
+            case #selector(NSResponder.cancelOperation(_:)): parent.onCancel(); return true
+            default: return false
+            }
+        }
+    }
+}
+
+private final class FocusGrabbingTextField: NSTextField {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            window?.makeFirstResponder(self)
+        }
     }
 }
 
