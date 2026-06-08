@@ -54,7 +54,10 @@ final class BrowserHost {
     }
 
     func captureSnapshot(_ completion: @escaping (NSImage?) -> Void) {
-        webView.takeSnapshot(with: WKSnapshotConfiguration()) { image, _ in
+        let config = WKSnapshotConfiguration()
+        config.rect = webView.bounds
+        config.afterScreenUpdates = true
+        webView.takeSnapshot(with: config) { image, _ in
             completion(image)
         }
     }
