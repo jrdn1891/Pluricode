@@ -14,6 +14,9 @@ struct TerminalPaneView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let host = hostForTab()
         host.startIfNeeded(scrollbackDir: workspace.scrollbackDir)
+        if workspace.consumePendingFocus(paneID: paneID) {
+            DispatchQueue.main.async { host.focusInput() }
+        }
         return host.containerView
     }
 
@@ -58,6 +61,9 @@ struct ShellPaneView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let host = hostForTab()
         host.startIfNeeded(scrollbackDir: workspace.scrollbackDir)
+        if workspace.consumePendingFocus(paneID: paneID) {
+            DispatchQueue.main.async { host.focusInput() }
+        }
         return host.containerView
     }
 

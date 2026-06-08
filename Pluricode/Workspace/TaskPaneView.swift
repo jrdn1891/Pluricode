@@ -14,6 +14,7 @@ struct TaskPaneView: View {
     let paneID: UUID
     let listID: UUID
     let store: TaskListStore
+    let workspace: Workspace
     let onActivate: () -> Void
     let onMinimize: (() -> Void)?
     let onClose: () -> Void
@@ -66,6 +67,9 @@ struct TaskPaneView: View {
             } else {
                 MissingTaskListBody(listID: listID, onRemove: onClose)
             }
+        }
+        .onAppear {
+            if workspace.consumePendingFocus(paneID: paneID) { draftFocused = true }
         }
     }
 

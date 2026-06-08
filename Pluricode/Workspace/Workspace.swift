@@ -28,6 +28,7 @@ final class Workspace {
     var minimizedPanes: [MinimizedPane] = []
     @ObservationIgnored weak var store: WorkspaceStore?
     var focusedPaneID: UUID?
+    @ObservationIgnored var pendingFocusPaneID: UUID?
     var expandedPaneID: UUID?
     var commandKeyHeld: Bool = false
     var dragSession: DragSession?
@@ -141,13 +142,21 @@ final class Workspace {
     func addPane(_ content: TabContent) {
         let id = tiling.addPane(content)
         focusedPaneID = id
+        pendingFocusPaneID = id
         scheduleSave()
     }
 
     func splitPane(paneID: UUID, edge: TileEdge, content: TabContent) {
         let id = tiling.split(paneID: paneID, edge: edge, newContent: content)
         focusedPaneID = id
+        pendingFocusPaneID = id
         scheduleSave()
+    }
+
+    func consumePendingFocus(paneID: UUID) -> Bool {
+        guard pendingFocusPaneID == paneID else { return false }
+        pendingFocusPaneID = nil
+        return true
     }
 
     func canMinimize(paneID: UUID) -> Bool {
