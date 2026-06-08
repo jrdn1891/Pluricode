@@ -204,11 +204,12 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 #### Phase 2 — Capture + auto-send
 
-- [ ] "Mark up" button in the browser pane header → `WKWebView.takeSnapshot` of the visible viewport to an `NSImage`.
-- [ ] `TerminalSession.sendMarkup(note:imagePath:)` — writes `note + " " + shellEscape(path) + "\n"` to the PTY.
-- [ ] Agent-terminal resolution (`originTabID` → first matching `(repoID, worktreeID)` non-`"dev"` tab → error state).
-- [ ] Temp PNG under `NSTemporaryDirectory()`; full-viewport screenshot + note auto-sent to the agent.
-- [ ] Verify: capture sends a readable screenshot path + note into the bound worktree's agent terminal, submitted automatically.
+- [x] "Mark up" (camera) button in the browser pane header → `BrowserHost.captureSnapshot` (`WKWebView.takeSnapshot`) of the visible viewport to an `NSImage`.
+- [x] Note composition via `MarkupPopover` (screenshot thumbnail + multiline note field), with a disabled-send + warning when no agent terminal is resolved.
+- [x] `TerminalSession.sendMarkup(note:imagePath:)` — writes `note + " " + shellEscape(path) + "\n"` to the PTY (reuses `shellEscape`).
+- [x] Agent-terminal resolution via `Workspace.agentSession(repoID:worktreeID:preferredTabID:)` — prefers the browser's `originTabID`, else first matching `(repoID, worktreeID)` non-`"dev"` terminal; `MarkupPopover` shows the error state when none.
+- [x] Temp PNG via `BrowserHost.writeTempPNG` under `NSTemporaryDirectory()`; screenshot + note auto-sent (trailing newline submits it).
+- [ ] Verify (interactive): with an agent terminal open, capture sends a readable screenshot path + note into the bound worktree's agent terminal, submitted automatically. *(Builds clean; needs a live agent terminal to drive end-to-end.)*
 
 #### Phase 3 — Region markup overlay
 

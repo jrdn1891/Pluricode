@@ -1,3 +1,4 @@
+import AppKit
 import WebKit
 import Observation
 
@@ -50,6 +51,25 @@ final class BrowserHost {
 
     func reload() {
         if webView.isLoading { webView.stopLoading() } else { webView.reload() }
+    }
+
+    func captureSnapshot(_ completion: @escaping (NSImage?) -> Void) {
+        webView.takeSnapshot(with: WKSnapshotConfiguration()) { image, _ in
+            completion(image)
+        }
+    }
+
+    static func writeTempPNG(_ image: NSImage) -> String? {
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        let path = NSTemporaryDirectory() + "pluricode-markup-\(UUID().uuidString.prefix(8)).png"
+        do {
+            try png.write(to: URL(fileURLWithPath: path))
+            return path
+        } catch {
+            return nil
+        }
     }
 
     func teardown() {

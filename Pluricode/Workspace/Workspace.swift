@@ -284,6 +284,20 @@ final class Workspace {
         }
     }
 
+    func agentSession(repoID: UUID, worktreeID: String, preferredTabID: UUID?) -> TerminalSession? {
+        if let preferredTabID, let host = terminalHosts[preferredTabID] {
+            return host.session
+        }
+        for pane in tiling.panes {
+            for tab in pane.tabs {
+                guard case .terminal(let r, let w) = tab.content, r == repoID, w == worktreeID else { continue }
+                if tab.name == "dev" { continue }
+                if let host = terminalHosts[tab.id] { return host.session }
+            }
+        }
+        return nil
+    }
+
     private func findBrowserTab(repoID: UUID, worktreeID: String) -> (paneID: UUID, tab: Tab)? {
         for pane in tiling.panes {
             for tab in pane.tabs {

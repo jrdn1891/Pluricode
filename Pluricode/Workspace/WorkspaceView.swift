@@ -418,8 +418,16 @@ private struct BrowserHeader: View {
     let onExpand: () -> Void
     @State private var address: String = ""
     @FocusState private var addressFocused: Bool
+    @State private var capturedImage: NSImage?
+    @State private var note: String = ""
+    @State private var showingMarkup = false
 
     private var host: BrowserHost? { workspace.browserHosts[tabID] }
+
+    private var agentSession: TerminalSession? {
+        guard let host else { return nil }
+        return workspace.agentSession(repoID: host.repoID, worktreeID: host.worktreeID, preferredTabID: host.originTabID)
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -428,6 +436,23 @@ private struct BrowserHeader: View {
             navButton("chevron.right", enabled: host?.canGoForward ?? false) { host?.webView.goForward() }
             navButton(host?.isLoading == true ? "xmark" : "arrow.clockwise", enabled: host != nil) { host?.reload() }
             addressField
+            Button(action: capture) {
+                Image(systemName: "camera.viewfinder")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(host == nil)
+            .help("Send a screenshot + note to this worktree's agent")
+            .popover(isPresented: $showingMarkup, arrowEdge: .bottom) {
+                MarkupPopover(
+                    image: capturedImage,
+                    note: $note,
+                    agentAvailable: agentSession != nil,
+                    onSend: sendMarkup,
+                    onCancel: { showingMarkup = false }
+                )
+            }
             Button(action: onExpand) {
                 Image(systemName: isExpanded
                     ? "arrow.down.right.and.arrow.up.left"
@@ -524,6 +549,23 @@ private struct BrowserHeader: View {
         addressFocused = false
     }
 
+    private func capture() {
+        host?.captureSnapshot { image in
+            capturedImage = image
+            showingMarkup = true
+        }
+    }
+
+    private func sendMarkup() {
+        guard let image = capturedImage,
+              let path = BrowserHost.writeTempPNG(image),
+              let session = agentSession else { return }
+        session.sendMarkup(note: note, imagePath: path)
+        note = ""
+        capturedImage = nil
+        showingMarkup = false
+    }
+
     private func syncAddress() {
         guard !addressFocused else { return }
         guard let url = host?.currentURL else { address = ""; return }
@@ -556,6 +598,51 @@ private struct BrowserEmptyState: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 24)
         .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+private struct MarkupPopover: View {
+    let image: NSImage?
+    @Binding var note: String
+    let agentAvailable: Bool
+    let onSend: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: 296, maxHeight: 170)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.white.opacity(0.12)))
+            } else {
+                Text("Couldn't capture the current page.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            TextField("Describe the issue for the agent…", text: $note, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(2...5)
+                .padding(8)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.12)))
+            if !agentAvailable {
+                Label("No agent terminal open for this worktree", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
+                Button("Send to Agent", action: onSend)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!agentAvailable || image == nil)
+            }
+        }
+        .padding(12)
+        .frame(width: 320)
     }
 }
 

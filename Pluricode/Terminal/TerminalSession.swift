@@ -98,6 +98,13 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         terminalView.process?.send(data: bytes[...])
     }
 
+    func sendMarkup(note: String, imagePath: String) {
+        let escaped = Self.shellEscape(imagePath)
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let line = (trimmed.isEmpty ? escaped : "\(trimmed) \(escaped)") + "\n"
+        terminalView.process?.send(data: Array(line.utf8)[...])
+    }
+
     func saveScrollback(to dir: URL) {
         let data = terminalView.getTerminal().getBufferAsData()
         guard data.count != lastSavedBufferSize else { return }
