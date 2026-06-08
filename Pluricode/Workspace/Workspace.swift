@@ -23,7 +23,9 @@ final class Workspace {
     let worktreePaths: WorktreePaths
     let worktreeStatusService: WorktreeStatusService
     var terminalHosts: [UUID: TerminalHost] = [:]
+    var browserHosts: [UUID: BrowserHost] = [:]
     var pendingDevScripts: [UUID: String] = [:]
+    var pendingBrowserOrigins: [UUID: UUID] = [:]
     var stubTabs: [UUID: UUID] = [:]
     var minimizedPanes: [MinimizedPane] = []
     @ObservationIgnored weak var store: WorkspaceStore?
@@ -82,6 +84,7 @@ final class Workspace {
         saveTask?.cancel()
         save()
         for host in terminalHosts.values { host.teardown() }
+        for host in browserHosts.values { host.teardown() }
     }
 
     static var rootDir: URL {
@@ -236,7 +239,9 @@ final class Workspace {
             host.saveScrollback(to: Self.scrollbackDir)
             host.teardown()
         }
+        browserHosts.removeValue(forKey: tabID)?.teardown()
         pendingDevScripts.removeValue(forKey: tabID)
+        pendingBrowserOrigins.removeValue(forKey: tabID)
         stubTabs.removeValue(forKey: tabID)
         store?.localHostRegistry.remove(tabID: tabID)
     }
@@ -255,6 +260,76 @@ final class Workspace {
 
     func consumePendingDevScript(tabID: UUID) -> String? {
         pendingDevScripts.removeValue(forKey: tabID)
+    }
+
+    func consumePendingBrowserOrigin(tabID: UUID) -> UUID? {
+        pendingBrowserOrigins.removeValue(forKey: tabID)
+    }
+
+    func openBrowser(repoID: UUID, worktreeID: String, url: URL? = nil, originTabID: UUID?, nearPaneID: UUID?) {
+        let resolved = url ?? store?.localHostRegistry.entries
+            .filter { $0.repoID == repoID && $0.branch == worktreeID }
+            .sorted { $0.discoveredAt > $1.discoveredAt }
+            .first?.url
+
+        if let (paneID, tab) = findBrowserTab(repoID: repoID, worktreeID: worktreeID) {
+            setActiveTab(paneID: paneID, tabID: tab.id)
+            setFocus(paneID: paneID)
+            if let resolved, browserHosts[tab.id]?.currentURL == nil {
+                browserHosts[tab.id]?.load(resolved)
+                updateBrowserURL(tabID: tab.id, url: resolved)
+            }
+            return
+        }
+
+        let content: TabContent = .browser(repoID: repoID, worktreeID: worktreeID, url: resolved)
+        if let nearPaneID {
+            splitPane(paneID: nearPaneID, edge: .right, content: content)
+        } else {
+            addPane(content)
+        }
+        if let originTabID, let pid = focusedPaneID, let tabID = pane(id: pid)?.activeTabID {
+            pendingBrowserOrigins[tabID] = originTabID
+        }
+    }
+
+    func agentSession(repoID: UUID, worktreeID: String, preferredTabID: UUID?) -> TerminalSession? {
+        if let preferredTabID, let host = terminalHosts[preferredTabID] {
+            return host.session
+        }
+        for pane in tiling.panes {
+            for tab in pane.tabs {
+                guard case .terminal(let r, let w) = tab.content, r == repoID, w == worktreeID else { continue }
+                if tab.name == "dev" { continue }
+                if let host = terminalHosts[tab.id] { return host.session }
+            }
+        }
+        return nil
+    }
+
+    private func findBrowserTab(repoID: UUID, worktreeID: String) -> (paneID: UUID, tab: Tab)? {
+        for pane in tiling.panes {
+            for tab in pane.tabs {
+                if case .browser(let r, let w, _) = tab.content, r == repoID, w == worktreeID {
+                    return (pane.id, tab)
+                }
+            }
+        }
+        return nil
+    }
+
+    func updateBrowserURL(tabID: UUID, url: URL) {
+        for pane in tiling.panes {
+            guard let tab = pane.tabs.first(where: { $0.id == tabID }),
+                  case .browser(let repoID, let worktreeID, let existing) = tab.content,
+                  existing != url else { continue }
+            tiling.updatePane(pane.id) { p in
+                guard let idx = p.tabs.firstIndex(where: { $0.id == tabID }) else { return }
+                p.tabs[idx].content = .browser(repoID: repoID, worktreeID: worktreeID, url: url)
+            }
+            scheduleSave()
+            return
+        }
     }
 
     func expandPane(paneID: UUID) {
@@ -313,6 +388,7 @@ final class Workspace {
         case .shell(let cwd): return cwd.lastPathComponent
         case .widget(let kind): return kind.label
         case .tasks: return fallback
+        case .browser(_, let worktreeID, _): return worktreeID
         }
     }
 
@@ -352,7 +428,7 @@ final class Workspace {
         tiling.panes.filter {
             switch $0.activeTab.content {
             case .terminal, .shell: return true
-            case .tasks, .widget: return false
+            case .tasks, .widget, .browser: return false
             }
         }
     }

@@ -163,11 +163,73 @@ Each milestone has a checklist. Tick items as completed across sessions.
 - [x] Broken-worktree panes show an error state with "Remove Pane" (done earlier in M3).
 - Divider hover widening + ⌘⌥ arrow focus navigation: deferred (nice-to-have, not blocking day-to-day use).
 
+### M10 — Built-in Browser
+
+**Goal**: render a worktree's locally-hosted preview inside Pluricode, and let the user mark up a region of that preview with a note that is sent straight to the worktree's agent terminal — closing the see-it → fix-it loop without leaving the app.
+
+**How it fits**: the browser is a fourth pane content type, reusing three existing systems:
+- **Pane/tab model** — a new `TabContent.browser` case (`Tiling/TileNode.swift`), rendered through `TabBody` like the others (`Workspace/WorkspaceView.swift`).
+- **Localhost detection** — `LocalHostRegistry` already tracks each worktree's live dev-server URL; the browser resolves its initial URL from there instead of `NSWorkspace.shared.open` (`Workspace/LocalHostsWidgetView.swift`).
+- **Agent injection** — `TerminalSession` already shell-escapes image paths into the PTY (`sendStartupScript`, `flushAttachmentInjection`, `shellEscape`); markup delivery is one more injection method on that class. No MCP/structured channel needed (deleted in M4) — auto-send writes directly to the agent's PTY.
+
+**New types** (mirroring the terminal pattern):
+- `BrowserHost` (parallel to `Workspace/TerminalHost.swift`): owns one `WKWebView`, keyed by `tabID` in a new `workspace.browserHosts: [UUID: BrowserHost]`, so page state survives SwiftUI re-layout, pane moves, and tab switches. Holds a runtime `originTabID` (the terminal that opened it) for markup routing.
+- `BrowserPaneView: NSViewRepresentable` (parallel to `Workspace/TerminalPaneView.swift`): returns `host.webView`, wires nav state back to SwiftUI.
+- `BrowserPaneBody` + header in the `WorkspaceView.swift` `TabBody` switch.
+
+**Decisions**:
+- Engine: `WKWebView` (only sensible native choice).
+- Markup region basis: the *visible viewport* capture (`WKWebView.takeSnapshot`), so rectangle coords map 1:1 to what the user sees.
+- Agent routing: resolved at send time, not stored — prefer the runtime `originTabID`'s session, else the first terminal session matching `(repoID, worktreeID)` skipping the `"dev"` tab; none → inline "No agent terminal open for this worktree." (Follows "don't store what you can compute.")
+- Delivery: **auto-send** — note + image path injected into the agent terminal and submitted (trailing newline), via a new `TerminalSession.sendMarkup(note:imagePath:)` mirroring `sendStartupScript` and reusing `shellEscape`.
+- Entry point: a **Preview button in the terminal pane header** (`PaneHeader`, next to the dev-script ▶), opening a browser pane bound to that pane's `(repoID, worktreeID)`.
+
+**Config**: add `NSAppTransportSecurity` → `NSAllowsLocalNetworking = true` to `Info.plist` so `http://localhost` loads in `WKWebView`. Sandbox is already off; no entitlement changes.
+
+**Switch sites to extend for the new `TabContent` case** (each already handles the other 3): `WorkspaceView.swift` `TabBody`/`GhostPane`/`ExpandedPaneCard`/`MinimizedPaneChip`; `Workspace.tabLabel`/`teardownTab` (release `browserHosts[tabID]`); `TilingDragPayload.Kind` + `acceptDrop` + `simulateDrop` (browser panes drag/tile like the rest).
+
+#### Phase 1 — Preview pane
+
+- [x] `TabContent.browser(repoID:worktreeID:url:)` case in `TileNode.swift` (Codable; stores last URL for relaunch restore).
+- [x] `BrowserHost` + `workspace.browserHosts` map; teardown wired into `Workspace.teardownTab` and `deinit`.
+- [x] `BrowserPaneView` (`NSViewRepresentable` over `WKWebView`) + `BrowserPaneBody` with header: address bar, back / forward / reload, loading indicator.
+- [x] Preview button added to `PaneHeader`; `Workspace.openBrowser` opens a browser pane bound to the pane's `(repoID, worktreeID)`, dedup-focusing an existing one, recording `originTabID` via `pendingBrowserOrigins`.
+- [x] Initial URL resolved from `LocalHostRegistry` for that worktree; empty state ("Waiting for a dev server on this worktree…") + usable address bar when none.
+- [x] `LocalHostsWidgetView` "Open in Browser" switches from launching Safari to opening an internal browser pane.
+- [x] Extend the tiling/drag switch sites so a browser pane labels, ghosts, minimizes, and tiles like the others (drag via a leading grip).
+- [x] Expandable like terminal/shell panes — expand button in the header; the single `WKWebView` NSView moves to the `ExpandedPaneOverlay` (via shared `BrowserContent`, in-place shows `ExpandedPanePlaceholder`), no reload on expand/collapse.
+- [x] Hot reload works for free — the dev server's own HMR/live-reload client runs inside the `WKWebView`, and `NSAllowsLocalNetworking` permits its `ws://localhost` connection. No app code needed; navigation churn is avoided since same-URL reloads no-op in `updateBrowserURL`.
+- [x] `NSAllowsLocalNetworking` added to `Info.plist`.
+- [ ] Verify (interactive): open a dev server in a worktree, click Preview, page renders; expand/collapse and resize/move keep the page live; edits hot-reload in place; URL persists across restart. *(Builds + launches clean; needs a live dev server to drive end-to-end.)*
+
+#### Phase 2 — Capture + auto-send
+
+- [x] "Mark up" (camera) button in the browser pane header → `BrowserHost.captureSnapshot` (`WKWebView.takeSnapshot`) of the visible viewport to an `NSImage`.
+- [x] Note composition via `MarkupPopover` (screenshot thumbnail + multiline note field), with a disabled-send + warning when no agent terminal is resolved.
+- [x] `TerminalSession.sendMarkup(note:imagePath:)` — writes `note + " " + shellEscape(path) + "\n"` to the PTY (reuses `shellEscape`).
+- [x] Agent-terminal resolution via `Workspace.agentSession(repoID:worktreeID:preferredTabID:)` — prefers the browser's `originTabID`, else first matching `(repoID, worktreeID)` non-`"dev"` terminal; `MarkupPopover` shows the error state when none.
+- [x] Temp PNG via `BrowserHost.writeTempPNG` under `NSTemporaryDirectory()`; screenshot + note auto-sent (trailing newline submits it).
+- [ ] Verify (interactive): with an agent terminal open, capture sends a readable screenshot path + note into the bound worktree's agent terminal, submitted automatically. *(Builds clean; needs a live agent terminal to drive end-to-end.)*
+
+#### Phase 3 — Region markup overlay (on the live preview)
+
+Selection happens **directly on the running page**, not on a static capture: a markup-mode toggle (pencil) in the header turns the pane into a drawing surface; capture + composite happen at send time (which also sidesteps the snapshot warm-up). Supersedes Phase 2's capture-then-popover UI.
+
+- [x] Markup-mode state on `BrowserHost` (`isMarkingUp`, `markupRects` normalized 0–1, `markupNote`) + `beginMarkup`/`cancelMarkup`/`clearRects`; pencil toggle in `BrowserHeader` (accent-tinted when active).
+- [x] `MarkupSelectionOverlay` layered over the `WKWebView` (intercepts drags, dims the page) — drag to add red rectangles; `MarkupNoteBar` (bottom) with note field, clear-boxes, agent-availability warning, Cancel/Send.
+- [x] On send: capture the viewport, `BrowserHost.annotate` composites the rectangles onto the full-res image (Core Graphics, y-flipped to image space), `writeTempPNG`, then the Phase 2 delivery path (`agentSession.sendMarkup`); exits markup mode.
+- [x] Works in the expanded view too (markup state lives on the shared host).
+- [ ] Verify (interactive): toggle markup, drag boxes over the page, add a note, Send → the agent receives the screenshot with red boxes drawn where you marked, plus the note. *(Builds + launches clean; needs a live dev server + agent to drive end-to-end.)*
+
+**Open edge cases**:
+- Multiple agent terminals per worktree: the "skip `dev`, take first" heuristic is a guess; may want to target the *focused* terminal or prompt.
+- Annotation richness: Phase 3 starts with rectangles only; arrows/freehand/text-on-image can follow.
+
 ---
 
 ## Ordering
 
-M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last.
+M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last. M10 (browser) is independent of the task-list work; its three phases are sequential (each builds on the last).
 
 ## Open decisions
 
