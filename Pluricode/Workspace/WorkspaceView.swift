@@ -185,6 +185,7 @@ private struct GhostPane: View {
         case .shell: return "folder"
         case .tasks: return "checklist"
         case .widget(let kind): return kind.systemImage
+        case .browser: return "globe"
         }
     }
 
@@ -198,6 +199,8 @@ private struct GhostPane: View {
             return workspace.taskListStore.lists.first { $0.id == listID }?.name ?? "Tasks"
         case .widget(let kind):
             return kind.label
+        case .browser(_, let worktreeID, _):
+            return worktreeID
         }
     }
 }
@@ -276,6 +279,15 @@ private struct TabBody: View {
             TaskPaneBody(pane: pane, tabID: tab.id, listID: listID, workspace: workspace)
         case .widget(.localHosts):
             WidgetPaneBody(pane: pane, tabID: tab.id, workspace: workspace)
+        case .browser(let repoID, let worktreeID, let url):
+            BrowserPaneBody(
+                pane: pane,
+                tabID: tab.id,
+                repoID: repoID,
+                worktreeID: worktreeID,
+                url: url,
+                workspace: workspace
+            )
         }
     }
 }
@@ -303,6 +315,247 @@ private struct WidgetPaneBody: View {
                 delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
             )
         }
+    }
+}
+
+private struct BrowserPaneBody: View {
+    let pane: Pane
+    let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let url: URL?
+    let workspace: Workspace
+
+    var body: some View {
+        let isExpanded = workspace.expandedPaneID == pane.id
+        VStack(spacing: 0) {
+            BrowserHeader(
+                pane: pane,
+                tabID: tabID,
+                worktreeID: worktreeID,
+                repoName: workspace.repo(id: repoID)?.name,
+                repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
+                workspace: workspace,
+                isExpanded: isExpanded,
+                onExpand: {
+                    if isExpanded { workspace.collapseExpandedPane() }
+                    else { workspace.expandPane(paneID: pane.id) }
+                }
+            )
+            if isExpanded {
+                ExpandedPanePlaceholder()
+            } else {
+                GeometryReader { geo in
+                    BrowserContent(tabID: tabID, repoID: repoID, worktreeID: worktreeID, url: url, workspace: workspace)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .onDrop(
+                            of: [.plainText],
+                            delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
+                        )
+                }
+            }
+        }
+    }
+}
+
+private struct BrowserContent: View {
+    let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let url: URL?
+    let workspace: Workspace
+
+    var body: some View {
+        ZStack {
+            BrowserPaneView(
+                tabID: tabID,
+                repoID: repoID,
+                worktreeID: worktreeID,
+                initialURL: url,
+                workspace: workspace
+            )
+            .id(tabID)
+            if url == nil, workspace.browserHosts[tabID]?.currentURL == nil {
+                BrowserEmptyState()
+            }
+        }
+    }
+}
+
+private struct BrowserExpandedContent: View {
+    let pane: Pane
+    let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let url: URL?
+    let workspace: Workspace
+
+    var body: some View {
+        VStack(spacing: 0) {
+            BrowserHeader(
+                pane: pane,
+                tabID: tabID,
+                worktreeID: worktreeID,
+                repoName: workspace.repo(id: repoID)?.name,
+                repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
+                workspace: workspace,
+                isExpanded: true,
+                onExpand: { workspace.collapseExpandedPane() }
+            )
+            BrowserContent(tabID: tabID, repoID: repoID, worktreeID: worktreeID, url: url, workspace: workspace)
+        }
+    }
+}
+
+private struct BrowserHeader: View {
+    let pane: Pane
+    let tabID: UUID
+    let worktreeID: String
+    let repoName: String?
+    let repoColor: Color?
+    let workspace: Workspace
+    let isExpanded: Bool
+    let onExpand: () -> Void
+    @State private var address: String = ""
+    @FocusState private var addressFocused: Bool
+
+    private var host: BrowserHost? { workspace.browserHosts[tabID] }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            dragHandle
+            navButton("chevron.left", enabled: host?.canGoBack ?? false) { host?.webView.goBack() }
+            navButton("chevron.right", enabled: host?.canGoForward ?? false) { host?.webView.goForward() }
+            navButton(host?.isLoading == true ? "xmark" : "arrow.clockwise", enabled: host != nil) { host?.reload() }
+            addressField
+            Button(action: onExpand) {
+                Image(systemName: isExpanded
+                    ? "arrow.down.right.and.arrow.up.left"
+                    : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(isExpanded ? "Collapse" : "Expand")
+            if !isExpanded, workspace.canMinimize(paneID: pane.id) {
+                Button(action: { workspace.minimizePane(paneID: pane.id) }) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Minimize pane")
+            }
+            if !isExpanded {
+                Button(action: { workspace.closeTab(paneID: pane.id, tabID: tabID) }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(headerBackground)
+        .contentShape(Rectangle())
+        .onTapGesture { workspace.setFocus(paneID: pane.id) }
+        .onAppear { syncAddress() }
+        .onChange(of: host?.currentURL) { _, _ in syncAddress() }
+    }
+
+    private var dragHandle: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(repoColor ?? .accentColor)
+                .frame(width: 10, height: 10)
+            Image(systemName: "globe")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+        }
+        .contentShape(Rectangle())
+        .help(worktreeID)
+        .draggable(beginMoveDrag()) {
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
+                Text(worktreeID)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    private var addressField: some View {
+        TextField("localhost:3000", text: $address)
+            .textFieldStyle(.plain)
+            .font(.system(size: 11, design: .monospaced))
+            .focused($addressFocused)
+            .onSubmit(submit)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(Color.secondary.opacity(0.12)))
+            .frame(maxWidth: .infinity)
+    }
+
+    private func navButton(_ systemName: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(enabled ? Color.secondary : Color.secondary.opacity(0.35))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+
+    private var headerBackground: Color {
+        if let repoColor { return repoColor.opacity(0.12) }
+        return Color.secondary.opacity(0.1)
+    }
+
+    private func submit() {
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let str = trimmed.contains("://") ? trimmed : "http://\(trimmed)"
+        guard let url = URL(string: str) else { return }
+        host?.load(url)
+        workspace.updateBrowserURL(tabID: tabID, url: url)
+        addressFocused = false
+    }
+
+    private func syncAddress() {
+        guard !addressFocused else { return }
+        guard let url = host?.currentURL else { address = ""; return }
+        var s = url.absoluteString
+        if s.hasSuffix("/") { s.removeLast() }
+        address = s
+    }
+
+    private func beginMoveDrag() -> TilingDragPayload {
+        let payload = TilingDragPayload(kind: .movePane(paneID: pane.id))
+        workspace.beginDrag(payload)
+        return payload
+    }
+}
+
+private struct BrowserEmptyState: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "globe")
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+            Text("Waiting for a dev server on this worktree…")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text("Start your dev server, then click Preview again — or type a URL above.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 24)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 }
 
@@ -458,7 +711,15 @@ private struct TerminalPaneBody: View {
                     if isExpanded { workspace.collapseExpandedPane() }
                     else { workspace.expandPane(paneID: pane.id) }
                 },
-                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) },
+                onPreview: {
+                    workspace.openBrowser(
+                        repoID: repoID,
+                        worktreeID: worktreeID,
+                        originTabID: tabID,
+                        nearPaneID: pane.id
+                    )
+                }
             )
             if isExpanded {
                 ExpandedPanePlaceholder()
@@ -674,6 +935,7 @@ private struct PaneHeader: View {
     let onActivate: () -> Void
     let onExpand: () -> Void
     let onClose: () -> Void
+    let onPreview: (() -> Void)?
     @State private var devScript: String?
 
     private var isMerged: Bool {
@@ -707,6 +969,15 @@ private struct PaneHeader: View {
                 }
                 .buttonStyle(.plain)
                 .help("Run dev script in a new tab (⌘R)")
+            }
+            if let onPreview {
+                Button(action: onPreview) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Preview this worktree's local server in a built-in browser")
             }
             Button(action: onExpand) {
                 Image(systemName: isExpanded
@@ -942,6 +1213,7 @@ private struct MinimizedPaneChip: View {
         case .shell: "folder"
         case .tasks: "checklist"
         case .widget(let kind): kind.systemImage
+        case .browser: "globe"
         }
     }
 
@@ -953,6 +1225,7 @@ private struct MinimizedPaneChip: View {
         case .shell(let cwd): return cwd.lastPathComponent
         case .tasks(let listID): return workspace.taskListStore.list(id: listID)?.name ?? "Tasks"
         case .widget(let kind): return kind.label
+        case .browser(_, let worktreeID, _): return worktreeID
         }
     }
 }
@@ -1015,6 +1288,15 @@ private struct ExpandedPaneCard: View {
                 cwd: cwd,
                 workspace: workspace
             )
+        case .browser(let repoID, let worktreeID, let url):
+            BrowserExpandedContent(
+                pane: pane,
+                tabID: pane.activeTabID,
+                repoID: repoID,
+                worktreeID: worktreeID,
+                url: url,
+                workspace: workspace
+            )
         case .tasks, .widget:
             EmptyView()
         }
@@ -1040,7 +1322,8 @@ private struct TerminalExpandedContent: View {
                 isExpanded: true,
                 onActivate: { workspace.setFocus(paneID: pane.id) },
                 onExpand: { workspace.collapseExpandedPane() },
-                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
+                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) },
+                onPreview: nil
             )
             if let targetID = workspace.stubTabs[tabID] {
                 SessionMovedBody(
