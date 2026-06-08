@@ -65,8 +65,6 @@ final class BrowserHost {
         markupNote = ""
     }
 
-    func clearRects() { markupRects = [] }
-
     func captureSnapshot(_ completion: @escaping (NSImage?) -> Void) {
         let config = WKSnapshotConfiguration()
         config.rect = webView.bounds

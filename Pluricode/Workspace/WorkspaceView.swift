@@ -386,16 +386,12 @@ private struct BrowserContent: View {
                 BrowserEmptyState()
             }
             if let host, host.isMarkingUp {
-                MarkupSelectionOverlay(host: host)
-                VStack {
-                    Spacer()
-                    MarkupNoteBar(
-                        host: host,
-                        agentAvailable: agentAvailable,
-                        onSend: sendMarkup,
-                        onCancel: host.cancelMarkup
-                    )
-                }
+                MarkupSelectionOverlay(
+                    host: host,
+                    agentAvailable: agentAvailable,
+                    onSend: sendMarkup,
+                    onCancel: host.cancelMarkup
+                )
             }
         }
     }
@@ -606,31 +602,52 @@ private struct BrowserEmptyState: View {
 
 private struct MarkupSelectionOverlay: View {
     let host: BrowserHost
+    let agentAvailable: Bool
+    let onSend: () -> Void
+    let onCancel: () -> Void
     @State private var current: CGRect?
+
+    private let fieldWidth: CGFloat = 280
+    private let fieldHeight: CGFloat = 34
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
                 Color.black.opacity(0.06)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 2)
+                            .onChanged { value in
+                                current = normalizedRect(value.startLocation, value.location, geo.size)
+                            }
+                            .onEnded { value in
+                                let rect = normalizedRect(value.startLocation, value.location, geo.size)
+                                if rect.width > 0.004, rect.height > 0.004 { host.markupRects.append(rect) }
+                                current = nil
+                            }
+                    )
+                if host.markupRects.isEmpty, current == nil {
+                    Text("Drag to mark up an area")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.regularMaterial, in: Capsule())
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        .allowsHitTesting(false)
+                }
                 ForEach(Array(host.markupRects.enumerated()), id: \.offset) { _, rect in
                     box(rect, in: geo.size)
                 }
                 if let current {
                     box(current, in: geo.size)
                 }
+                if let anchor = host.markupRects.last {
+                    MarkupCommentField(host: host, agentAvailable: agentAvailable, onSend: onSend, onCancel: onCancel)
+                        .frame(width: fieldWidth)
+                        .offset(commentOffset(anchor, in: geo.size))
+                }
             }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 2)
-                    .onChanged { value in
-                        current = normalizedRect(value.startLocation, value.location, geo.size)
-                    }
-                    .onEnded { value in
-                        let rect = normalizedRect(value.startLocation, value.location, geo.size)
-                        if rect.width > 0.004, rect.height > 0.004 { host.markupRects.append(rect) }
-                        current = nil
-                    }
-            )
         }
     }
 
@@ -640,6 +657,16 @@ private struct MarkupSelectionOverlay: View {
             .overlay(Rectangle().strokeBorder(Color.red, lineWidth: 2))
             .frame(width: rect.width * size.width, height: rect.height * size.height)
             .position(x: (rect.minX + rect.width / 2) * size.width, y: (rect.minY + rect.height / 2) * size.height)
+            .allowsHitTesting(false)
+    }
+
+    private func commentOffset(_ rect: CGRect, in size: CGSize) -> CGSize {
+        let gap: CGFloat = 8
+        let x = min(max(8, rect.minX * size.width), max(8, size.width - fieldWidth - 8))
+        let below = (rect.minY + rect.height) * size.height + gap
+        let above = rect.minY * size.height - fieldHeight - gap
+        let y = below + fieldHeight <= size.height ? below : max(8, above)
+        return CGSize(width: x, height: y)
     }
 
     private func normalizedRect(_ a: CGPoint, _ b: CGPoint, _ size: CGSize) -> CGRect {
@@ -653,50 +680,37 @@ private struct MarkupSelectionOverlay: View {
     }
 }
 
-private struct MarkupNoteBar: View {
+private struct MarkupCommentField: View {
     @Bindable var host: BrowserHost
     let agentAvailable: Bool
     let onSend: () -> Void
     let onCancel: () -> Void
-
-    private var canSend: Bool {
-        agentAvailable
-            && (!host.markupNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !host.markupRects.isEmpty)
-    }
+    @FocusState private var focused: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
-            TextField("Describe the issue for the agent…", text: $host.markupNote)
+        HStack(spacing: 6) {
+            TextField("Describe the issue…", text: $host.markupNote)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.secondary.opacity(0.18)))
-                .onSubmit { if canSend { onSend() } }
-            if !host.markupRects.isEmpty {
-                Button(action: host.clearRects) {
-                    Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Clear boxes (\(host.markupRects.count))")
-            }
-            if !agentAvailable {
+                .focused($focused)
+                .onSubmit { if agentAvailable { onSend() } }
+            if agentAvailable {
+                Image(systemName: "return")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            } else {
                 Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11))
                     .foregroundStyle(.orange)
                     .help("No agent terminal open for this worktree")
             }
-            Button("Cancel", action: onCancel)
-                .keyboardShortcut(.cancelAction)
-            Button("Send", action: onSend)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!canSend)
         }
-        .padding(10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .shadow(color: .black.opacity(0.25), radius: 8, y: 2)
-        .padding(10)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+        .onAppear { focused = true }
+        .onExitCommand(perform: onCancel)
     }
 }
 
