@@ -365,6 +365,13 @@ private struct BrowserContent: View {
     let url: URL?
     let workspace: Workspace
 
+    private var host: BrowserHost? { workspace.browserHosts[tabID] }
+
+    private var agentAvailable: Bool {
+        guard let host else { return false }
+        return workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID) != nil
+    }
+
     var body: some View {
         ZStack {
             BrowserPaneView(
@@ -375,9 +382,34 @@ private struct BrowserContent: View {
                 workspace: workspace
             )
             .id(tabID)
-            if url == nil, workspace.browserHosts[tabID]?.currentURL == nil {
+            if url == nil, host?.currentURL == nil {
                 BrowserEmptyState()
             }
+            if let host, host.isMarkingUp {
+                MarkupSelectionOverlay(host: host)
+                VStack {
+                    Spacer()
+                    MarkupNoteBar(
+                        host: host,
+                        agentAvailable: agentAvailable,
+                        onSend: sendMarkup,
+                        onCancel: host.cancelMarkup
+                    )
+                }
+            }
+        }
+    }
+
+    private func sendMarkup() {
+        guard let host,
+              let session = workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID) else { return }
+        let rects = host.markupRects
+        let note = host.markupNote
+        host.captureSnapshot { image in
+            guard let image,
+                  let path = BrowserHost.writeTempPNG(BrowserHost.annotate(image, rects: rects)) else { return }
+            session.sendMarkup(note: note, imagePath: path)
+            host.cancelMarkup()
         }
     }
 }
@@ -418,16 +450,8 @@ private struct BrowserHeader: View {
     let onExpand: () -> Void
     @State private var address: String = ""
     @FocusState private var addressFocused: Bool
-    @State private var capturedImage: NSImage?
-    @State private var note: String = ""
-    @State private var showingMarkup = false
 
     private var host: BrowserHost? { workspace.browserHosts[tabID] }
-
-    private var agentSession: TerminalSession? {
-        guard let host else { return nil }
-        return workspace.agentSession(repoID: host.repoID, worktreeID: host.worktreeID, preferredTabID: host.originTabID)
-    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -436,23 +460,14 @@ private struct BrowserHeader: View {
             navButton("chevron.right", enabled: host?.canGoForward ?? false) { host?.webView.goForward() }
             navButton(host?.isLoading == true ? "xmark" : "arrow.clockwise", enabled: host != nil) { host?.reload() }
             addressField
-            Button(action: capture) {
-                Image(systemName: "camera.viewfinder")
+            Button(action: toggleMarkup) {
+                Image(systemName: "pencil.tip.crop.circle")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle((host?.isMarkingUp == true) ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
             .disabled(host == nil)
-            .help("Send a screenshot + note to this worktree's agent")
-            .popover(isPresented: $showingMarkup, arrowEdge: .bottom) {
-                MarkupPopover(
-                    image: capturedImage,
-                    note: $note,
-                    agentAvailable: agentSession != nil,
-                    onSend: sendMarkup,
-                    onCancel: { showingMarkup = false }
-                )
-            }
+            .help("Mark up the preview for this worktree's agent")
             Button(action: onExpand) {
                 Image(systemName: isExpanded
                     ? "arrow.down.right.and.arrow.up.left"
@@ -549,21 +564,9 @@ private struct BrowserHeader: View {
         addressFocused = false
     }
 
-    private func capture() {
-        host?.captureSnapshot { image in
-            capturedImage = image
-            showingMarkup = true
-        }
-    }
-
-    private func sendMarkup() {
-        guard let image = capturedImage,
-              let path = BrowserHost.writeTempPNG(image),
-              let session = agentSession else { return }
-        session.sendMarkup(note: note, imagePath: path)
-        note = ""
-        capturedImage = nil
-        showingMarkup = false
+    private func toggleMarkup() {
+        guard let host else { return }
+        if host.isMarkingUp { host.cancelMarkup() } else { host.beginMarkup() }
     }
 
     private func syncAddress() {
@@ -601,48 +604,99 @@ private struct BrowserEmptyState: View {
     }
 }
 
-private struct MarkupPopover: View {
-    let image: NSImage?
-    @Binding var note: String
+private struct MarkupSelectionOverlay: View {
+    let host: BrowserHost
+    @State private var current: CGRect?
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                Color.black.opacity(0.06)
+                ForEach(Array(host.markupRects.enumerated()), id: \.offset) { _, rect in
+                    box(rect, in: geo.size)
+                }
+                if let current {
+                    box(current, in: geo.size)
+                }
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 2)
+                    .onChanged { value in
+                        current = normalizedRect(value.startLocation, value.location, geo.size)
+                    }
+                    .onEnded { value in
+                        let rect = normalizedRect(value.startLocation, value.location, geo.size)
+                        if rect.width > 0.004, rect.height > 0.004 { host.markupRects.append(rect) }
+                        current = nil
+                    }
+            )
+        }
+    }
+
+    private func box(_ rect: CGRect, in size: CGSize) -> some View {
+        Rectangle()
+            .fill(Color.red.opacity(0.12))
+            .overlay(Rectangle().strokeBorder(Color.red, lineWidth: 2))
+            .frame(width: rect.width * size.width, height: rect.height * size.height)
+            .position(x: (rect.minX + rect.width / 2) * size.width, y: (rect.minY + rect.height / 2) * size.height)
+    }
+
+    private func normalizedRect(_ a: CGPoint, _ b: CGPoint, _ size: CGSize) -> CGRect {
+        guard size.width > 0, size.height > 0 else { return .zero }
+        let x = min(a.x, b.x) / size.width
+        let y = min(a.y, b.y) / size.height
+        let w = abs(a.x - b.x) / size.width
+        let h = abs(a.y - b.y) / size.height
+        return CGRect(x: x, y: y, width: w, height: h)
+            .intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+    }
+}
+
+private struct MarkupNoteBar: View {
+    @Bindable var host: BrowserHost
     let agentAvailable: Bool
     let onSend: () -> Void
     let onCancel: () -> Void
 
+    private var canSend: Bool {
+        agentAvailable
+            && (!host.markupNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !host.markupRects.isEmpty)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: 296, maxHeight: 170)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.white.opacity(0.12)))
-            } else {
-                Text("Couldn't capture the current page.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            TextField("Describe the issue for the agent…", text: $note, axis: .vertical)
+        HStack(spacing: 8) {
+            TextField("Describe the issue for the agent…", text: $host.markupNote)
                 .textFieldStyle(.plain)
-                .lineLimit(2...5)
-                .padding(8)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.12)))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.secondary.opacity(0.18)))
+                .onSubmit { if canSend { onSend() } }
+            if !host.markupRects.isEmpty {
+                Button(action: host.clearRects) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear boxes (\(host.markupRects.count))")
+            }
             if !agentAvailable {
-                Label("No agent terminal open for this worktree", systemImage: "exclamationmark.triangle")
-                    .font(.caption)
+                Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
+                    .help("No agent terminal open for this worktree")
             }
-            HStack {
-                Spacer()
-                Button("Cancel", action: onCancel)
-                    .keyboardShortcut(.cancelAction)
-                Button("Send to Agent", action: onSend)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!agentAvailable || image == nil)
-            }
+            Button("Cancel", action: onCancel)
+                .keyboardShortcut(.cancelAction)
+            Button("Send", action: onSend)
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canSend)
         }
-        .padding(12)
-        .frame(width: 320)
+        .padding(10)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.25), radius: 8, y: 2)
+        .padding(10)
     }
 }
 

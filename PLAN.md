@@ -211,11 +211,15 @@ Each milestone has a checklist. Tick items as completed across sessions.
 - [x] Temp PNG via `BrowserHost.writeTempPNG` under `NSTemporaryDirectory()`; screenshot + note auto-sent (trailing newline submits it).
 - [ ] Verify (interactive): with an agent terminal open, capture sends a readable screenshot path + note into the bound worktree's agent terminal, submitted automatically. *(Builds clean; needs a live agent terminal to drive end-to-end.)*
 
-#### Phase 3 — Region markup overlay
+#### Phase 3 — Region markup overlay (on the live preview)
 
-- [ ] Annotation overlay over the captured image: drag one or more rectangles + a note field.
-- [ ] Composite rectangles onto the image (Core Graphics) before writing the PNG; send via the Phase 2 delivery path.
-- [ ] Verify: drawn regions appear on the image the agent receives, with the note.
+Selection happens **directly on the running page**, not on a static capture: a markup-mode toggle (pencil) in the header turns the pane into a drawing surface; capture + composite happen at send time (which also sidesteps the snapshot warm-up). Supersedes Phase 2's capture-then-popover UI.
+
+- [x] Markup-mode state on `BrowserHost` (`isMarkingUp`, `markupRects` normalized 0–1, `markupNote`) + `beginMarkup`/`cancelMarkup`/`clearRects`; pencil toggle in `BrowserHeader` (accent-tinted when active).
+- [x] `MarkupSelectionOverlay` layered over the `WKWebView` (intercepts drags, dims the page) — drag to add red rectangles; `MarkupNoteBar` (bottom) with note field, clear-boxes, agent-availability warning, Cancel/Send.
+- [x] On send: capture the viewport, `BrowserHost.annotate` composites the rectangles onto the full-res image (Core Graphics, y-flipped to image space), `writeTempPNG`, then the Phase 2 delivery path (`agentSession.sendMarkup`); exits markup mode.
+- [x] Works in the expanded view too (markup state lives on the shared host).
+- [ ] Verify (interactive): toggle markup, drag boxes over the page, add a note, Send → the agent receives the screenshot with red boxes drawn where you marked, plus the note. *(Builds + launches clean; needs a live dev server + agent to drive end-to-end.)*
 
 **Open edge cases**:
 - Multiple agent terminals per worktree: the "skip `dev`, take first" heuristic is a guess; may want to target the *focused* terminal or prompt.
