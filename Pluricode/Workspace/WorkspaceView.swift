@@ -348,10 +348,16 @@ private struct BrowserPaneBody: View {
                 GeometryReader { geo in
                     BrowserContent(tabID: tabID, repoID: repoID, worktreeID: worktreeID, url: url, workspace: workspace)
                         .frame(width: geo.size.width, height: geo.size.height)
-                        .onDrop(
-                            of: [.plainText],
-                            delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
-                        )
+                        .overlay {
+                            if workspace.dragSession != nil {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onDrop(
+                                        of: [.plainText],
+                                        delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
+                                    )
+                            }
+                        }
                 }
             }
         }
@@ -496,6 +502,16 @@ private struct BrowserHeader: View {
         .background(headerBackground)
         .contentShape(Rectangle())
         .onTapGesture { workspace.setFocus(paneID: pane.id) }
+        .draggable(beginMoveDrag()) {
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
+                Text(worktreeID)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
         .onAppear { syncAddress() }
         .onChange(of: host?.currentURL) { _, _ in syncAddress() }
     }
@@ -509,18 +525,7 @@ private struct BrowserHeader: View {
                 .foregroundStyle(.secondary)
                 .font(.caption)
         }
-        .contentShape(Rectangle())
         .help(worktreeID)
-        .draggable(beginMoveDrag()) {
-            HStack(spacing: 6) {
-                Image(systemName: "globe")
-                Text(worktreeID)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.accentColor.opacity(0.2))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
     }
 
     private var addressField: some View {
