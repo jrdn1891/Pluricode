@@ -29,6 +29,9 @@ rm -f "$DMG"
 hdiutil create -volname "Pluricode ${VERSION}" -srcfolder build/Pluricode.app \
   -ov -format UDZO "$DMG"
 
+DMG_LATEST="build/Pluricode.dmg"
+cp "$DMG" "$DMG_LATEST"
+
 git tag -a "$TAG" -m "Pluricode ${VERSION}"
 git push origin "$TAG"
 
@@ -51,7 +54,7 @@ ${CHANGES}
 EOF
 )
 
-gh release create "$TAG" "$DMG" \
+gh release create "$TAG" "$DMG" "$DMG_LATEST" \
   --title "Pluricode ${VERSION}" \
   --notes "$NOTES"
 
