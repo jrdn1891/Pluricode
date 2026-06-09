@@ -91,6 +91,9 @@ struct PluricodeApp: App {
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesButton()
+            }
             CommandMenu("Pane") {
                 PaneCommands()
             }
@@ -106,6 +109,8 @@ struct PluricodeApp: App {
                     .tabItem { Label("Permissions", systemImage: "lock.shield") }
                 TerminalSettingsView()
                     .tabItem { Label("Terminal", systemImage: "terminal") }
+                UpdatesSettingsView()
+                    .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
             }
         }
     }

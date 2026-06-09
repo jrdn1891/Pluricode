@@ -26,5 +26,13 @@
 	<string>Pluricode forwards camera access to command-line tools you launch in its terminals (e.g. demo recorders).</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Pluricode forwards Automation access to command-line tools you launch in its terminals (e.g. osascript, AppleScript).</string>
+	<key>SUFeedURL</key>
+	<string>https://jrdn1891.github.io/Pluricode/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>CdxZRo6+Bh8okVpsZZRpcNpYql2luYhZLyIZ5GQd5FY=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

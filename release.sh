@@ -20,6 +20,10 @@ xcodebuild -project Pluricode.xcodeproj -scheme Pluricode -configuration Release
   -destination 'generic/platform=macOS' \
   CONFIGURATION_BUILD_DIR="$PWD/build" build -quiet
 
+BUILD_NUMBER=$(git rev-list --count HEAD)
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUMBER}" build/Pluricode.app/Contents/Info.plist
+codesign --force --deep --sign - build/Pluricode.app
+
 DMG="build/Pluricode-${VERSION}.dmg"
 rm -f "$DMG"
 hdiutil create -volname "Pluricode ${VERSION}" -srcfolder build/Pluricode.app \
@@ -50,3 +54,27 @@ EOF
 gh release create "$TAG" "$DMG" \
   --title "Pluricode ${VERSION}" \
   --notes "$NOTES"
+
+SIGN_UPDATE="${SPARKLE_BIN:+$SPARKLE_BIN/}sign_update"
+if ! command -v "$SIGN_UPDATE" >/dev/null 2>&1; then
+  SIGN_UPDATE=$(find "$HOME/Library/Developer/Xcode/DerivedData" -name sign_update -path '*Sparkle*' 2>/dev/null | head -1)
+fi
+if [[ -z "$SIGN_UPDATE" || ! -x "$SIGN_UPDATE" ]]; then
+  echo "sign_update not found — set SPARKLE_BIN to Sparkle's bin directory (see NIGHTLY.md)." >&2
+  exit 1
+fi
+
+SIG=$("$SIGN_UPDATE" "$DMG")
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+URL="https://github.com/${REPO}/releases/download/${TAG}/Pluricode-${VERSION}.dmg"
+cat > build/stable.item.xml <<EOF
+    <item>
+      <title>${VERSION}</title>
+      <pubDate>$(date -u +"%a, %d %b %Y %H:%M:%S +0000")</pubDate>
+      <sparkle:version>${BUILD_NUMBER}</sparkle:version>
+      <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <enclosure url="${URL}" ${SIG} type="application/octet-stream" />
+    </item>
+EOF
+APPCAST_VERSION="${VERSION}" bash scripts/publish_appcast.sh stable build/stable.item.xml

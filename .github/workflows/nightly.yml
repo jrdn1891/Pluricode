@@ -1,0 +1,109 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gate on new commits
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] && [ -z "$(git log --since='24 hours ago' --oneline)" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No commits in the last 24h; skipping nightly."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install tools
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          brew install xcodegen
+          VER=2.6.4
+          curl -fsSL -o /tmp/sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/download/${VER}/Sparkle-${VER}.tar.xz"
+          mkdir /tmp/sparkle && tar -xf /tmp/sparkle.tar.xz -C /tmp/sparkle
+          echo "SPARKLE_BIN=/tmp/sparkle/bin" >> "$GITHUB_ENV"
+
+      - name: Stamp version
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          BUILD=$(git rev-list --count HEAD)
+          BASE=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" Pluricode/Info.plist)
+          DISPLAY="${BASE}-nightly.$(date -u +%Y%m%d)+$(git rev-parse --short HEAD)"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD}" Pluricode/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${DISPLAY}" Pluricode/Info.plist
+          echo "BUILD=$BUILD" >> "$GITHUB_ENV"
+          echo "DISPLAY=$DISPLAY" >> "$GITHUB_ENV"
+
+      - name: Build
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          xcodegen generate
+          rm -rf build
+          xcodebuild -project Pluricode.xcodeproj -scheme Pluricode -configuration Release \
+            -destination 'generic/platform=macOS' \
+            CONFIGURATION_BUILD_DIR="$PWD/build" build
+
+      - name: Package
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          ditto -c -k --keepParent build/Pluricode.app Pluricode-nightly.zip
+          hdiutil create -volname "Pluricode ${DISPLAY}" -srcfolder build/Pluricode.app \
+            -ov -format UDZO Pluricode-nightly.dmg
+
+      - name: Sign update
+        if: steps.gate.outputs.run == 'true'
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          SIG=$(echo "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_BIN/sign_update" --ed-key-file - Pluricode-nightly.zip)
+          echo "SIG=$SIG" >> "$GITHUB_ENV"
+
+      - name: Publish release
+        if: steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Automated nightly from ${GITHUB_SHA}. Opt in via Pluricode → Settings → Updates → Receive nightly builds."
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release edit nightly --title "Nightly ${DISPLAY}" --notes "$NOTES"
+            gh release upload nightly Pluricode-nightly.zip Pluricode-nightly.dmg --clobber
+          else
+            gh release create nightly Pluricode-nightly.zip Pluricode-nightly.dmg \
+              --prerelease --target "$GITHUB_SHA" --title "Nightly ${DISPLAY}" --notes "$NOTES"
+          fi
+
+      - name: Publish appcast
+        if: steps.gate.outputs.run == 'true'
+        env:
+          APPCAST_REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          APPCAST_VERSION: ${{ env.DISPLAY }}
+        run: |
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/nightly/Pluricode-nightly.zip"
+          cat > nightly.item.xml <<EOF
+              <item>
+                <title>${DISPLAY}</title>
+                <pubDate>$(date -u +"%a, %d %b %Y %H:%M:%S +0000")</pubDate>
+                <sparkle:channel>nightly</sparkle:channel>
+                <sparkle:version>${BUILD}</sparkle:version>
+                <sparkle:shortVersionString>${DISPLAY}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+                <enclosure url="${URL}" ${SIG} type="application/octet-stream" />
+              </item>
+          EOF
+          bash scripts/publish_appcast.sh nightly nightly.item.xml
