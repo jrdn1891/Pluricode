@@ -31,5 +31,13 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>SUFeedURL</key>
+	<string>https://jrdn1891.github.io/Pluricode/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>CdxZRo6+Bh8okVpsZZRpcNpYql2luYhZLyIZ5GQd5FY=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

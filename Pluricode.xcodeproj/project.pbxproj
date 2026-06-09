@@ -11,11 +11,13 @@
 		0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A3E23A2A5CE1735F8D522D /* ProcessRunner.swift */; };
 		0DC403F2FCB7A4D30384AEB7 /* NewWorkspaceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */; };
 		149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E37A72F9CD0A1326611CB3C /* Worktree.swift */; };
+		14F9FF119D799707FCEF2F08 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9800670AB5C4F9EF61E843E /* Updater.swift */; };
 		19997BD2F3D31B49597027C8 /* SplitDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E043050E27961C20DFE8E3 /* SplitDivider.swift */; };
 		1FF2534862D523B586A00545 /* PermissionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A3591F4D52D920EBF984E5 /* PermissionsService.swift */; };
 		252121A12E8E251537CBFA7D /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 370E2E0EB9B46FAF48CFEC7E /* SwiftTerm */; };
 		280CCB430242DD94E60CD1A2 /* SidebarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 640330E4FAC0CC5442935F46 /* SidebarState.swift */; };
 		3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95CDC674CDC6FC6D7714CB17 /* Workspace.swift */; };
+		4A65156652B38799E93E2EBC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF1C742C1EC35344E7DF72A /* Sparkle */; };
 		4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83868DA08DF195AF66F38C70 /* IdleOverlay.swift */; };
 		4FB6C595C0CDBF7CFD164C21 /* TerminalSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73E8B37818B718BE8D743D3 /* TerminalSettings.swift */; };
 		5208192AF506608CB772A9C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84B103466B6BA9B7791B4EB8 /* Assets.xcassets */; };
@@ -88,6 +90,7 @@
 		D79713EC727834622CEEF2EF /* TaskListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListStore.swift; sourceTree = "<group>"; };
 		F1AE508972402DF38CAFBF8F /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
 		F722E7DD539F6776FA1674BA /* RepoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoStore.swift; sourceTree = "<group>"; };
+		F9800670AB5C4F9EF61E843E /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		FC246AB1895B3F4814510E30 /* PluricodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluricodeApp.swift; sourceTree = "<group>"; };
 		FCC7BCD7DE9AEC025D52DBD4 /* Pluricode.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pluricode.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -98,6 +101,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				252121A12E8E251537CBFA7D /* SwiftTerm in Frameworks */,
+				4A65156652B38799E93E2EBC /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -166,6 +170,14 @@
 			path = Tiling;
 			sourceTree = "<group>";
 		};
+		A6BB3640B667EFA6753F9E12 /* Updates */ = {
+			isa = PBXGroup;
+			children = (
+				F9800670AB5C4F9EF61E843E /* Updater.swift */,
+			);
+			path = Updates;
+			sourceTree = "<group>";
+		};
 		D05E9F1DFAAA2D4E739BC72D /* Model */ = {
 			isa = PBXGroup;
 			children = (
@@ -225,6 +237,7 @@
 				558E3CCEDDBF1FBDEA742319 /* Sidebar */,
 				30FCD81FC357CD2F07A9F304 /* Terminal */,
 				A167B8941568B24D1F8B5356 /* Tiling */,
+				A6BB3640B667EFA6753F9E12 /* Updates */,
 				E35867EDF8887AE840D897C9 /* Workspace */,
 				FA6D063D7BD01416B394A61E /* Worktree */,
 			);
@@ -249,6 +262,7 @@
 			name = Pluricode;
 			packageProductDependencies = (
 				370E2E0EB9B46FAF48CFEC7E /* SwiftTerm */,
+				2AF1C742C1EC35344E7DF72A /* Sparkle */,
 			);
 			productName = Pluricode;
 			productReference = 19BA3EE7DFFD7B396C3E7007 /* Pluricode.app */;
@@ -275,6 +289,7 @@
 			mainGroup = 83785D3BDF0469EA61202AC1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				D2141B2822067C5B55F08F73 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				FE92E9923F526E8AD850911A /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -333,6 +348,7 @@
 				06326AFE850E788295307D48 /* Theme.swift in Sources */,
 				56CB18171A578DECD2613656 /* TileNode.swift in Sources */,
 				E4DA8CFC22DCB7A91DEC0918 /* TileView.swift in Sources */,
+				14F9FF119D799707FCEF2F08 /* Updater.swift in Sources */,
 				3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */,
 				E8CCF649FB23C81F5E17E9FF /* WorkspaceView.swift in Sources */,
 				149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */,
@@ -527,6 +543,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		D2141B2822067C5B55F08F73 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
 		FE92E9923F526E8AD850911A /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm";
@@ -538,6 +562,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2AF1C742C1EC35344E7DF72A /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D2141B2822067C5B55F08F73 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		370E2E0EB9B46FAF48CFEC7E /* SwiftTerm */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = FE92E9923F526E8AD850911A /* XCRemoteSwiftPackageReference "SwiftTerm" */;
