@@ -49,21 +49,23 @@ private struct SplitContainer<Content: View>: View {
             let available = max(0, total - CGFloat(split.children.count - 1) * dividerThickness)
 
             if split.direction == .horizontal {
-                HStack(spacing: 0) { children(available: available) }
+                HStack(spacing: 0) { children(available: available, size: geo.size) }
             } else {
-                VStack(spacing: 0) { children(available: available) }
+                VStack(spacing: 0) { children(available: available, size: geo.size) }
             }
         }
     }
 
     @ViewBuilder
-    private func children(available: CGFloat) -> some View {
+    private func children(available: CGFloat, size: CGSize) -> some View {
         ForEach(Array(split.children.enumerated()), id: \.element.id) { index, child in
             TileView(node: child, tiling: tiling, content: content)
                 .frame(
-                    width: split.direction == .horizontal ? available * CGFloat(split.weights[index]) : nil,
-                    height: split.direction == .vertical ? available * CGFloat(split.weights[index]) : nil
+                    width: split.direction == .horizontal ? available * CGFloat(split.weights[index]) : size.width,
+                    height: split.direction == .vertical ? available * CGFloat(split.weights[index]) : size.height,
+                    alignment: .topLeading
                 )
+                .clipped()
             if index < split.children.count - 1 {
                 SplitDivider(
                     direction: split.direction,

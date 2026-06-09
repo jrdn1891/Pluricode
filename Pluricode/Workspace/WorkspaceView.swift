@@ -169,6 +169,7 @@ private struct GhostPane: View {
                 Text(paneTitle)
                     .font(.system(size: 13, weight: isHighlight ? .semibold : .medium))
             }
+            .lineLimit(1)
             .foregroundStyle(isHighlight ? Color.accentColor : .secondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -243,7 +244,7 @@ private struct WorkspacePane: View {
 
     var body: some View {
         PaneFrame {
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 if pane.tabs.count >= 2 {
                     TabStrip(pane: pane, workspace: workspace)
                 }
@@ -328,7 +329,7 @@ private struct BrowserPaneBody: View {
 
     var body: some View {
         let isExpanded = workspace.expandedPaneID == pane.id
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             BrowserHeader(
                 pane: pane,
                 tabID: tabID,
@@ -491,6 +492,7 @@ private struct BrowserHeader: View {
                 .buttonStyle(.plain)
             }
         }
+        .lineLimit(1)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(headerBackground)
@@ -796,6 +798,7 @@ private struct TabStrip: View {
             }
             Spacer(minLength: 0)
         }
+        .lineLimit(1)
         .padding(.horizontal, 6)
         .padding(.top, 4)
         .padding(.bottom, 2)
@@ -919,7 +922,7 @@ private struct TerminalPaneBody: View {
 
     var body: some View {
         let isExpanded = workspace.expandedPaneID == pane.id
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             PaneHeader(
                 pane: pane,
                 tabID: tabID,
@@ -988,7 +991,7 @@ private struct ShellPaneBody: View {
 
     var body: some View {
         let isExpanded = workspace.expandedPaneID == pane.id
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             ShellPaneHeader(
                 pane: pane,
                 workspace: workspace,
@@ -1081,6 +1084,7 @@ private struct ShellPaneHeader: View {
                 .buttonStyle(.plain)
             }
         }
+        .lineLimit(1)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Color.secondary.opacity(0.1))
@@ -1228,6 +1232,7 @@ private struct PaneHeader: View {
                 .buttonStyle(.plain)
             }
         }
+        .lineLimit(1)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(headerBackground)
