@@ -78,6 +78,7 @@ enum TabContent: Hashable, Codable {
     case shell(cwd: URL)
     case tasks(listID: UUID)
     case widget(WidgetKind)
+    case browser(repoID: UUID, worktreeID: String, url: URL?)
 }
 
 struct Tab: Identifiable, Hashable, Codable {

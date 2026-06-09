@@ -30,7 +30,7 @@ struct LocalHostsWidgetView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(entries) { entry in
-                            LocalHostRow(entry: entry, workspace: workspace)
+                            LocalHostRow(entry: entry, paneID: paneID, workspace: workspace)
                             Divider().opacity(0.3)
                         }
                     }
@@ -115,6 +115,7 @@ private struct EmptyLocalHostsBody: View {
 
 private struct LocalHostRow: View {
     let entry: LocalHostEntry
+    let paneID: UUID
     let workspace: Workspace
     @State private var hovering = false
 
@@ -187,7 +188,13 @@ private struct LocalHostRow: View {
     }
 
     private func open() {
-        NSWorkspace.shared.open(entry.url)
+        workspace.openBrowser(
+            repoID: entry.repoID,
+            worktreeID: entry.branch,
+            url: entry.url,
+            originTabID: entry.tabID,
+            nearPaneID: paneID
+        )
     }
 
     private func copyURL() {
