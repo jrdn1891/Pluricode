@@ -26,7 +26,7 @@ struct PluriPaneView: NSViewRepresentable {
     private func hostForTab() -> TerminalHost {
         if let existing = workspace.terminalHosts[tabID] { return existing }
         PluriHome.prepare(repos: workspace.repoStore.repos)
-        let host = TerminalHost(tabID: tabID, cwd: PluriHome.dir.path, startupScript: "claude")
+        let host = TerminalHost(tabID: tabID, cwd: PluriHome.dir.path, startupScript: PluriSettings.shared.setupScript)
         workspace.terminalHosts[tabID] = host
         return host
     }

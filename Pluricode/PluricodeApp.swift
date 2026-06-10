@@ -125,6 +125,8 @@ struct PluricodeApp: App {
                     .tabItem { Label("Permissions", systemImage: "lock.shield") }
                 TerminalSettingsView()
                     .tabItem { Label("Terminal", systemImage: "terminal") }
+                PluriSettingsView()
+                    .tabItem { Label("Pluri", systemImage: "sparkles") }
                 UpdatesSettingsView()
                     .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
             }

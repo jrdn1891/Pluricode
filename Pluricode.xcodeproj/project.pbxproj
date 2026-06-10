@@ -20,6 +20,8 @@
 		3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95CDC674CDC6FC6D7714CB17 /* Workspace.swift */; };
 		4A65156652B38799E93E2EBC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF1C742C1EC35344E7DF72A /* Sparkle */; };
 		4ADC14E5C3674C18F265925C /* PluriMascotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8327000CF8BB0AE0161EC6 /* PluriMascotView.swift */; };
+		4BD11E20A91D43C2B7E05A11 /* PluriSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2E8F31D04B45A9836F1B22 /* PluriSettings.swift */; };
+		4C1F92A4E85D470BB1C36D33 /* PluriSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D3A07B5F16C481CC2D47E44 /* PluriSettingsView.swift */; };
 		4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83868DA08DF195AF66F38C70 /* IdleOverlay.swift */; };
 		4FB6C595C0CDBF7CFD164C21 /* TerminalSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73E8B37818B718BE8D743D3 /* TerminalSettings.swift */; };
 		5208192AF506608CB772A9C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84B103466B6BA9B7791B4EB8 /* Assets.xcassets */; };
@@ -85,6 +87,8 @@
 		95CDC674CDC6FC6D7714CB17 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
 		98D4FD99941538CCD095F8FC /* LocalHostsWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHostsWidgetView.swift; sourceTree = "<group>"; };
 		9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoSidebarView.swift; sourceTree = "<group>"; };
+		7C2E8F31D04B45A9836F1B22 /* PluriSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriSettings.swift; sourceTree = "<group>"; };
+		8D3A07B5F16C481CC2D47E44 /* PluriSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriSettingsView.swift; sourceTree = "<group>"; };
 		9D8327000CF8BB0AE0161EC6 /* PluriMascotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriMascotView.swift; sourceTree = "<group>"; };
 		9E37A72F9CD0A1326611CB3C /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
 		A3AB0523B2C998E6BDF6FDB3 /* TerminalPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPaneView.swift; sourceTree = "<group>"; };
@@ -167,6 +171,8 @@
 				AFE88C8CCD743305385E5C9F /* PluriHome.swift */,
 				9D8327000CF8BB0AE0161EC6 /* PluriMascotView.swift */,
 				EDBDCE7E72C4A701F97A2697 /* PluriPaneView.swift */,
+				7C2E8F31D04B45A9836F1B22 /* PluriSettings.swift */,
+				8D3A07B5F16C481CC2D47E44 /* PluriSettingsView.swift */,
 			);
 			path = Pluri;
 			sourceTree = "<group>";
@@ -355,6 +361,8 @@
 				903487B058E11C3A6B4378F2 /* PluriHome.swift in Sources */,
 				4ADC14E5C3674C18F265925C /* PluriMascotView.swift in Sources */,
 				327DA7F76445AAAE665211E3 /* PluriPaneView.swift in Sources */,
+				4BD11E20A91D43C2B7E05A11 /* PluriSettings.swift in Sources */,
+				4C1F92A4E85D470BB1C36D33 /* PluriSettingsView.swift in Sources */,
 				97C1C6B70507B356349663B4 /* PluricodeApp.swift in Sources */,
 				0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */,
 				F814E0ED4F9B4CE50E1FC08D /* RepoConfig.swift in Sources */,

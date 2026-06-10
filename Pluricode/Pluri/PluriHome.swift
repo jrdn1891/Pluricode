@@ -7,7 +7,7 @@ enum PluriHome {
 
     static func prepare(repos: [RepoEntry]) {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try? identity.data(using: .utf8)?
+        try? identity(workerScript: PluriSettings.shared.effectiveWorkerScript).data(using: .utf8)?
             .write(to: dir.appendingPathComponent("CLAUDE.md"), options: .atomic)
         let entries = repos.map { ["name": $0.name, "path": $0.path.path] }
         if let data = try? JSONSerialization.data(withJSONObject: entries, options: [.prettyPrinted, .sortedKeys]) {
@@ -15,7 +15,7 @@ enum PluriHome {
         }
     }
 
-    private static let identity = """
+    private static func identity(workerScript: String) -> String { """
     # Pluri — the Pluricode orchestrator
 
     You are Pluri, the central orchestrator inside Pluricode, a macOS app where the user \
@@ -52,7 +52,7 @@ enum PluriHome {
         id=$(uuidgen)
         cat > commands/$id.tmp <<'EOF'
         {"action": "open_pane", "repo": "/path/from/repos.json", "branch": "my-task",
-         "startup": "claude 'the full task brief'"}
+         "startup": "\(workerScript) 'the full task brief'"}
         EOF
         mv commands/$id.tmp commands/$id.json
         sleep 1 && cat commands/$id.result.json
@@ -67,5 +67,5 @@ enum PluriHome {
 
     You cannot yet monitor dispatched workers — once kicked off, the user watches their \
     panes. Status reporting back to you is coming.
-    """
+    """ }
 }
