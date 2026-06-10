@@ -281,6 +281,15 @@ A central agent ("Pluri") the user talks to in natural language; it sets up work
 
 **Goal**: Slack-style threads in the chat window: thread root = task (from the M14 registry), thread replies route into the worker's PTY, worker pane one click away. Confirm-gate briefs render as approvable cards.
 
+- [x] `PluriTaskRegistry` is `@Observable` and each task carries an `updates` timeline (dispatched / running / waiting / done / reply, with messages); the monitor appends transitions, `register` seeds "dispatched". Old flat `tasks.json` becomes unreadable — registry resets (no-backwards-compat).
+- [x] Chat window: task chip bar (live status dots, sorted by recency) above the transcript; tapping opens the task's thread — brief, update timeline, reply field, status header.
+- [x] Thread replies route into the worker's PTY via `TerminalSession.submit` (extracted from `sendMarkup`) through `PluriBridge.reply`, and land in the timeline as `reply` updates. Workers resolved by `WorkspaceStore.workerPane` (tiled + minimized, stubs excluded).
+- [x] Worker pane one click away: "Open Pane" selects the workspace, restores from minimized, activates the right tab, focuses the terminal, raises the main window. With no live session the button becomes "Re-dispatch" — re-registers and starts a fresh worker with the original brief (also the recovery path for workers killed by an app restart).
+- [x] Confirm-gate: new bridge action `propose` `{tasks: [{repo, branch, prompt}]}` validates worktrees and stores a proposal; the chat renders it as a card with per-task briefs and Approve & Dispatch / Decline. Approve dispatches through the same core `open_pane` uses (extracted `PluriBridge.dispatch`); either way Pluri hears the outcome as an `[approval]` resumed turn.
+- [x] `waiting` no longer burns a Pluri turn — it surfaces in the thread (with the notification message) and the orange dot; only `done` still posts a `[worker update]` for the summary.
+- [x] Identity: fan-outs go through `propose` (worktrees first, end turn after proposing, never re-`open_pane` approved tasks); thread replies documented as user→worker, not through Pluri.
+- [ ] Verify (interactive): ask Pluri for a multi-task fan-out — card appears, Approve dispatches all workers and Pluri acknowledges; a task chip opens the thread, a reply lands in the worker's terminal and echoes in the timeline; Open Pane jumps to the pane; Re-dispatch revives a dead task. *(Builds clean; needs a live run.)*
+
 ---
 
 ## Ordering

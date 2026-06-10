@@ -718,6 +718,39 @@ final class WorkspaceStore {
         return true
     }
 
+    func workerPane(repoID: UUID, branch: String) -> (workspace: Workspace, paneID: UUID, tabID: UUID)? {
+        for ws in workspaces {
+            for pane in ws.tiling.panes + ws.minimizedPanes.map(\.pane) {
+                for tab in pane.tabs {
+                    guard case .terminal(let r, let b) = tab.content,
+                          r == repoID, b == branch,
+                          ws.terminalHosts[tab.id] != nil,
+                          ws.stubTabs[tab.id] == nil else { continue }
+                    return (ws, pane.id, tab.id)
+                }
+            }
+        }
+        return nil
+    }
+
+    @discardableResult
+    func focusWorkerPane(repoID: UUID, branch: String) -> Bool {
+        guard let (ws, paneID, tabID) = workerPane(repoID: repoID, branch: branch) else { return false }
+        selectedWorkspaceID = ws.id
+        saveSelection()
+        if ws.minimizedPanes.contains(where: { $0.pane.id == paneID }) {
+            ws.restoreMinimizedPane(paneID: paneID)
+        }
+        ws.setActiveTab(paneID: paneID, tabID: tabID)
+        ws.setFocus(paneID: paneID)
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows
+            .first { $0.canBecomeKey && $0.identifier?.rawValue.contains("pluri") != true && !($0 is NSPanel) }?
+            .makeKeyAndOrderFront(nil)
+        DispatchQueue.main.async { ws.terminalHosts[tabID]?.focusInput() }
+        return true
+    }
+
     private func findLiveHost(repoID: UUID, branch: String) -> (workspace: Workspace, tabID: UUID)? {
         for ws in workspaces {
             for pane in ws.tiling.panes {

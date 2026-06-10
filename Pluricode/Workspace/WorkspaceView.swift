@@ -1278,14 +1278,6 @@ private struct PaneHeader: View {
 }
 
 private extension WorkerStatus {
-    var color: Color {
-        switch self {
-        case .running: .blue
-        case .waiting: .orange
-        case .done: .green
-        }
-    }
-
     var help: String {
         switch self {
         case .running: "Agent is working"

@@ -94,14 +94,17 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         terminalView.process?.send(data: bytes[...])
     }
 
-    func sendMarkup(note: String, imagePath: String) {
-        let escaped = shellEscape(imagePath)
-        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        let text = trimmed.isEmpty ? escaped : "\(trimmed) \(escaped)"
+    func submit(_ text: String) {
         terminalView.process?.send(data: Array(text.utf8)[...])
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.terminalView.process?.send(data: Array("\r".utf8)[...])
         }
+    }
+
+    func sendMarkup(note: String, imagePath: String) {
+        let escaped = shellEscape(imagePath)
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        submit(trimmed.isEmpty ? escaped : "\(trimmed) \(escaped)")
     }
 
     func saveScrollback(to dir: URL) {

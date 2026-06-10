@@ -10,6 +10,7 @@ struct PluricodeApp: App {
     @State private var pluriBridge: PluriBridge
     @State private var pluriSession: PluriSession
     @State private var pluriMonitor: PluriMonitor
+    @State private var pluriRegistry: PluriTaskRegistry
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showPalette = false
     @State private var creatingWorkspace = false
@@ -38,6 +39,7 @@ struct PluricodeApp: App {
         ))
         _pluriSession = State(initialValue: session)
         _pluriMonitor = State(initialValue: PluriMonitor(registry: registry, session: session))
+        _pluriRegistry = State(initialValue: registry)
         pluriBridge.start()
         pluriMonitor.start()
     }
@@ -126,7 +128,7 @@ struct PluricodeApp: App {
         }
 
         Window("Pluri", id: "pluri") {
-            PluriChatView(session: pluriSession)
+            PluriChatView(session: pluriSession, bridge: pluriBridge, registry: pluriRegistry)
         }
         .defaultSize(width: 460, height: 640)
 

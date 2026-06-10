@@ -60,16 +60,9 @@ final class PluriMonitor {
         }
         guard statuses[path] != status else { return }
         statuses[path] = status
-        guard let task = registry.updateStatus(status, atWorktreePath: path) else { return }
-        let label = "\(URL(fileURLWithPath: task.repo).lastPathComponent) / \(task.branch)"
-        switch status {
-        case .done:
-            session.postEvent("[worker update] \(label): done — the worker finished its turn.")
-        case .waiting:
-            let detail = event.message.map { " — \($0)" } ?? ""
-            session.postEvent("[worker update] \(label): waiting\(detail)")
-        case .running:
-            break
+        guard let task = registry.updateStatus(status, message: event.message, atWorktreePath: path) else { return }
+        if status == .done {
+            session.postEvent("[worker update] \(task.repoName) / \(task.branch): done — the worker finished its turn.")
         }
     }
 }

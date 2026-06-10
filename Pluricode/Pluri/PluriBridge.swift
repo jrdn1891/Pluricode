@@ -63,10 +63,12 @@ final class PluriBridge {
         switch cmd.action {
         case "open_pane":
             return openPane(cmd)
+        case "propose":
+            return propose(data)
         case "delete_worktree":
             return deleteWorktree(cmd)
         default:
-            return Self.failure("unknown action '\(cmd.action)'; supported: open_pane, delete_worktree")
+            return Self.failure("unknown action '\(cmd.action)'; supported: open_pane, propose, delete_worktree")
         }
     }
 
@@ -101,24 +103,103 @@ final class PluriBridge {
         guard let repo = repo(at: repoPath) else {
             return unknownRepo(repoPath)
         }
-        guard let workspace = resolveWorkspace(cmd.workspace) else {
-            return Self.failure("no workspace selected in Pluricode; pass 'workspace' (name) to create one")
+        if let error = dispatch(repo: repo, branch: branch, prompt: cmd.prompt, startup: cmd.startup, workspaceName: cmd.workspace) {
+            return Self.failure(error)
+        }
+        return Self.success
+    }
+
+    private func dispatch(repo: RepoEntry, branch: String, prompt: String?, startup: String?, workspaceName: String? = nil) -> String? {
+        guard let workspace = resolveWorkspace(workspaceName) else {
+            return "no workspace selected in Pluricode; pass 'workspace' (name) to create one"
         }
         workspaceStore.worktreePaths.invalidate(repoID: repo.id)
         workspaceStore.worktreeStatusService.invalidate(repoID: repo.id)
         guard workspaceStore.worktreePaths.path(forRepoID: repo.id, repoPath: repo.path, branch: branch) != nil else {
-            return Self.failure("no managed worktree on branch '\(branch)' in \(repo.name)")
+            return "no managed worktree on branch '\(branch)' in \(repo.name)"
         }
         sidebarState.refresh(repo)
-        let startup: String?
-        if let prompt = cmd.prompt, !prompt.isEmpty {
-            startup = "\(cmd.startup ?? PluriSettings.shared.effectiveWorkerScript) \(shellEscape(prompt))"
+        let script: String?
+        if let prompt, !prompt.isEmpty {
+            script = "\(startup ?? PluriSettings.shared.effectiveWorkerScript) \(shellEscape(prompt))"
             registry.register(repo: repo.path.standardizedFileURL.path, branch: branch, brief: prompt)
         } else {
-            startup = cmd.startup
+            script = startup
         }
-        workspace.openWorktreePane(repoID: repo.id, branch: branch, startupScript: startup)
+        workspace.openWorktreePane(repoID: repo.id, branch: branch, startupScript: script)
+        return nil
+    }
+
+    private struct ProposeCommand: Decodable {
+        struct Item: Decodable {
+            let repo: String
+            let branch: String
+            let prompt: String
+        }
+        let tasks: [Item]
+    }
+
+    private func propose(_ data: Data) -> Data {
+        let cmd: ProposeCommand
+        do {
+            cmd = try JSONDecoder().decode(ProposeCommand.self, from: data)
+        } catch {
+            return Self.failure("propose needs 'tasks': [{repo, branch, prompt}]: \(error.localizedDescription)")
+        }
+        guard !cmd.tasks.isEmpty else {
+            return Self.failure("propose needs at least one task")
+        }
+        var items: [ProposalItem] = []
+        for task in cmd.tasks {
+            guard let repo = repo(at: task.repo) else {
+                return unknownRepo(task.repo)
+            }
+            workspaceStore.worktreePaths.invalidate(repoID: repo.id)
+            guard workspaceStore.worktreePaths.path(forRepoID: repo.id, repoPath: repo.path, branch: task.branch) != nil else {
+                return Self.failure("no managed worktree on branch '\(task.branch)' in \(repo.name); create worktrees before proposing")
+            }
+            guard !task.prompt.isEmpty else {
+                return Self.failure("task on '\(task.branch)' has an empty prompt")
+            }
+            items.append(ProposalItem(repo: repo, branch: task.branch, prompt: task.prompt))
+        }
+        registry.proposal = items
         return Self.success
+    }
+
+    func approveProposal() {
+        guard let items = registry.proposal else { return }
+        registry.proposal = nil
+        for item in items {
+            _ = dispatch(repo: item.repo, branch: item.branch, prompt: item.prompt, startup: nil)
+        }
+    }
+
+    func redispatch(_ task: PluriTask) -> String? {
+        guard let repo = repo(at: task.repo) else {
+            return "repo '\(task.repo)' is no longer registered"
+        }
+        return dispatch(repo: repo, branch: task.branch, prompt: task.brief, startup: nil)
+    }
+
+    func workerSession(for task: PluriTask) -> TerminalSession? {
+        guard let repo = repo(at: task.repo),
+              let (ws, _, tabID) = workspaceStore.workerPane(repoID: repo.id, branch: task.branch) else { return nil }
+        return ws.terminalHosts[tabID]?.session
+    }
+
+    @discardableResult
+    func reply(to task: PluriTask, text: String) -> Bool {
+        guard let session = workerSession(for: task) else { return false }
+        session.submit(text)
+        registry.appendReply(text, taskID: task.id)
+        return true
+    }
+
+    @discardableResult
+    func focusWorkerPane(for task: PluriTask) -> Bool {
+        guard let repo = repo(at: task.repo) else { return false }
+        return workspaceStore.focusWorkerPane(repoID: repo.id, branch: task.branch)
     }
 
     private func deleteWorktree(_ cmd: Command) -> Data {

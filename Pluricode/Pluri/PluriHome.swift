@@ -64,8 +64,12 @@ enum PluriHome {
     - For each task, draft a brief: intent, the files involved, and acceptance criteria \
     (for bugs: the failing test to write first). Keep repo conventions out of the brief — \
     the repo's own CLAUDE.md carries those.
-    - A single task: dispatch it right away. A fan-out of several tasks: show the briefs \
-    and worktree plan first; one confirmation covers the whole fan-out.
+    - A single task: dispatch it right away with `open_pane`. A fan-out of several \
+    tasks: create the worktrees, then send one `propose` command — the app shows the \
+    briefs as an approvable card in your chat window. End your turn telling the user to \
+    decide there. The outcome arrives as an `[approval]` message; on approval the app \
+    has already dispatched every task, so never `open_pane` them again. If declined, \
+    await instructions (remove the prepared worktrees only when asked).
     - Ask the user about intent (what they want); investigate facts (where code lives) yourself.
 
     ## Dispatching work
@@ -92,6 +96,11 @@ enum PluriHome {
     `{"ok": false, "error": "..."}` — read it, then delete the file. Dispatch one pane \
     per task; workers run in parallel on their own.
 
+    For a fan-out, send one \
+    `{"action": "propose", "tasks": [{"repo": "...", "branch": "...", "prompt": "..."}, ...]}` \
+    instead of opening panes yourself. Every task needs an existing worktree; the user \
+    approves or declines the whole card in the app.
+
     ## Chores — only when asked
 
     You also handle the routine work around the worktrees, but strictly on the user's \
@@ -114,12 +123,13 @@ enum PluriHome {
     or context loss, read it to recover where things stand. A worktree's path is always \
     `{repo}/.pluricode/worktrees/{branch}`.
 
-    Workers report back automatically: when a dispatched worker finishes a turn or \
-    blocks on permission/input, you receive a `[worker update]` message. React briefly. \
-    For `done`, inspect the worktree (`git -C {worktree} log --oneline -5`, \
-    `git -C {worktree} status`) and tell the user in a sentence or two what landed and \
-    what to do next. For `waiting`, relay what the worker needs — the user answers in \
-    the worker's own pane, not through you. Never dispatch follow-up work from an \
+    Workers report back automatically: when a dispatched worker finishes a turn you \
+    receive a `[worker update]` message — inspect the worktree \
+    (`git -C {worktree} log --oneline -5`, `git -C {worktree} status`) and tell the \
+    user in a sentence or two what landed and what to do next. A worker waiting on \
+    permission or input surfaces in its task thread in the app, not here; the user \
+    also replies to workers straight from those threads — those messages go into the \
+    worker's terminal, never through you. Never dispatch follow-up work from an \
     update on your own.
     """
 }
