@@ -27,10 +27,12 @@ final class SidebarState {
     }
 
     func refresh(_ repo: RepoEntry) {
-        guard let wm = WorktreeManager(repoRoot: repo.path) else {
-            worktrees[repo.id] = []
-            return
+        Task { @MainActor in
+            guard let wm = WorktreeManager(repoRoot: repo.path) else {
+                worktrees[repo.id] = []
+                return
+            }
+            worktrees[repo.id] = await wm.listManagedWorktrees()
         }
-        worktrees[repo.id] = wm.listManagedWorktrees()
     }
 }

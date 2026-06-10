@@ -195,8 +195,10 @@ struct RepoSidebarView: View {
     }
 
     private func deleteWorktree(repo: RepoEntry, worktree: Worktree) {
-        workspaceStore.deleteWorktree(repo: repo, worktree: worktree, pinStore: pinStore)
-        sidebarState.refresh(repo)
+        Task {
+            await workspaceStore.deleteWorktree(repo: repo, worktree: worktree, pinStore: pinStore)
+            sidebarState.refresh(repo)
+        }
     }
 
     @ViewBuilder
@@ -820,9 +822,9 @@ struct NewWorktreeSheet: View {
         }
         .padding(24)
         .frame(width: 460)
-        .onAppear {
+        .task {
             if let wm = WorktreeManager(repoRoot: repo.path) {
-                baseBranch = wm.defaultBaseRef()
+                baseBranch = await wm.defaultBaseRef()
             }
         }
     }
@@ -836,19 +838,19 @@ struct NewWorktreeSheet: View {
         }
         isCreating = true
         error = nil
-        do {
-            _ = try wm.createWorktree(
-                name: cleanName,
-                baseBranch: baseBranch.isEmpty ? wm.defaultBaseRef() : baseBranch
-            )
-            onCreated(cleanName)
-            dismiss()
-        } catch let WorktreeError.createFailed(message) {
-            error = message
-            isCreating = false
-        } catch {
-            self.error = error.localizedDescription
-            isCreating = false
+        Task {
+            do {
+                let base = baseBranch.isEmpty ? await wm.defaultBaseRef() : baseBranch
+                _ = try await wm.createWorktree(name: cleanName, baseBranch: base)
+                onCreated(cleanName)
+                dismiss()
+            } catch let WorktreeError.createFailed(message) {
+                error = message
+                isCreating = false
+            } catch {
+                self.error = error.localizedDescription
+                isCreating = false
+            }
         }
     }
 
@@ -960,14 +962,16 @@ private struct RenameWorktreeSheet: View {
             error = "Not a git repository"
             return
         }
-        do {
-            let result = try wm.renameWorktree(oldBranch: target.worktree.branch, newName: clean)
-            onRenamed(result.branch)
-            dismiss()
-        } catch let WorktreeError.createFailed(message) {
-            error = message
-        } catch {
-            self.error = error.localizedDescription
+        Task {
+            do {
+                let result = try await wm.renameWorktree(oldBranch: target.worktree.branch, newName: clean)
+                onRenamed(result.branch)
+                dismiss()
+            } catch let WorktreeError.createFailed(message) {
+                error = message
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
     }
 

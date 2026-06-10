@@ -185,8 +185,12 @@ final class LocalHostDetector {
 
     func feed(_ slice: ArraySlice<UInt8>) {
         let chunk = String(decoding: slice, as: UTF8.self)
-        let cleaned = Self.stripAnsi(chunk)
+        let cleaned = chunk.contains("\u{1B}") ? Self.stripAnsi(chunk) : chunk
         buffer.append(cleaned)
+        guard buffer.contains("http") else {
+            trimBuffer()
+            return
+        }
         let ns = buffer as NSString
         let matches = Self.urlRegex.matches(in: buffer, range: NSRange(location: 0, length: ns.length))
         for match in matches {
@@ -195,6 +199,14 @@ final class LocalHostDetector {
             guard let url = Self.normalize(trimmed) else { continue }
             onURL(url)
         }
+        if let last = matches.last {
+            let end = last.range.location + last.range.length
+            buffer = ns.substring(from: end == ns.length ? last.range.location : end)
+        }
+        trimBuffer()
+    }
+
+    private func trimBuffer() {
         if buffer.count > Self.maxBuffer {
             buffer = String(buffer.suffix(Self.maxBuffer))
         }

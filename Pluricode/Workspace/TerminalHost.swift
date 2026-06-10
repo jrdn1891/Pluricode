@@ -60,7 +60,6 @@ final class TerminalHost {
     }
 
     func saveScrollback(to dir: URL) {
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         session.saveScrollback(to: dir)
     }
 

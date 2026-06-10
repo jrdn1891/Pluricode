@@ -18,8 +18,9 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     @Published private(set) var isIdle: Bool = false
     @Published private(set) var pendingAttachments: [PendingImageAttachment] = []
     private var lastAppliedZoom: Float = 1.0
-    private var lastSavedBufferSize: Int = 0
+    private var scrollbackDirty: Bool = false
     private var idleWorkItem: DispatchWorkItem?
+    private var idleArmedAt: TimeInterval = 0
     private var isHovering: Bool = false
     private lazy var hostDetector: LocalHostDetector = LocalHostDetector { [weak self] url in
         self?.onLocalHostDiscovered?(url)
@@ -38,7 +39,10 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         self.terminalView = view
         super.init()
         view.onActivity = { [weak self] in self?.noteActivity() }
-        view.onRawData = { [weak self] slice in self?.hostDetector.feed(slice) }
+        view.onRawData = { [weak self] slice in
+            self?.scrollbackDirty = true
+            self?.hostDetector.feed(slice)
+        }
         view.onAttachImage = { [weak self] attachment in self?.attach(attachment) }
         view.flushAttachments = { [weak self] in self?.flushAttachmentInjection() }
         view.onMouseDown = { [weak self] in self?.onFocus?() }
@@ -73,9 +77,15 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
     private func noteActivity() {
         if isIdle { isIdle = false }
+        guard !isHovering else {
+            idleWorkItem?.cancel()
+            idleWorkItem = nil
+            return
+        }
+        let now = ProcessInfo.processInfo.systemUptime
+        if idleWorkItem != nil, now - idleArmedAt < 0.25 { return }
         idleWorkItem?.cancel()
-        idleWorkItem = nil
-        guard !isHovering else { return }
+        idleArmedAt = now
         let item = DispatchWorkItem { [weak self] in self?.isIdle = true }
         idleWorkItem = item
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.idleThreshold, execute: item)
@@ -109,11 +119,14 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
     }
 
     func saveScrollback(to dir: URL) {
+        guard scrollbackDirty else { return }
+        scrollbackDirty = false
         let data = terminalView.getTerminal().getBufferAsData()
-        guard data.count != lastSavedBufferSize else { return }
-        lastSavedBufferSize = data.count
         let file = dir.appendingPathComponent("\(nodeID.uuidString).txt")
-        try? data.write(to: file, options: .atomic)
+        Workspace.diskQueue.async {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try? data.write(to: file, options: .atomic)
+        }
     }
 
     func restoreScrollback(from dir: URL) {
@@ -174,8 +187,6 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     var flushAttachments: (() -> String?)?
     var onMouseDown: (() -> Void)?
     var onHoverChange: ((Bool) -> Void)?
-    private var keyMonitor: Any?
-    private var mouseMonitor: Any?
     private var hoverTrackingArea: NSTrackingArea?
     private lazy var hoverObserver = HoverObserver { [weak self] hovering in self?.onHoverChange?(hovering) }
     private var metalCancellable: AnyCancellable?
@@ -192,26 +203,23 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
 
     required init?(coder: NSCoder) { super.init(coder: coder) }
 
-    deinit {
-        if let monitor = keyMonitor { NSEvent.removeMonitor(monitor) }
-        if let monitor = mouseMonitor { NSEvent.removeMonitor(monitor) }
-    }
+    private static let instances = NSHashTable<ActivityAwareTerminalView>.weakObjects()
+    private static let sharedMonitors: Void = {
+        _ = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            for view in instances.allObjects { view.interceptReturn(event) }
+            return event
+        }
+        _ = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+            for view in instances.allObjects { view.captureFocusIfHit(event) }
+            return event
+        }
+    }()
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window != nil {
-            if keyMonitor == nil {
-                keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                    self?.interceptReturn(event)
-                    return event
-                }
-            }
-            if mouseMonitor == nil {
-                mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
-                    self?.captureFocusIfHit(event)
-                    return event
-                }
-            }
+            Self.instances.add(self)
+            _ = Self.sharedMonitors
             if hoverTrackingArea == nil {
                 let area = NSTrackingArea(
                     rect: .zero,
@@ -223,10 +231,7 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
                 hoverTrackingArea = area
             }
         } else {
-            if let monitor = keyMonitor { NSEvent.removeMonitor(monitor) }
-            keyMonitor = nil
-            if let monitor = mouseMonitor { NSEvent.removeMonitor(monitor) }
-            mouseMonitor = nil
+            Self.instances.remove(self)
             if let area = hoverTrackingArea { removeTrackingArea(area) }
             hoverTrackingArea = nil
             onHoverChange?(false)

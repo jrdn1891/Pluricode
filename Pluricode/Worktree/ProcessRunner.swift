@@ -16,7 +16,12 @@ enum ProcessRunner {
         NSHomeDirectory() + "/.local/bin",
     ]
 
-    static func run(_ executable: String, args: [String], cwd: URL? = nil) throws -> ProcessResult {
+    static func run(
+        _ executable: String,
+        args: [String],
+        cwd: URL? = nil,
+        timeout: TimeInterval? = nil
+    ) async throws -> ProcessResult {
         guard let execURL = resolveExecutable(executable) else {
             return ProcessResult(status: 127, stdout: "", stderr: "executable not found: \(executable)")
         }
@@ -31,23 +36,41 @@ enum ProcessRunner {
         let stderr = Pipe()
         process.standardOutput = stdout
         process.standardError = stderr
-        try process.run()
-        var outData = Data()
-        var errData = Data()
-        let group = DispatchGroup()
-        DispatchQueue.global().async(group: group) {
-            outData = stdout.fileHandleForReading.readDataToEndOfFile()
+        let outData = drain(stdout)
+        let errData = drain(stderr)
+        let status: Int32 = try await withCheckedThrowingContinuation { continuation in
+            process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
+            do {
+                try process.run()
+                if let timeout {
+                    DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                        if process.isRunning { process.terminate() }
+                    }
+                }
+            } catch {
+                process.terminationHandler = nil
+                try? stdout.fileHandleForWriting.close()
+                try? stderr.fileHandleForWriting.close()
+                continuation.resume(throwing: error)
+            }
         }
-        DispatchQueue.global().async(group: group) {
-            errData = stderr.fileHandleForReading.readDataToEndOfFile()
-        }
-        process.waitUntilExit()
-        group.wait()
         return ProcessResult(
-            status: process.terminationStatus,
-            stdout: String(data: outData, encoding: .utf8) ?? "",
-            stderr: String(data: errData, encoding: .utf8) ?? ""
+            status: status,
+            stdout: String(data: await outData.value, encoding: .utf8) ?? "",
+            stderr: String(data: await errData.value, encoding: .utf8) ?? ""
         )
+    }
+
+    private static func drain(_ pipe: Pipe) -> Task<Data, Never> {
+        Task {
+            var data = Data()
+            do {
+                for try await byte in pipe.fileHandleForReading.bytes {
+                    data.append(byte)
+                }
+            } catch {}
+            return data
+        }
     }
 
     private static func resolveExecutable(_ name: String) -> URL? {

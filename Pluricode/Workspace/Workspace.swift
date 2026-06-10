@@ -109,16 +109,18 @@ final class Workspace {
         repoStore.repos.first { $0.id == id }
     }
 
+    static let diskQueue = DispatchQueue(label: "com.pluricode.disk", qos: .utility)
+
     func save() {
         guard !isDeleted else { return }
-        try? FileManager.default.createDirectory(at: Self.workspacesDir, withIntermediateDirectories: true)
         let snapshot = WorkspaceSnapshot(id: id, name: name, root: tiling.root, minimizedPanes: minimizedPanes)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        if let data = try? encoder.encode(snapshot) {
-            try? data.write(to: snapshotURL, options: .atomic)
+        if let data = try? JSONEncoder().encode(snapshot) {
+            let url = snapshotURL
+            Self.diskQueue.async {
+                try? FileManager.default.createDirectory(at: Self.workspacesDir, withIntermediateDirectories: true)
+                try? data.write(to: url, options: .atomic)
+            }
         }
-        try? FileManager.default.createDirectory(at: Self.scrollbackDir, withIntermediateDirectories: true)
         for host in terminalHosts.values {
             host.saveScrollback(to: Self.scrollbackDir)
         }
@@ -737,15 +739,13 @@ final class WorkspaceStore {
         }
     }
 
-    func deleteWorktree(repo: RepoEntry, worktree: Worktree, pinStore: PinStore) {
+    @MainActor
+    func deleteWorktree(repo: RepoEntry, worktree: Worktree, pinStore: PinStore) async {
         guard let wm = WorktreeManager(repoRoot: repo.path) else { return }
         pinStore.removeWorktree(repoID: repo.id, branch: worktree.branch)
         removePanes(repoID: repo.id, worktreeID: worktree.branch)
-        try? wm.removeWorktree(at: URL(fileURLWithPath: worktree.path))
-        _ = try? Process.run(
-            URL(fileURLWithPath: "/usr/bin/git"),
-            arguments: ["-C", repo.path.path, "branch", "-D", worktree.branch]
-        )
+        try? await wm.removeWorktree(at: URL(fileURLWithPath: worktree.path))
+        _ = try? await ProcessRunner.run("git", args: ["-C", repo.path.path, "branch", "-D", worktree.branch])
         worktreePaths.invalidate(repoID: repo.id)
         worktreeStatusService.invalidate(repoID: repo.id)
     }
