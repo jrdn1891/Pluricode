@@ -250,7 +250,7 @@ A central agent ("Pluri") the user talks to in natural language; it sets up work
 - [x] `Workspace.openWorktreePane(repoID:branch:startupScript:)`: pane inserted right of the anchor via `reinsertPane`; startup delivered through the existing `pendingDevScripts` channel; keyboard focus stays where the user is (Pluri's pane).
 - [x] Bridge invalidates `WorktreePaths` + worktree status caches and refreshes the sidebar, so worktrees Pluri just created with git resolve immediately.
 - [x] `PluriHome` `CLAUDE.md` documents the protocol with a copy-paste dispatch recipe; limits section now only covers monitoring (M13).
-- [ ] Verify (interactive): ask Pluri to set up a worktree and dispatch a task — worktree appears in the sidebar, a pane opens next to Pluri with `claude '<brief>'` running. *(Builds clean; needs a live run.)*
+- [x] Verify (interactive): asked Pluri to set up a worktree and dispatch a task — Pluri created the branch + worktree with git (appeared in the sidebar), the bridge opened a worker pane with the brief running, and the worker completed it. (Driven live during the M14 verify; "next to Pluri" predates M13 — Pluri is a window now, the pane opens at the workspace anchor.)
 
 ### M13 — Pluri chat window
 
@@ -275,7 +275,7 @@ A central agent ("Pluri") the user talks to in natural language; it sets up work
 - [x] `PluriSession.postEvent`: events queue while a turn is running and flush as one resumed turn when idle (and after `finish`); rendered as dim `bolt` system rows (`PluriBlock.Kind.event`) instead of user bubbles.
 - [x] `PaneHeader` worker-status dot (blue running / orange waiting / green done) next to the branch name, looked up by worktree path from `PluriMonitor` via SwiftUI environment.
 - [x] Identity: "Current limits" replaced by a Monitoring section — `tasks.json` is the app-maintained read-only truth, `[worker update]` turns arrive automatically, react briefly (`done` → inspect the worktree and summarize; `waiting` → relay; never self-dispatch follow-ups).
-- [ ] Verify (interactive): dispatch a task through Pluri — `settings.local.json` appears in the worktree, the pane dot turns blue then green, `tasks.json` tracks the status, and a `[worker update]` turn lands in the chat with Pluri's one-line summary; a permission prompt in the worker flips the dot orange and posts a waiting update. *(Builds clean; needs a live run.)*
+- [x] Verify (interactive): dispatched a test task through Pluri — `settings.local.json` appeared in the worktree, the pane dot went blue then green, `tasks.json` flipped running → done seven seconds after dispatch, and the `[worker update]` turn landed in the chat with Pluri's summary. Not yet driven: the orange waiting state (worker ran with `--dangerously-skip-permissions`, so no permission prompt occurs). Known behavior: a worker killed by an app restart leaves its registry entry `running` until re-engaged — M15 territory.
 
 ### M15 — Threads
 
