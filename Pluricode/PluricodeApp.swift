@@ -8,6 +8,7 @@ struct PluricodeApp: App {
     @State private var pinStore: PinStore
     @State private var sidebarState: SidebarState
     @State private var pluriBridge: PluriBridge
+    @State private var pluriSession: PluriSession
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showPalette = false
     @State private var creatingWorkspace = false
@@ -31,6 +32,8 @@ struct PluricodeApp: App {
             sidebarState: sidebar,
             pinStore: pins
         ))
+        _pluriSession = State(initialValue: PluriSession(repoStore: repos))
+        pluriBridge.start()
     }
 
     var body: some Scene {
@@ -54,13 +57,7 @@ struct PluricodeApp: App {
             }
             .toolbar {
                 ToolbarItem {
-                    Button {
-                        workspaceStore.selectedWorkspace?.openPluri()
-                    } label: {
-                        PluriMascotView()
-                    }
-                    .help("Pluri — describe what you want to work on")
-                    .disabled(workspaceStore.selectedWorkspace == nil)
+                    PluriToolbarButton()
                 }
                 PaneCreationToolbar(
                     workspace: workspaceStore.selectedWorkspace
@@ -85,7 +82,6 @@ struct PluricodeApp: App {
             .navigationTitle(workspaceStore.selectedWorkspace?.name ?? "Pluricode")
             .onAppear {
                 (AppearanceMode(rawValue: appearanceModeRaw) ?? .system).apply()
-                pluriBridge.start()
             }
             .onChange(of: appearanceModeRaw) { _, newValue in
                 (AppearanceMode(rawValue: newValue) ?? .system).apply()
@@ -121,6 +117,11 @@ struct PluricodeApp: App {
                     .keyboardShortcut("k", modifiers: .command)
             }
         }
+
+        Window("Pluri", id: "pluri") {
+            PluriChatView(session: pluriSession)
+        }
+        .defaultSize(width: 460, height: 640)
 
         Settings {
             TabView {
@@ -166,6 +167,19 @@ struct PluricodeApp: App {
                 sidebarState.refresh(repo)
             }
         }
+    }
+}
+
+struct PluriToolbarButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button {
+            openWindow(id: "pluri")
+        } label: {
+            PluriMascotView()
+        }
+        .help("Pluri — describe what you want to work on")
     }
 }
 

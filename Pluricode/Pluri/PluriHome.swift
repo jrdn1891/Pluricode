@@ -13,7 +13,23 @@ enum PluriHome {
         if let data = try? JSONSerialization.data(withJSONObject: entries, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: dir.appendingPathComponent("repos.json"), options: .atomic)
         }
+        let claudeDir = dir.appendingPathComponent(".claude", isDirectory: true)
+        try? FileManager.default.createDirectory(at: claudeDir, withIntermediateDirectories: true)
+        try? permissions.data(using: .utf8)?
+            .write(to: claudeDir.appendingPathComponent("settings.json"), options: .atomic)
     }
+
+    private static let permissions = """
+    {
+      "permissions": {
+        "allow": [
+          "Read", "Glob", "Grep", "Task", "Write",
+          "Bash(git:*)", "Bash(gh:*)", "Bash(ls:*)", "Bash(cat:*)", "Bash(mv:*)",
+          "Bash(rm:*)", "Bash(sleep:*)", "Bash(echo:*)"
+        ]
+      }
+    }
+    """
 
     private static let identity = """
     # Pluri — the Pluricode orchestrator
@@ -25,12 +41,14 @@ enum PluriHome {
     ## What you know
 
     - `repos.json` in this directory lists the user's registered repositories \
-    (regenerated every time this pane starts).
+    (regenerated with every message you receive).
     - Managed worktrees live at `{repo}/.pluricode/worktrees/{name}` on a branch named \
     `{name}`. Pluricode's sidebar lists them straight from `git worktree list`, so \
     worktrees you create appear in the app.
     - A repo may carry `.pluricode/repo.json`; its `devScript` is how the user runs \
     that repo's dev environment.
+    - You run headless behind Pluricode's chat window; tools outside your allow-list \
+    are denied automatically. When a denial blocks you, tell the user what you needed.
 
     ## How you work
 
@@ -52,17 +70,16 @@ enum PluriHome {
 
     ## Dispatching work
 
-    You drive the Pluricode app through the command bridge: write a JSON request into \
+    You drive the Pluricode app through the command bridge: create a JSON request in \
     `commands/` in this directory and the app answers with `{name}.result.json` within a \
-    second. Write to a temp name first, then `mv` it in — the rename must be atomic:
+    second. The shell guard blocks writing JSON from bash (brace-quote heredocs and \
+    redirects are rejected), so always use the Write tool for the request, then an \
+    atomic `mv`:
 
-        id=$(uuidgen)
-        cat > commands/$id.tmp <<'EOF'
-        {"action": "open_pane", "repo": "/path/from/repos.json", "branch": "my-task",
-         "prompt": "the full task brief"}
-        EOF
-        mv commands/$id.tmp commands/$id.json
-        sleep 1 && cat commands/$id.result.json
+    1. Write tool → `commands/{task-name}.tmp` containing \
+    `{"action": "open_pane", "repo": "/path/from/repos.json", "branch": "my-task", "prompt": "the full task brief"}`
+    2. `mv commands/{task-name}.tmp commands/{task-name}.json`
+    3. `sleep 1 && cat commands/{task-name}.result.json`
 
     `open_pane` opens the worktree as a terminal pane in the user's current workspace, \
     starts the user's configured worker agent in it, and hands it `prompt` as the task. \

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		06326AFE850E788295307D48 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742F16B907FA39DBB0114F60 /* Theme.swift */; };
+		07587D98DC7B2F5EF8635D93 /* PluriSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A046DDFC2D686C469E21BA43 /* PluriSession.swift */; };
 		0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A3E23A2A5CE1735F8D522D /* ProcessRunner.swift */; };
 		0DC403F2FCB7A4D30384AEB7 /* NewWorkspaceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */; };
 		149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E37A72F9CD0A1326611CB3C /* Worktree.swift */; };
@@ -16,17 +17,16 @@
 		1FF2534862D523B586A00545 /* PermissionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A3591F4D52D920EBF984E5 /* PermissionsService.swift */; };
 		252121A12E8E251537CBFA7D /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 370E2E0EB9B46FAF48CFEC7E /* SwiftTerm */; };
 		280CCB430242DD94E60CD1A2 /* SidebarState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 640330E4FAC0CC5442935F46 /* SidebarState.swift */; };
-		327DA7F76445AAAE665211E3 /* PluriPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDBDCE7E72C4A701F97A2697 /* PluriPaneView.swift */; };
 		3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95CDC674CDC6FC6D7714CB17 /* Workspace.swift */; };
 		4A65156652B38799E93E2EBC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 2AF1C742C1EC35344E7DF72A /* Sparkle */; };
 		4ADC14E5C3674C18F265925C /* PluriMascotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8327000CF8BB0AE0161EC6 /* PluriMascotView.swift */; };
-		4BD11E20A91D43C2B7E05A11 /* PluriSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C2E8F31D04B45A9836F1B22 /* PluriSettings.swift */; };
-		4C1F92A4E85D470BB1C36D33 /* PluriSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D3A07B5F16C481CC2D47E44 /* PluriSettingsView.swift */; };
 		4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83868DA08DF195AF66F38C70 /* IdleOverlay.swift */; };
 		4FB6C595C0CDBF7CFD164C21 /* TerminalSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73E8B37818B718BE8D743D3 /* TerminalSettings.swift */; };
+		516B47B522F259A8FF480B8B /* PluriChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9995D9D8A99B99FA5C33AFD /* PluriChatView.swift */; };
 		5208192AF506608CB772A9C5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84B103466B6BA9B7791B4EB8 /* Assets.xcassets */; };
 		56CB18171A578DECD2613656 /* TileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FC19651849CFB42A1D4A3A /* TileNode.swift */; };
 		585484B172F60EB3A21E8D7C /* PinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2701F83AE83DE7286C13ED90 /* PinStore.swift */; };
+		5B7EA870BAD5BD55A4926917 /* PluriSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658E63739A71DF77F181FC44 /* PluriSettingsView.swift */; };
 		5BFF6AC69093B72FBE9F32BC /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 311D5BA84A083B24731CB565 /* TerminalSession.swift */; };
 		6DBF9A14E662ED45AF58A42C /* WorktreeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259CAD09D9A3D60E24F5B0E1 /* WorktreeManager.swift */; };
 		6EE30230AA44ABEEA156649B /* TaskPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45E91297C034C82CF173906F /* TaskPaneView.swift */; };
@@ -44,6 +44,7 @@
 		9BA48262D7C491D52BC53471 /* TerminalSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868643F98C559E20E51603B7 /* TerminalSettingsView.swift */; };
 		A7474169AFC652EE29ABF746 /* AttachmentChipsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */; };
 		AFE23BE23AAB889F92202451 /* LocalHostRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49CBB28DBEB1E236A8D06740 /* LocalHostRegistry.swift */; };
+		B6E37DE9AFF07D74294B1F49 /* PluriSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96512E0F34E744DEFE098223 /* PluriSettings.swift */; };
 		C878C31C08E33B2454F9E6DE /* LocalHostsWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D4FD99941538CCD095F8FC /* LocalHostsWidgetView.swift */; };
 		CAFE3849F50A463074800322 /* RepoSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */; };
 		DCDE0298F6E0858E03064C01 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861AC6957D983804F39D40DF /* main.swift */; };
@@ -69,6 +70,7 @@
 		567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachmentChipsOverlay.swift; sourceTree = "<group>"; };
 		640330E4FAC0CC5442935F46 /* SidebarState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarState.swift; sourceTree = "<group>"; };
 		648929BD87FF1ACCA8C36AD0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		658E63739A71DF77F181FC44 /* PluriSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriSettingsView.swift; sourceTree = "<group>"; };
 		67FC19651849CFB42A1D4A3A /* TileNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileNode.swift; sourceTree = "<group>"; };
 		69A3E23A2A5CE1735F8D522D /* ProcessRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRunner.swift; sourceTree = "<group>"; };
 		718374F2B635E5413EA4CC56 /* TileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TileView.swift; sourceTree = "<group>"; };
@@ -85,21 +87,21 @@
 		861AC6957D983804F39D40DF /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		868643F98C559E20E51603B7 /* TerminalSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSettingsView.swift; sourceTree = "<group>"; };
 		95CDC674CDC6FC6D7714CB17 /* Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Workspace.swift; sourceTree = "<group>"; };
+		96512E0F34E744DEFE098223 /* PluriSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriSettings.swift; sourceTree = "<group>"; };
 		98D4FD99941538CCD095F8FC /* LocalHostsWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalHostsWidgetView.swift; sourceTree = "<group>"; };
 		9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoSidebarView.swift; sourceTree = "<group>"; };
-		7C2E8F31D04B45A9836F1B22 /* PluriSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriSettings.swift; sourceTree = "<group>"; };
-		8D3A07B5F16C481CC2D47E44 /* PluriSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriSettingsView.swift; sourceTree = "<group>"; };
 		9D8327000CF8BB0AE0161EC6 /* PluriMascotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriMascotView.swift; sourceTree = "<group>"; };
 		9E37A72F9CD0A1326611CB3C /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
+		A046DDFC2D686C469E21BA43 /* PluriSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriSession.swift; sourceTree = "<group>"; };
 		A3AB0523B2C998E6BDF6FDB3 /* TerminalPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPaneView.swift; sourceTree = "<group>"; };
 		AB221A191585CD45CDE17669 /* PluriBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriBridge.swift; sourceTree = "<group>"; };
 		AFE88C8CCD743305385E5C9F /* PluriHome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriHome.swift; sourceTree = "<group>"; };
+		B9995D9D8A99B99FA5C33AFD /* PluriChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriChatView.swift; sourceTree = "<group>"; };
 		BDC77F2E641969738B4482B5 /* TerminalHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalHost.swift; sourceTree = "<group>"; };
 		CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewWorkspaceSheet.swift; sourceTree = "<group>"; };
 		CFEE476A6394A367AC294860 /* BrowserHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserHost.swift; sourceTree = "<group>"; };
 		D73E8B37818B718BE8D743D3 /* TerminalSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSettings.swift; sourceTree = "<group>"; };
 		D79713EC727834622CEEF2EF /* TaskListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListStore.swift; sourceTree = "<group>"; };
-		EDBDCE7E72C4A701F97A2697 /* PluriPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriPaneView.swift; sourceTree = "<group>"; };
 		F1AE508972402DF38CAFBF8F /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
 		F722E7DD539F6776FA1674BA /* RepoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoStore.swift; sourceTree = "<group>"; };
 		F9800670AB5C4F9EF61E843E /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
@@ -168,11 +170,12 @@
 			isa = PBXGroup;
 			children = (
 				AB221A191585CD45CDE17669 /* PluriBridge.swift */,
+				B9995D9D8A99B99FA5C33AFD /* PluriChatView.swift */,
 				AFE88C8CCD743305385E5C9F /* PluriHome.swift */,
 				9D8327000CF8BB0AE0161EC6 /* PluriMascotView.swift */,
-				EDBDCE7E72C4A701F97A2697 /* PluriPaneView.swift */,
-				7C2E8F31D04B45A9836F1B22 /* PluriSettings.swift */,
-				8D3A07B5F16C481CC2D47E44 /* PluriSettingsView.swift */,
+				A046DDFC2D686C469E21BA43 /* PluriSession.swift */,
+				96512E0F34E744DEFE098223 /* PluriSettings.swift */,
+				658E63739A71DF77F181FC44 /* PluriSettingsView.swift */,
 			);
 			path = Pluri;
 			sourceTree = "<group>";
@@ -358,11 +361,12 @@
 				93E709A761D2947E0F687A71 /* PermissionsView.swift in Sources */,
 				585484B172F60EB3A21E8D7C /* PinStore.swift in Sources */,
 				9429A4B82D7F691C455E0733 /* PluriBridge.swift in Sources */,
+				516B47B522F259A8FF480B8B /* PluriChatView.swift in Sources */,
 				903487B058E11C3A6B4378F2 /* PluriHome.swift in Sources */,
 				4ADC14E5C3674C18F265925C /* PluriMascotView.swift in Sources */,
-				327DA7F76445AAAE665211E3 /* PluriPaneView.swift in Sources */,
-				4BD11E20A91D43C2B7E05A11 /* PluriSettings.swift in Sources */,
-				4C1F92A4E85D470BB1C36D33 /* PluriSettingsView.swift in Sources */,
+				07587D98DC7B2F5EF8635D93 /* PluriSession.swift in Sources */,
+				B6E37DE9AFF07D74294B1F49 /* PluriSettings.swift in Sources */,
+				5B7EA870BAD5BD55A4926917 /* PluriSettingsView.swift in Sources */,
 				97C1C6B70507B356349663B4 /* PluricodeApp.swift in Sources */,
 				0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */,
 				F814E0ED4F9B4CE50E1FC08D /* RepoConfig.swift in Sources */,

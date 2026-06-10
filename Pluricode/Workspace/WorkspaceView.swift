@@ -186,7 +186,6 @@ private struct GhostPane: View {
         case .tasks: return "checklist"
         case .widget(let kind): return kind.systemImage
         case .browser: return "globe"
-        case .pluri: return "sparkles"
         }
     }
 
@@ -202,8 +201,6 @@ private struct GhostPane: View {
             return kind.label
         case .browser(_, let worktreeID, _):
             return worktreeID
-        case .pluri:
-            return "Pluri"
         }
     }
 }
@@ -291,8 +288,6 @@ private struct TabBody: View {
                 url: url,
                 workspace: workspace
             )
-        case .pluri:
-            PluriPaneBody(pane: pane, tabID: tab.id, workspace: workspace)
         }
     }
 }
@@ -1123,114 +1118,6 @@ private struct ShellPaneHeader: View {
     }
 }
 
-private struct PluriPaneBody: View {
-    let pane: Pane
-    let tabID: UUID
-    let workspace: Workspace
-
-    var body: some View {
-        let isExpanded = workspace.expandedPaneID == pane.id
-        VStack(spacing: 0) {
-            PluriPaneHeader(
-                pane: pane,
-                workspace: workspace,
-                isExpanded: isExpanded,
-                onActivate: { workspace.setFocus(paneID: pane.id) },
-                onExpand: {
-                    if isExpanded { workspace.collapseExpandedPane() }
-                    else { workspace.expandPane(paneID: pane.id) }
-                },
-                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
-            )
-            if isExpanded {
-                ExpandedPanePlaceholder()
-            } else {
-                GeometryReader { geo in
-                    PluriPaneView(paneID: pane.id, tabID: tabID, workspace: workspace)
-                        .id(tabID)
-                        .overlay {
-                            if let session = workspace.terminalHosts[tabID]?.session {
-                                AttachmentChipsOverlay(session: session)
-                            }
-                        }
-                        .onDrop(
-                            of: [.plainText],
-                            delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
-                        )
-                }
-            }
-        }
-    }
-}
-
-private struct PluriPaneHeader: View {
-    let pane: Pane
-    let workspace: Workspace
-    let isExpanded: Bool
-    let onActivate: () -> Void
-    let onExpand: () -> Void
-    let onClose: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            PluriMascotView(size: 15)
-            Text("Pluri")
-                .font(.system(size: 12, weight: .medium))
-            Text("orchestrator")
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
-            Spacer()
-            Button(action: onExpand) {
-                Image(systemName: isExpanded
-                    ? "arrow.down.right.and.arrow.up.left"
-                    : "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help(isExpanded ? "Collapse" : "Expand")
-            if !isExpanded, workspace.canMinimize(paneID: pane.id) {
-                Button(action: { workspace.minimizePane(paneID: pane.id) }) {
-                    Image(systemName: "minus")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Minimize pane")
-            }
-            if !isExpanded {
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(PluriMascotView.coral.opacity(0.12))
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onActivate)
-        .draggable(beginMoveDrag()) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                Text("Pluri")
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.accentColor.opacity(0.2))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
-    }
-
-    private func beginMoveDrag() -> TilingDragPayload {
-        let payload = TilingDragPayload(kind: .movePane(paneID: pane.id))
-        workspace.beginDrag(payload)
-        return payload
-    }
-}
-
 private struct MissingFolderBody: View {
     let cwd: URL
     let onRemove: () -> Void
@@ -1554,7 +1441,6 @@ private struct MinimizedPaneChip: View {
         case .tasks: "checklist"
         case .widget(let kind): kind.systemImage
         case .browser: "globe"
-        case .pluri: "sparkles"
         }
     }
 
@@ -1567,7 +1453,6 @@ private struct MinimizedPaneChip: View {
         case .tasks(let listID): return workspace.taskListStore.list(id: listID)?.name ?? "Tasks"
         case .widget(let kind): return kind.label
         case .browser(_, let worktreeID, _): return worktreeID
-        case .pluri: return "Pluri"
         }
     }
 }
@@ -1637,12 +1522,6 @@ private struct ExpandedPaneCard: View {
                 repoID: repoID,
                 worktreeID: worktreeID,
                 url: url,
-                workspace: workspace
-            )
-        case .pluri:
-            PluriExpandedContent(
-                pane: pane,
-                tabID: pane.activeTabID,
                 workspace: workspace
             )
         case .tasks, .widget:
@@ -1729,32 +1608,6 @@ private struct ShellExpandedContent: View {
                     onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
                 )
             }
-        }
-    }
-}
-
-private struct PluriExpandedContent: View {
-    let pane: Pane
-    let tabID: UUID
-    let workspace: Workspace
-
-    var body: some View {
-        VStack(spacing: 0) {
-            PluriPaneHeader(
-                pane: pane,
-                workspace: workspace,
-                isExpanded: true,
-                onActivate: { workspace.setFocus(paneID: pane.id) },
-                onExpand: { workspace.collapseExpandedPane() },
-                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
-            )
-            PluriPaneView(paneID: pane.id, tabID: tabID, workspace: workspace)
-                .id(tabID)
-                .overlay {
-                    if let session = workspace.terminalHosts[tabID]?.session {
-                        AttachmentChipsOverlay(session: session)
-                    }
-                }
         }
     }
 }

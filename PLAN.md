@@ -227,9 +227,9 @@ Selection happens **directly on the running page**, not on a static capture: a m
 
 ---
 
-## Pluri — central orchestrator (M11–M14)
+## Pluri — central orchestrator (M11–M15)
 
-A central agent ("Pluri") the user talks to in natural language; it sets up worktrees, prepares task briefs, dispatches worker sessions, and monitors them. Pluricode stays the dumb reliable hands: Pluri is the user's own Claude Code running inside a pane — no API keys, no LLM runtime in the app. The value is fan-out: one utterance containing N tasks across M repos becomes N parallel worker sessions. Workers are parallel by construction (separate PTYs in their own panes); Pluri only dispatches, so its own loop stays free.
+A central agent ("Pluri") the user talks to in natural language; it sets up worktrees, prepares task briefs, dispatches worker sessions, and monitors them. Pluricode stays the dumb reliable hands: Pluri is the user's own Claude Code — no API keys, no LLM runtime in the app. The value is fan-out: one utterance containing N tasks across M repos becomes N parallel worker sessions. Workers are parallel by construction (separate PTYs in their own panes); Pluri only dispatches, so its own loop stays free.
 
 ### M11 — Pluri in the toolbar
 
@@ -252,19 +252,32 @@ A central agent ("Pluri") the user talks to in natural language; it sets up work
 - [x] `PluriHome` `CLAUDE.md` documents the protocol with a copy-paste dispatch recipe; limits section now only covers monitoring (M13).
 - [ ] Verify (interactive): ask Pluri to set up a worktree and dispatch a task — worktree appears in the sidebar, a pane opens next to Pluri with `claude '<brief>'` running. *(Builds clean; needs a live run.)*
 
-### M13 — Status & events
+### M13 — Pluri chat window
 
-**Goal**: the return channel. Worker sessions get Claude Code hooks that write status files under the Pluri home; the app watches them, badges panes (running / waiting / done), and injects one-line events into Pluri's PTY so worker completions wake Pluri. A persistent task registry file (task, repo, worktree, brief, status) makes orchestration state survive context compaction — the conversation is the UI, the registry is the truth.
+**Goal**: Pluri leaves the tiling. Pulled ahead of status & events because the standalone surface is the user-facing priority; the bridge carries over unchanged. The mascot now opens a dedicated chat window driven by headless Claude Code: each user message spawns `claude -p --output-format stream-json --include-partial-messages` (resuming the session by id) in the Pluri home with the prompt on stdin — no shell escaping, no PTY, still the user's own auth. Headless mode cannot show terminal permission prompts (unmatched tools auto-deny), so the home gets a `.claude/settings.json` allow-list of what Pluri legitimately runs (git, gh, the bridge recipe, reads, subagents); approval lives where it belongs — in the conversation, before a fan-out dispatch.
 
-### M14 — Native Pluri pane
+- [x] `Pluri/PluriSession.swift`: per-turn `claude -p` subprocess via the login shell; parses the NDJSON stream (text deltas, tool_use starts, partial tool input, result) into `PluriBlock`s; captures `session_id` and resumes it on the next turn; SIGINT to interrupt; stderr surfaces as an error block when a turn dies without a result.
+- [x] `Pluri/PluriChatView.swift`: transcript (user bubbles, streaming markdown text, compact tool-call capsules, errors), auto-scroll, multiline input with send/stop, new-conversation toolbar button, mascot empty state.
+- [x] `PluricodeApp`: `Window("Pluri")` scene; the toolbar mascot opens it (no workspace required anymore).
+- [x] `PluriHome.prepare` additionally writes `.claude/settings.json` (permission allow-list) and now runs per message, so `repos.json` is always fresh; identity updated for headless operation.
+- [x] `PluriSettings.command` ("Pluri command") replaces the pane setup script; the worker setup script is unchanged.
+- [x] Pane teardown: `TabContent.pluri`, `Workspace.openPluri()`, `PluriPaneView`, and all pane/header/expanded/minimized switch sites deleted.
+- [x] Live-run fixes: dispatch recipe moved to the Write tool + atomic `mv` (the headless shell guard rejects JSON heredocs, and the redirect sandbox mismatches the home path's space — scoped Write rules fail on the same, so the allow-list carries bare `Write`); `PluriBridge.start()` moved from the main window's `onAppear` to app init (the chat window can exist without the main window, leaving the bridge unarmed); stream deltas coalesce into a 10 Hz flush so the transcript doesn't re-layout per token (beachballed on long turns).
+- [ ] Verify (interactive): mascot opens the window; a message streams text and tool capsules live; a follow-up message continues the same session; a dispatch opens a worker pane in the workspace; stop interrupts; denied tools come back as a readable explanation.
 
-**Goal**: replace Pluri's PTY pane with a native SwiftUI chat driven by headless Claude Code (Agent SDK, streaming JSON). Slack-style threads: thread root = task (from the registry), thread replies route into the worker's PTY, worker pane one click away. Confirm-gate briefs render as approvable cards. Transport changes; the M12 bridge and M13 registry carry over unchanged.
+### M14 — Status & events
+
+**Goal**: the return channel. Worker sessions get Claude Code hooks that write status files under the Pluri home; the app watches them, badges panes (running / waiting / done), and posts worker events into Pluri's chat as resumed turns — the M13 transport makes PTY injection unnecessary. A persistent task registry file (task, repo, worktree, brief, status) makes orchestration state survive context compaction — the conversation is the UI, the registry is the truth.
+
+### M15 — Threads
+
+**Goal**: Slack-style threads in the chat window: thread root = task (from the M14 registry), thread replies route into the worker's PTY, worker pane one click away. Confirm-gate briefs render as approvable cards.
 
 ---
 
 ## Ordering
 
-M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last. M10 (browser) is independent of the task-list work; its three phases are sequential (each builds on the last). M11 → M12 → M13 → M14 are sequential: each Pluri milestone proves the previous before adding machinery.
+M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last. M10 (browser) is independent of the task-list work; its three phases are sequential (each builds on the last). M11 → M12 → M13 → M14 → M15 are sequential: each Pluri milestone proves the previous before adding machinery.
 
 ## Open decisions
 

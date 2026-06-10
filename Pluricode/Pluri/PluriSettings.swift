@@ -3,10 +3,10 @@ import Foundation
 final class PluriSettings: ObservableObject {
     static let shared = PluriSettings()
 
-    static let defaultSetupScript = "claude"
+    static let defaultCommand = "claude"
 
-    @Published var setupScript: String {
-        didSet { UserDefaults.standard.set(setupScript, forKey: Self.setupScriptKey) }
+    @Published var command: String {
+        didSet { UserDefaults.standard.set(command, forKey: Self.commandKey) }
     }
 
     @Published var workerSetupScript: String {
@@ -14,14 +14,14 @@ final class PluriSettings: ObservableObject {
     }
 
     var effectiveWorkerScript: String {
-        workerSetupScript.isEmpty ? setupScript : workerSetupScript
+        workerSetupScript.isEmpty ? command : workerSetupScript
     }
 
-    private static let setupScriptKey = "pluriSetupScript"
+    private static let commandKey = "pluriCommand"
     private static let workerSetupScriptKey = "pluriWorkerSetupScript"
 
     private init() {
-        setupScript = UserDefaults.standard.string(forKey: Self.setupScriptKey) ?? Self.defaultSetupScript
+        command = UserDefaults.standard.string(forKey: Self.commandKey) ?? Self.defaultCommand
         workerSetupScript = UserDefaults.standard.string(forKey: Self.workerSetupScriptKey) ?? ""
     }
 }

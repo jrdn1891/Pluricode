@@ -6,7 +6,7 @@ struct PluriSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                setupScriptRow
+                commandRow
                 workerSetupScriptRow
             }
             .padding(20)
@@ -14,20 +14,20 @@ struct PluriSettingsView: View {
         .frame(width: 540, height: 520)
     }
 
-    private var setupScriptRow: some View {
+    private var commandRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Pluri setup script").font(.headline)
-                Text("Typed into Pluri's terminal when its pane starts. Applies the next time the pane opens.")
+                Text("Pluri command").font(.headline)
+                Text("The Claude Code command behind Pluri's chat window, run headless with streaming output. Applies from the next message.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 10) {
-                TextField("claude --dangerously-skip-permissions", text: $settings.setupScript)
+                TextField("claude --model opus", text: $settings.command)
                     .textFieldStyle(.roundedBorder)
-                Button("Reset") { settings.setupScript = PluriSettings.defaultSetupScript }
-                    .disabled(settings.setupScript == PluriSettings.defaultSetupScript)
+                Button("Reset") { settings.command = PluriSettings.defaultCommand }
+                    .disabled(settings.command == PluriSettings.defaultCommand)
             }
         }
         .padding(14)
@@ -39,12 +39,12 @@ struct PluriSettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Worker setup script").font(.headline)
-                Text("The command Pluri uses to start worker agents in the worktrees it spawns; the task brief is passed as its argument. Leave empty to use the Pluri setup script.")
+                Text("The command Pluri uses to start worker agents in the worktrees it spawns; the task brief is passed as its argument. Leave empty to use the Pluri command.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            TextField("Same as Pluri setup script", text: $settings.workerSetupScript)
+            TextField("Same as Pluri command", text: $settings.workerSetupScript)
                 .textFieldStyle(.roundedBorder)
         }
         .padding(14)
