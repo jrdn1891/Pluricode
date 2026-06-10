@@ -5,7 +5,7 @@ struct PluricodeApp: App {
     @State private var repoStore = RepoStore()
     @State private var taskListStore = TaskListStore()
     @State private var workspaceStore: WorkspaceStore
-    @State private var pinStore = PinStore()
+    @State private var pinStore: PinStore
     @State private var sidebarState: SidebarState
     @State private var pluriBridge: PluriBridge
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -19,14 +19,17 @@ struct PluricodeApp: App {
         let lists = TaskListStore()
         let sidebar = SidebarState()
         let store = WorkspaceStore(repoStore: repos, taskListStore: lists)
+        let pins = PinStore()
         _repoStore = State(initialValue: repos)
         _taskListStore = State(initialValue: lists)
         _sidebarState = State(initialValue: sidebar)
         _workspaceStore = State(initialValue: store)
+        _pinStore = State(initialValue: pins)
         _pluriBridge = State(initialValue: PluriBridge(
             repoStore: repos,
             workspaceStore: store,
-            sidebarState: sidebar
+            sidebarState: sidebar,
+            pinStore: pins
         ))
     }
 
