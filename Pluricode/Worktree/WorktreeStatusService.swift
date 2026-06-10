@@ -22,6 +22,7 @@ final class WorktreeStatusService {
 
     static let diffInterval: Duration = .seconds(15)
     static let mergedEveryNTicks: Int = 4
+    static let maxConcurrentJobs: Int = 4
 
     init(repoStore: RepoStore) {
         self.repoStore = repoStore
@@ -87,30 +88,50 @@ final class WorktreeStatusService {
         previous: [WorktreeStatusKey: WorktreeStatus],
         includeMerged: Bool
     ) async -> [WorktreeStatusKey: WorktreeStatus] {
-        await withTaskGroup(of: (WorktreeStatusKey, WorktreeStatus).self) { group in
-            for repo in repos {
-                guard let wm = WorktreeManager(repoRoot: repo.path) else { continue }
-                for wt in wm.listManagedWorktrees() {
-                    let key = WorktreeStatusKey(repoID: repo.id, branch: wt.branch)
-                    let path = URL(fileURLWithPath: wt.path)
-                    let isPrimary = wt.isPrimary
-                    let prevMerged = previous[key]?.isMerged ?? false
-                    group.addTask {
-                        let diff = WorktreeManager.diffStats(at: path)
-                        let merged: Bool
-                        if isPrimary {
-                            merged = false
-                        } else if includeMerged {
-                            merged = WorktreeManager.isMerged(at: path)
-                        } else {
-                            merged = prevMerged
-                        }
-                        return (key, WorktreeStatus(diff: diff, isMerged: merged))
+        struct Job {
+            let key: WorktreeStatusKey
+            let path: URL
+            let isPrimary: Bool
+            let prevMerged: Bool
+        }
+        var jobs: [Job] = []
+        for repo in repos {
+            guard let wm = WorktreeManager(repoRoot: repo.path) else { continue }
+            for wt in await wm.listManagedWorktrees() {
+                let key = WorktreeStatusKey(repoID: repo.id, branch: wt.branch)
+                jobs.append(Job(
+                    key: key,
+                    path: URL(fileURLWithPath: wt.path),
+                    isPrimary: wt.isPrimary,
+                    prevMerged: previous[key]?.isMerged ?? false
+                ))
+            }
+        }
+        return await withTaskGroup(of: (WorktreeStatusKey, WorktreeStatus).self) { group in
+            func add(_ job: Job) {
+                group.addTask {
+                    let diff = await WorktreeManager.diffStats(at: job.path)
+                    let merged: Bool
+                    if job.isPrimary {
+                        merged = false
+                    } else if includeMerged {
+                        merged = await WorktreeManager.isMerged(at: job.path)
+                    } else {
+                        merged = job.prevMerged
                     }
+                    return (job.key, WorktreeStatus(diff: diff, isMerged: merged))
                 }
             }
+            var iterator = jobs.makeIterator()
+            for _ in 0..<maxConcurrentJobs {
+                guard let job = iterator.next() else { break }
+                add(job)
+            }
             var result: [WorktreeStatusKey: WorktreeStatus] = [:]
-            for await item in group { result[item.0] = item.1 }
+            for await item in group {
+                result[item.0] = item.1
+                if let job = iterator.next() { add(job) }
+            }
             return result
         }
     }

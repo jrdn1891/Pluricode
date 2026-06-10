@@ -146,7 +146,7 @@ private struct PaneCreationPopover: View {
             onReturn: { commit() },
             onEscape: onComplete
         ))
-        .onAppear(perform: loadAll)
+        .task(loadAll)
         .sheet(item: $newWorktreeRepo) { repo in
             NewWorktreeSheet(repo: repo) { branch in
                 workspace.performPaneCreation(
@@ -285,10 +285,10 @@ private struct PaneCreationPopover: View {
         run(all[highlight])
     }
 
-    private func loadAll() {
+    @Sendable private func loadAll() async {
         for repo in workspace.repoStore.repos {
             if let wm = WorktreeManager(repoRoot: repo.path) {
-                worktreesByRepo[repo.id] = wm.listManagedWorktrees()
+                worktreesByRepo[repo.id] = await wm.listManagedWorktrees()
             } else {
                 worktreesByRepo[repo.id] = []
             }

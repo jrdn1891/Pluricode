@@ -133,16 +133,18 @@ struct PluricodeApp: App {
     }
 
     private func runMergedDeletion(_ matches: [MergedWorktreeMatch]) {
-        var affectedRepos: Set<UUID> = []
-        for match in matches {
-            guard let repo = repoStore.repos.first(where: { $0.id == match.repoID }) else { continue }
-            let worktree = Worktree(branch: match.branch, path: match.path, head: "", isPrimary: false)
-            workspaceStore.deleteWorktree(repo: repo, worktree: worktree, pinStore: pinStore)
-            affectedRepos.insert(repo.id)
-        }
-        for id in affectedRepos {
-            if let repo = repoStore.repos.first(where: { $0.id == id }) {
-                sidebarState.refresh(repo)
+        Task {
+            var affectedRepos: Set<UUID> = []
+            for match in matches {
+                guard let repo = repoStore.repos.first(where: { $0.id == match.repoID }) else { continue }
+                let worktree = Worktree(branch: match.branch, path: match.path, head: "", isPrimary: false)
+                await workspaceStore.deleteWorktree(repo: repo, worktree: worktree, pinStore: pinStore)
+                affectedRepos.insert(repo.id)
+            }
+            for id in affectedRepos {
+                if let repo = repoStore.repos.first(where: { $0.id == id }) {
+                    sidebarState.refresh(repo)
+                }
             }
         }
     }

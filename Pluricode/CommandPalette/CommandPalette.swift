@@ -189,11 +189,12 @@ struct CommandPaletteView: View {
         let repos = repoStore.repos
         Task { @MainActor in
             await service.refreshNow()
-            let matches: [MergedWorktreeMatch] = service.mergedKeys().compactMap { key in
+            var matches: [MergedWorktreeMatch] = []
+            for key in service.mergedKeys() {
                 guard let repo = repos.first(where: { $0.id == key.repoID }),
-                      let path = paths.path(forRepoID: key.repoID, repoPath: repo.path, branch: key.branch)
-                else { return nil }
-                return MergedWorktreeMatch(repoID: key.repoID, branch: key.branch, path: path)
+                      let path = await paths.resolve(forRepoID: key.repoID, repoPath: repo.path, branch: key.branch)
+                else { continue }
+                matches.append(MergedWorktreeMatch(repoID: key.repoID, branch: key.branch, path: path))
             }
             scanningMerged = false
             isPresented = false

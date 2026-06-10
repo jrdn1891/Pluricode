@@ -977,11 +977,13 @@ private struct TerminalPaneBody: View {
                             delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
                         )
                 }
-            } else {
+            } else if workspace.repo(id: repoID) == nil || workspace.worktreePaths.isLoaded(repoID: repoID) {
                 MissingWorktreeBody(
                     worktreeID: worktreeID,
                     onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
                 )
+            } else {
+                Color.clear
             }
         }
     }
@@ -1571,11 +1573,13 @@ private struct TerminalExpandedContent: View {
                             AttachmentChipsOverlay(session: session)
                         }
                     }
-            } else {
+            } else if workspace.repo(id: repoID) == nil || workspace.worktreePaths.isLoaded(repoID: repoID) {
                 MissingWorktreeBody(
                     worktreeID: worktreeID,
                     onRemove: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
                 )
+            } else {
+                Color.clear
             }
         }
     }
