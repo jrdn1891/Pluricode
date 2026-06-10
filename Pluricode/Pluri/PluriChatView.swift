@@ -121,6 +121,16 @@ private struct PluriBlockRow: View {
                     .padding(.vertical, 8)
                     .background(PluriMascotView.coral.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
             }
+        case .event:
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                Text(block.content)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
         case .text:
             Text(markdown(block.content))
                 .textSelection(.enabled)

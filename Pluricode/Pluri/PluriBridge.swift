@@ -6,37 +6,26 @@ final class PluriBridge {
     private let workspaceStore: WorkspaceStore
     private let sidebarState: SidebarState
     private let pinStore: PinStore
-    private var source: DispatchSourceFileSystemObject?
+    private let registry: PluriTaskRegistry
+    private let watcher = DirectoryWatcher()
 
     static var commandsDir: URL {
         PluriHome.dir.appendingPathComponent("commands", isDirectory: true)
     }
 
-    init(repoStore: RepoStore, workspaceStore: WorkspaceStore, sidebarState: SidebarState, pinStore: PinStore) {
+    init(repoStore: RepoStore, workspaceStore: WorkspaceStore, sidebarState: SidebarState, pinStore: PinStore, registry: PluriTaskRegistry) {
         self.repoStore = repoStore
         self.workspaceStore = workspaceStore
         self.sidebarState = sidebarState
         self.pinStore = pinStore
+        self.registry = registry
     }
 
     func start() {
-        guard source == nil else { return }
-        let dir = Self.commandsDir
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        watcher.watch(Self.commandsDir) { [weak self] in self?.drain() }
         for url in contents() {
             try? FileManager.default.removeItem(at: url)
         }
-        let fd = open(dir.path, O_EVTONLY)
-        guard fd >= 0 else { return }
-        let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
-        src.setEventHandler { [weak self] in self?.drain() }
-        src.setCancelHandler { close(fd) }
-        src.resume()
-        source = src
-    }
-
-    deinit {
-        source?.cancel()
     }
 
     private func contents() -> [URL] {
@@ -124,6 +113,7 @@ final class PluriBridge {
         let startup: String?
         if let prompt = cmd.prompt, !prompt.isEmpty {
             startup = "\(cmd.startup ?? PluriSettings.shared.effectiveWorkerScript) \(shellEscape(prompt))"
+            registry.register(repo: repo.path.standardizedFileURL.path, branch: branch, brief: prompt)
         } else {
             startup = cmd.startup
         }
@@ -147,6 +137,7 @@ final class PluriBridge {
             worktree: Worktree(branch: branch, path: path, head: "", isPrimary: false),
             pinStore: pinStore
         )
+        registry.remove(repo: repo.path.standardizedFileURL.path, branch: branch)
         sidebarState.refresh(repo)
         return Self.success
     }

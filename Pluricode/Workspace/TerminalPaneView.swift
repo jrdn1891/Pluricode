@@ -30,6 +30,7 @@ struct TerminalPaneView: NSViewRepresentable {
 
     private func hostForTab() -> TerminalHost {
         if let existing = workspace.terminalHosts[tabID] { return existing }
+        WorkerHooks.install(atWorktree: worktreePath)
         let startup = workspace.consumePendingDevScript(tabID: tabID)
             ?? RepoConfig.load(at: repoPath).startupScript
         let host = TerminalHost(

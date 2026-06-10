@@ -9,6 +9,7 @@ struct PluricodeApp: App {
     @State private var sidebarState: SidebarState
     @State private var pluriBridge: PluriBridge
     @State private var pluriSession: PluriSession
+    @State private var pluriMonitor: PluriMonitor
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showPalette = false
     @State private var creatingWorkspace = false
@@ -26,14 +27,19 @@ struct PluricodeApp: App {
         _sidebarState = State(initialValue: sidebar)
         _workspaceStore = State(initialValue: store)
         _pinStore = State(initialValue: pins)
+        let registry = PluriTaskRegistry()
+        let session = PluriSession(repoStore: repos)
         _pluriBridge = State(initialValue: PluriBridge(
             repoStore: repos,
             workspaceStore: store,
             sidebarState: sidebar,
-            pinStore: pins
+            pinStore: pins,
+            registry: registry
         ))
-        _pluriSession = State(initialValue: PluriSession(repoStore: repos))
+        _pluriSession = State(initialValue: session)
+        _pluriMonitor = State(initialValue: PluriMonitor(registry: registry, session: session))
         pluriBridge.start()
+        pluriMonitor.start()
     }
 
     var body: some Scene {
@@ -103,6 +109,7 @@ struct PluricodeApp: App {
                 NewWorkspaceSheet(workspaceStore: workspaceStore)
             }
             .confirmation($pendingConfirmation)
+            .environment(pluriMonitor)
         }
         .defaultSize(width: 1200, height: 800)
         .commands {

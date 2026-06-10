@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		06326AFE850E788295307D48 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742F16B907FA39DBB0114F60 /* Theme.swift */; };
 		07587D98DC7B2F5EF8635D93 /* PluriSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A046DDFC2D686C469E21BA43 /* PluriSession.swift */; };
+		0AA7F4FACDF7353E5E86EC24 /* DirectoryWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15565F890172CEB6B07AA56A /* DirectoryWatcher.swift */; };
 		0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A3E23A2A5CE1735F8D522D /* ProcessRunner.swift */; };
 		0DC403F2FCB7A4D30384AEB7 /* NewWorkspaceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */; };
 		149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E37A72F9CD0A1326611CB3C /* Worktree.swift */; };
@@ -35,6 +36,7 @@
 		80543F030E8942BE861D585D /* RepoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F722E7DD539F6776FA1674BA /* RepoStore.swift */; };
 		820CCAAFAB80B9E444259E54 /* BrowserHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFEE476A6394A367AC294860 /* BrowserHost.swift */; };
 		839539342BF3A0F58CBC5402 /* Keyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 835064814C58E7F4AAE43D35 /* Keyboard.swift */; };
+		8A3E98AA10243CE649307055 /* PluriMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4E815531EDA76FE1FF7EBE0 /* PluriMonitor.swift */; };
 		903487B058E11C3A6B4378F2 /* PluriHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFE88C8CCD743305385E5C9F /* PluriHome.swift */; };
 		923F4EE4762F7511C958407D /* WorktreeStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F6723A6A2AD807D7B9378D1 /* WorktreeStatusService.swift */; };
 		93E709A761D2947E0F687A71 /* PermissionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860492197C8C2313E336830D /* PermissionsView.swift */; };
@@ -42,6 +44,8 @@
 		97C1C6B70507B356349663B4 /* PluricodeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC246AB1895B3F4814510E30 /* PluricodeApp.swift */; };
 		99EAA5BA43DBEFF39BC75180 /* TaskListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79713EC727834622CEEF2EF /* TaskListStore.swift */; };
 		9BA48262D7C491D52BC53471 /* TerminalSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868643F98C559E20E51603B7 /* TerminalSettingsView.swift */; };
+		A0CCAF61AEC9D24285FE50CF /* WorkerHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDCFE9F2C0F1978C8D2A101C /* WorkerHooks.swift */; };
+		A6DFE38A4389E68A2314D9CF /* PluriTaskRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F591025ADD66235E64D75352 /* PluriTaskRegistry.swift */; };
 		A7474169AFC652EE29ABF746 /* AttachmentChipsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */; };
 		AFE23BE23AAB889F92202451 /* LocalHostRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49CBB28DBEB1E236A8D06740 /* LocalHostRegistry.swift */; };
 		B6E37DE9AFF07D74294B1F49 /* PluriSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96512E0F34E744DEFE098223 /* PluriSettings.swift */; };
@@ -61,6 +65,7 @@
 		04A3591F4D52D920EBF984E5 /* PermissionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsService.swift; sourceTree = "<group>"; };
 		0E105E5A80CFDC4A1D8A36A8 /* RepoConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoConfig.swift; sourceTree = "<group>"; };
 		0F6723A6A2AD807D7B9378D1 /* WorktreeStatusService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeStatusService.swift; sourceTree = "<group>"; };
+		15565F890172CEB6B07AA56A /* DirectoryWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryWatcher.swift; sourceTree = "<group>"; };
 		19BA3EE7DFFD7B396C3E7007 /* Pluricode.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pluricode.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		259CAD09D9A3D60E24F5B0E1 /* WorktreeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeManager.swift; sourceTree = "<group>"; };
 		2701F83AE83DE7286C13ED90 /* PinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinStore.swift; sourceTree = "<group>"; };
@@ -94,6 +99,7 @@
 		9E37A72F9CD0A1326611CB3C /* Worktree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Worktree.swift; sourceTree = "<group>"; };
 		A046DDFC2D686C469E21BA43 /* PluriSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriSession.swift; sourceTree = "<group>"; };
 		A3AB0523B2C998E6BDF6FDB3 /* TerminalPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPaneView.swift; sourceTree = "<group>"; };
+		A4E815531EDA76FE1FF7EBE0 /* PluriMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriMonitor.swift; sourceTree = "<group>"; };
 		AB221A191585CD45CDE17669 /* PluriBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriBridge.swift; sourceTree = "<group>"; };
 		AFE88C8CCD743305385E5C9F /* PluriHome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriHome.swift; sourceTree = "<group>"; };
 		B9995D9D8A99B99FA5C33AFD /* PluriChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriChatView.swift; sourceTree = "<group>"; };
@@ -103,10 +109,12 @@
 		D73E8B37818B718BE8D743D3 /* TerminalSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSettings.swift; sourceTree = "<group>"; };
 		D79713EC727834622CEEF2EF /* TaskListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListStore.swift; sourceTree = "<group>"; };
 		F1AE508972402DF38CAFBF8F /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
+		F591025ADD66235E64D75352 /* PluriTaskRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriTaskRegistry.swift; sourceTree = "<group>"; };
 		F722E7DD539F6776FA1674BA /* RepoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoStore.swift; sourceTree = "<group>"; };
 		F9800670AB5C4F9EF61E843E /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		FC246AB1895B3F4814510E30 /* PluricodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluricodeApp.swift; sourceTree = "<group>"; };
 		FCC7BCD7DE9AEC025D52DBD4 /* Pluricode.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pluricode.entitlements; sourceTree = "<group>"; };
+		FDCFE9F2C0F1978C8D2A101C /* WorkerHooks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerHooks.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -169,13 +177,17 @@
 		6A393B1FBDCC071EAA477633 /* Pluri */ = {
 			isa = PBXGroup;
 			children = (
+				15565F890172CEB6B07AA56A /* DirectoryWatcher.swift */,
 				AB221A191585CD45CDE17669 /* PluriBridge.swift */,
 				B9995D9D8A99B99FA5C33AFD /* PluriChatView.swift */,
 				AFE88C8CCD743305385E5C9F /* PluriHome.swift */,
 				9D8327000CF8BB0AE0161EC6 /* PluriMascotView.swift */,
+				A4E815531EDA76FE1FF7EBE0 /* PluriMonitor.swift */,
 				A046DDFC2D686C469E21BA43 /* PluriSession.swift */,
 				96512E0F34E744DEFE098223 /* PluriSettings.swift */,
 				658E63739A71DF77F181FC44 /* PluriSettingsView.swift */,
+				F591025ADD66235E64D75352 /* PluriTaskRegistry.swift */,
+				FDCFE9F2C0F1978C8D2A101C /* WorkerHooks.swift */,
 			);
 			path = Pluri;
 			sourceTree = "<group>";
@@ -351,6 +363,7 @@
 				820CCAAFAB80B9E444259E54 /* BrowserHost.swift in Sources */,
 				6FBDD4B05827295807F38FCC /* BrowserPaneView.swift in Sources */,
 				F3D1887C447587AFF3CD02F6 /* CommandPalette.swift in Sources */,
+				0AA7F4FACDF7353E5E86EC24 /* DirectoryWatcher.swift in Sources */,
 				4D38799761484F09D1DC8AB7 /* IdleOverlay.swift in Sources */,
 				839539342BF3A0F58CBC5402 /* Keyboard.swift in Sources */,
 				AFE23BE23AAB889F92202451 /* LocalHostRegistry.swift in Sources */,
@@ -364,9 +377,11 @@
 				516B47B522F259A8FF480B8B /* PluriChatView.swift in Sources */,
 				903487B058E11C3A6B4378F2 /* PluriHome.swift in Sources */,
 				4ADC14E5C3674C18F265925C /* PluriMascotView.swift in Sources */,
+				8A3E98AA10243CE649307055 /* PluriMonitor.swift in Sources */,
 				07587D98DC7B2F5EF8635D93 /* PluriSession.swift in Sources */,
 				B6E37DE9AFF07D74294B1F49 /* PluriSettings.swift in Sources */,
 				5B7EA870BAD5BD55A4926917 /* PluriSettingsView.swift in Sources */,
+				A6DFE38A4389E68A2314D9CF /* PluriTaskRegistry.swift in Sources */,
 				97C1C6B70507B356349663B4 /* PluricodeApp.swift in Sources */,
 				0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */,
 				F814E0ED4F9B4CE50E1FC08D /* RepoConfig.swift in Sources */,
@@ -385,6 +400,7 @@
 				56CB18171A578DECD2613656 /* TileNode.swift in Sources */,
 				E4DA8CFC22DCB7A91DEC0918 /* TileView.swift in Sources */,
 				14F9FF119D799707FCEF2F08 /* Updater.swift in Sources */,
+				A0CCAF61AEC9D24285FE50CF /* WorkerHooks.swift in Sources */,
 				3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */,
 				E8CCF649FB23C81F5E17E9FF /* WorkspaceView.swift in Sources */,
 				149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */,

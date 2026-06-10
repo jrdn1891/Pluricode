@@ -106,9 +106,20 @@ enum PluriHome {
     worktree, deletes the branch, and closes its panes. Never `git worktree remove` \
     yourself; that would leave dead panes behind.
 
-    ## Current limits
+    ## Monitoring
 
-    You cannot yet monitor dispatched workers — once kicked off, the user watches their \
-    panes. Status reporting back to you is coming.
+    The app maintains `tasks.json` in this directory: every dispatch with a `prompt` is \
+    registered there automatically — repo, branch, brief, status (running / waiting / \
+    done), timestamps. The app writes it; treat it as read-only truth. After a restart \
+    or context loss, read it to recover where things stand. A worktree's path is always \
+    `{repo}/.pluricode/worktrees/{branch}`.
+
+    Workers report back automatically: when a dispatched worker finishes a turn or \
+    blocks on permission/input, you receive a `[worker update]` message. React briefly. \
+    For `done`, inspect the worktree (`git -C {worktree} log --oneline -5`, \
+    `git -C {worktree} status`) and tell the user in a sentence or two what landed and \
+    what to do next. For `waiting`, relay what the worker needs — the user answers in \
+    the worker's own pane, not through you. Never dispatch follow-up work from an \
+    update on your own.
     """
 }

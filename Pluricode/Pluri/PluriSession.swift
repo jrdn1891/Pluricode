@@ -3,6 +3,7 @@ import Foundation
 struct PluriBlock: Identifiable, Equatable {
     enum Kind: Equatable {
         case user
+        case event
         case text
         case tool(name: String)
         case error
@@ -25,6 +26,7 @@ final class PluriSession {
     private var sawResult = false
     @ObservationIgnored private var pendingBlocks: [PluriBlock] = []
     @ObservationIgnored private var flushScheduled = false
+    @ObservationIgnored private var queuedEvents: [String] = []
 
     init(repoStore: RepoStore) {
         self.repoStore = repoStore
@@ -41,6 +43,25 @@ final class PluriSession {
         run(prompt: prompt)
     }
 
+    func postEvent(_ text: String) {
+        queuedEvents.append(text)
+        flushQueuedEvents()
+    }
+
+    private func flushQueuedEvents() {
+        guard !isRunning, !queuedEvents.isEmpty else { return }
+        PluriHome.prepare(repos: repoStore.repos)
+        for event in queuedEvents {
+            pendingBlocks.append(PluriBlock(kind: .event, content: event))
+        }
+        let prompt = queuedEvents.joined(separator: "\n")
+        queuedEvents.removeAll()
+        blocks = pendingBlocks
+        isRunning = true
+        sawResult = false
+        run(prompt: prompt)
+    }
+
     func interrupt() {
         process?.interrupt()
     }
@@ -50,6 +71,7 @@ final class PluriSession {
         pendingBlocks = []
         blocks = []
         sessionID = nil
+        queuedEvents = []
     }
 
     private func run(prompt: String) {
@@ -178,6 +200,7 @@ final class PluriSession {
             pendingBlocks.append(PluriBlock(kind: .error, content: detail.isEmpty ? "Pluri exited with status \(status)" : detail))
         }
         blocks = pendingBlocks
+        flushQueuedEvents()
     }
 
     private struct StreamLine: Decodable {
