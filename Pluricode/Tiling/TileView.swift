@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct ResizeReporter {
-    var begin: (UUID, TileDirection, [Float], Set<UUID>) -> Void
-    var change: ([Float]) -> Void
+    var change: ([UUID: [Float]], Set<UUID>) -> Void
     var end: () -> Void
 }
 
@@ -10,10 +9,26 @@ private struct ResizeReporterKey: EnvironmentKey {
     static let defaultValue: ResizeReporter? = nil
 }
 
+struct PerpendicularResize {
+    typealias Resize = (CGFloat) -> (weights: [Float], highlightedPaneIDs: Set<UUID>)?
+    let splitID: UUID
+    let leading: Resize?
+    let trailing: Resize?
+}
+
+private struct PerpendicularResizeKey: EnvironmentKey {
+    static let defaultValue: PerpendicularResize? = nil
+}
+
 extension EnvironmentValues {
     var resizeReporter: ResizeReporter? {
         get { self[ResizeReporterKey.self] }
         set { self[ResizeReporterKey.self] = newValue }
+    }
+
+    var perpendicularResize: PerpendicularResize? {
+        get { self[PerpendicularResizeKey.self] }
+        set { self[PerpendicularResizeKey.self] = newValue }
     }
 }
 
@@ -41,7 +56,8 @@ private struct SplitContainer<Content: View>: View {
     private let minFraction: Float = 0.08
 
     @Environment(\.resizeReporter) private var reporter
-    @State private var dragWeights: [Float]?
+    @Environment(\.perpendicularResize) private var perpendicularResize
+    @State private var dragWeights: [UUID: [Float]]?
 
     var body: some View {
         GeometryReader { geo in
@@ -66,10 +82,15 @@ private struct SplitContainer<Content: View>: View {
                     alignment: .topLeading
                 )
                 .clipped()
+                .environment(\.perpendicularResize, perpendicularHandler(childIndex: index, available: available))
             if index < split.children.count - 1 {
                 SplitDivider(
                     direction: split.direction,
-                    onChanged: { delta in updateDrag(leftIndex: index, delta: delta, available: available) },
+                    hasLeadingCorner: perpendicularResize?.leading != nil,
+                    hasTrailingCorner: perpendicularResize?.trailing != nil,
+                    onChanged: { region, translation in
+                        updateDrag(leftIndex: index, region: region, translation: translation, available: available)
+                    },
                     onEnded: commitDrag
                 )
                 .frame(
@@ -80,31 +101,57 @@ private struct SplitContainer<Content: View>: View {
         }
     }
 
-    private func updateDrag(leftIndex: Int, delta: CGFloat, available: CGFloat) {
+    private func perpendicularHandler(childIndex: Int, available: CGFloat) -> PerpendicularResize {
+        PerpendicularResize(
+            splitID: split.id,
+            leading: childIndex > 0
+                ? { delta in resizedWeights(leftIndex: childIndex - 1, delta: delta, available: available) }
+                : nil,
+            trailing: childIndex < split.children.count - 1
+                ? { delta in resizedWeights(leftIndex: childIndex, delta: delta, available: available) }
+                : nil
+        )
+    }
+
+    private func resizedWeights(leftIndex: Int, delta: CGFloat, available: CGFloat) -> (weights: [Float], highlightedPaneIDs: Set<UUID>)? {
         guard available > 0,
               split.weights.indices.contains(leftIndex),
-              split.weights.indices.contains(leftIndex + 1) else { return }
+              split.weights.indices.contains(leftIndex + 1) else { return nil }
         let fraction = Float(delta / available)
         let combined = split.weights[leftIndex] + split.weights[leftIndex + 1]
         let newLeft = max(minFraction, min(combined - minFraction, split.weights[leftIndex] + fraction))
         var next = split.weights
         next[leftIndex] = newLeft
         next[leftIndex + 1] = combined - newLeft
-        if dragWeights == nil {
-            let highlighted = Set(
-                Tiling.allPanes(in: split.children[leftIndex]).map(\.id)
-                + Tiling.allPanes(in: split.children[leftIndex + 1]).map(\.id)
-            )
-            reporter?.begin(split.id, split.direction, next, highlighted)
-        } else {
-            reporter?.change(next)
+        let highlighted = Set(
+            Tiling.allPanes(in: split.children[leftIndex]).map(\.id)
+            + Tiling.allPanes(in: split.children[leftIndex + 1]).map(\.id)
+        )
+        return (next, highlighted)
+    }
+
+    private func updateDrag(leftIndex: Int, region: DividerRegion, translation: CGSize, available: CGFloat) {
+        let ownDelta = split.direction == .horizontal ? translation.width : translation.height
+        let perpendicularDelta = split.direction == .horizontal ? translation.height : translation.width
+        guard let own = resizedWeights(leftIndex: leftIndex, delta: ownDelta, available: available) else { return }
+        var weightsBySplit = [split.id: own.weights]
+        var highlighted = own.highlightedPaneIDs
+        let resize: PerpendicularResize.Resize? = switch region {
+        case .leading: perpendicularResize?.leading
+        case .middle: nil
+        case .trailing: perpendicularResize?.trailing
         }
-        dragWeights = next
+        if let perpendicularResize, let perpendicular = resize?(perpendicularDelta) {
+            weightsBySplit[perpendicularResize.splitID] = perpendicular.weights
+            highlighted.formUnion(perpendicular.highlightedPaneIDs)
+        }
+        reporter?.change(weightsBySplit, highlighted)
+        dragWeights = weightsBySplit
     }
 
     private func commitDrag() {
-        if let dragWeights {
-            tiling.setWeights(splitID: split.id, weights: dragWeights)
+        for (splitID, weights) in dragWeights ?? [:] {
+            tiling.setWeights(splitID: splitID, weights: weights)
         }
         dragWeights = nil
         reporter?.end()

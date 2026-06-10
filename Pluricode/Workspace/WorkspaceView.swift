@@ -80,10 +80,9 @@ private struct WorkspaceBody: View {
 
     private var resizeReporter: ResizeReporter {
         ResizeReporter(
-            begin: { splitID, direction, weights, highlighted in
-                workspace.beginResize(splitID: splitID, direction: direction, weights: weights, highlightedPaneIDs: highlighted)
+            change: { weightsBySplit, highlighted in
+                workspace.updateResize(weightsBySplit: weightsBySplit, highlightedPaneIDs: highlighted)
             },
-            change: { weights in workspace.updateResize(weights: weights) },
             end: { workspace.endResize() }
         )
     }
