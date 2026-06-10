@@ -293,6 +293,37 @@ final class Workspace {
         }
     }
 
+    func openPluri() {
+        for pane in tiling.panes {
+            if let tab = pane.tabs.first(where: { $0.content == .pluri }) {
+                setActiveTab(paneID: pane.id, tabID: tab.id)
+                setFocus(paneID: pane.id)
+                terminalHosts[tab.id]?.focusInput()
+                return
+            }
+        }
+        if let item = minimizedPanes.first(where: { $0.pane.tabs.contains { $0.content == .pluri } }) {
+            restoreMinimizedPane(paneID: item.pane.id)
+            return
+        }
+        if let anchor = anchorPaneID {
+            splitPane(paneID: anchor, edge: .right, content: .pluri)
+        } else {
+            addPane(.pluri)
+        }
+    }
+
+    func openWorktreePane(repoID: UUID, branch: String, startupScript: String?) {
+        let tab = Tab(content: .terminal(repoID: repoID, worktreeID: branch))
+        if let startupScript, !startupScript.isEmpty {
+            pendingDevScripts[tab.id] = startupScript
+        }
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+            tiling.reinsertPane(Pane(tabs: [tab]), near: anchorPaneID, edge: .right)
+        }
+        scheduleSave()
+    }
+
     func agentSession(repoID: UUID, worktreeID: String, preferredTabID: UUID?) -> TerminalSession? {
         if let preferredTabID, let host = terminalHosts[preferredTabID] {
             return host.session
@@ -389,6 +420,7 @@ final class Workspace {
         case .widget(let kind): return kind.label
         case .tasks: return fallback
         case .browser(_, let worktreeID, _): return worktreeID
+        case .pluri: return "Pluri"
         }
     }
 
@@ -427,7 +459,7 @@ final class Workspace {
     var terminalPanes: [Pane] {
         tiling.panes.filter {
             switch $0.activeTab.content {
-            case .terminal, .shell: return true
+            case .terminal, .shell, .pluri: return true
             case .tasks, .widget, .browser: return false
             }
         }

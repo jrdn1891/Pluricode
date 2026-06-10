@@ -6,7 +6,8 @@ struct PluricodeApp: App {
     @State private var taskListStore = TaskListStore()
     @State private var workspaceStore: WorkspaceStore
     @State private var pinStore = PinStore()
-    @State private var sidebarState = SidebarState()
+    @State private var sidebarState: SidebarState
+    @State private var pluriBridge: PluriBridge
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showPalette = false
     @State private var creatingWorkspace = false
@@ -16,11 +17,16 @@ struct PluricodeApp: App {
     init() {
         let repos = RepoStore()
         let lists = TaskListStore()
+        let sidebar = SidebarState()
+        let store = WorkspaceStore(repoStore: repos, taskListStore: lists)
         _repoStore = State(initialValue: repos)
         _taskListStore = State(initialValue: lists)
-        _workspaceStore = State(initialValue: WorkspaceStore(
+        _sidebarState = State(initialValue: sidebar)
+        _workspaceStore = State(initialValue: store)
+        _pluriBridge = State(initialValue: PluriBridge(
             repoStore: repos,
-            taskListStore: lists
+            workspaceStore: store,
+            sidebarState: sidebar
         ))
     }
 
@@ -44,6 +50,15 @@ struct PluricodeApp: App {
                 }
             }
             .toolbar {
+                ToolbarItem {
+                    Button {
+                        workspaceStore.selectedWorkspace?.openPluri()
+                    } label: {
+                        PluriMascotView()
+                    }
+                    .help("Pluri — describe what you want to work on")
+                    .disabled(workspaceStore.selectedWorkspace == nil)
+                }
                 PaneCreationToolbar(
                     workspace: workspaceStore.selectedWorkspace
                 )
@@ -67,6 +82,7 @@ struct PluricodeApp: App {
             .navigationTitle(workspaceStore.selectedWorkspace?.name ?? "Pluricode")
             .onAppear {
                 (AppearanceMode(rawValue: appearanceModeRaw) ?? .system).apply()
+                pluriBridge.start()
             }
             .onChange(of: appearanceModeRaw) { _, newValue in
                 (AppearanceMode(rawValue: newValue) ?? .system).apply()

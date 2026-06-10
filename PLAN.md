@@ -227,9 +227,44 @@ Selection happens **directly on the running page**, not on a static capture: a m
 
 ---
 
+## Pluri — central orchestrator (M11–M14)
+
+A central agent ("Pluri") the user talks to in natural language; it sets up worktrees, prepares task briefs, dispatches worker sessions, and monitors them. Pluricode stays the dumb reliable hands: Pluri is the user's own Claude Code running inside a pane — no API keys, no LLM runtime in the app. The value is fan-out: one utterance containing N tasks across M repos becomes N parallel worker sessions. Workers are parallel by construction (separate PTYs in their own panes); Pluri only dispatches, so its own loop stays free.
+
+### M11 — Pluri in the toolbar
+
+**Goal**: the single entry point. An animated mascot lives in the toolbar; clicking it opens the workspace's Pluri pane — a terminal running `claude` in Pluri's home directory, primed with an orchestrator identity. Pluri can already investigate repos and create worktrees with plain git: the sidebar derives worktrees from `git worktree list`, so what Pluri sets up appears in the app with no IPC.
+
+- [x] `Pluri/PluriHome.swift`: home at `~/Library/Application Support/Pluricode/pluri/`; on pane start writes `CLAUDE.md` (orchestrator identity, worktree conventions, brief-drafting rules) and `repos.json` (registered-repo export, regenerated each start).
+- [x] `TabContent.pluri` case + all switch sites (TabBody, ghost pane, minimized chip, expanded card, `tabLabel`, `terminalPanes`).
+- [x] `Pluri/PluriPaneView.swift`: `TerminalHost` at the Pluri home with startup script `claude`.
+- [x] `Workspace.openPluri()`: dedup — focus an existing Pluri tab (restoring from minimized), else split right of the anchor pane.
+- [x] `Pluri/PluriMascotView.swift`: coral mascot with blinking eyes and hover bounce; toolbar button → `openPluri()`.
+- [ ] Verify (interactive): mascot animates; click opens Pluri running `claude`; second click focuses instead of duplicating; a worktree created by Pluri shows up in the sidebar. *(Builds clean; needs a live run to drive end-to-end.)*
+
+### M12 — Control surface
+
+**Goal**: give Pluri hands. A file-based command bridge under the Pluri home (`commands/` watched by the app, responses written back) plus a documented contract in `CLAUDE.md`, so Pluri can open a worktree pane and kick off a worker `claude "<brief>"` in it. Listing worktrees needs no bridge — it's `git worktree list`. Keep Pluri's turns short: anything slow (repo investigation) runs as Pluri's own background subagents.
+
+- [x] `Pluri/PluriBridge.swift`: DispatchSource watcher on `pluri/commands/`; handles `open_pane` `{repo, branch, startup}`; writes `{id}.result.json`; clears stale files at launch. Requests arrive via atomic `mv` (documented), so no partial reads.
+- [x] `Workspace.openWorktreePane(repoID:branch:startupScript:)`: pane inserted right of the anchor via `reinsertPane`; startup delivered through the existing `pendingDevScripts` channel; keyboard focus stays where the user is (Pluri's pane).
+- [x] Bridge invalidates `WorktreePaths` + worktree status caches and refreshes the sidebar, so worktrees Pluri just created with git resolve immediately.
+- [x] `PluriHome` `CLAUDE.md` documents the protocol with a copy-paste dispatch recipe; limits section now only covers monitoring (M13).
+- [ ] Verify (interactive): ask Pluri to set up a worktree and dispatch a task — worktree appears in the sidebar, a pane opens next to Pluri with `claude '<brief>'` running. *(Builds clean; needs a live run.)*
+
+### M13 — Status & events
+
+**Goal**: the return channel. Worker sessions get Claude Code hooks that write status files under the Pluri home; the app watches them, badges panes (running / waiting / done), and injects one-line events into Pluri's PTY so worker completions wake Pluri. A persistent task registry file (task, repo, worktree, brief, status) makes orchestration state survive context compaction — the conversation is the UI, the registry is the truth.
+
+### M14 — Native Pluri pane
+
+**Goal**: replace Pluri's PTY pane with a native SwiftUI chat driven by headless Claude Code (Agent SDK, streaming JSON). Slack-style threads: thread root = task (from the registry), thread replies route into the worker's PTY, worker pane one click away. Confirm-gate briefs render as approvable cards. Transport changes; the M12 bridge and M13 registry carry over unchanged.
+
+---
+
 ## Ordering
 
-M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last. M10 (browser) is independent of the task-list work; its three phases are sequential (each builds on the last).
+M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last. M10 (browser) is independent of the task-list work; its three phases are sequential (each builds on the last). M11 → M12 → M13 → M14 are sequential: each Pluri milestone proves the previous before adding machinery.
 
 ## Open decisions
 
