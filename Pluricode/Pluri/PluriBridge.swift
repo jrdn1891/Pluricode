@@ -115,19 +115,34 @@ final class PluriBridge {
         }
         workspaceStore.worktreePaths.invalidate(repoID: repo.id)
         workspaceStore.worktreeStatusService.invalidate(repoID: repo.id)
-        guard workspaceStore.worktreePaths.path(forRepoID: repo.id, repoPath: repo.path, branch: branch) != nil else {
+        guard let worktreePath = workspaceStore.worktreePaths.path(forRepoID: repo.id, repoPath: repo.path, branch: branch) else {
             return "no managed worktree on branch '\(branch)' in \(repo.name)"
         }
         sidebarState.refresh(repo)
         let script: String?
         if let prompt, !prompt.isEmpty {
-            script = "\(startup ?? PluriSettings.shared.effectiveWorkerScript) \(shellEscape(prompt))"
+            guard let briefPath = writeBrief(prompt, worktreePath: worktreePath) else {
+                return "could not write the brief into the worktree"
+            }
+            script = "\(startup ?? PluriSettings.shared.effectiveWorkerScript) \"$(cat '\(briefPath)')\""
             registry.register(repo: repo.path.standardizedFileURL.path, branch: branch, brief: prompt)
         } else {
             script = startup
         }
         workspace.openWorktreePane(repoID: repo.id, branch: branch, startupScript: script)
         return nil
+    }
+
+    private func writeBrief(_ prompt: String, worktreePath: String) -> String? {
+        let dir = URL(fileURLWithPath: worktreePath).appendingPathComponent(".pluricode", isDirectory: true)
+        let file = dir.appendingPathComponent("brief.md")
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try prompt.write(to: file, atomically: true, encoding: .utf8)
+        } catch {
+            return nil
+        }
+        return file.path
     }
 
     private struct ProposeCommand: Decodable {

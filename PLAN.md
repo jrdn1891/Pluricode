@@ -288,7 +288,8 @@ A central agent ("Pluri") the user talks to in natural language; it sets up work
 - [x] Confirm-gate: new bridge action `propose` `{tasks: [{repo, branch, prompt}]}` validates worktrees and stores a proposal; the chat renders it as a card with per-task briefs and Approve & Dispatch / Decline. Approve dispatches through the same core `open_pane` uses (extracted `PluriBridge.dispatch`); either way Pluri hears the outcome as an `[approval]` resumed turn.
 - [x] `waiting` no longer burns a Pluri turn — it surfaces in the thread (with the notification message) and the orange dot; only `done` still posts a `[worker update]` for the summary.
 - [x] Identity: fan-outs go through `propose` (worktrees first, end turn after proposing, never re-`open_pane` approved tasks); thread replies documented as user→worker, not through Pluri.
-- [ ] Verify (interactive): ask Pluri for a multi-task fan-out — card appears, Approve dispatches all workers and Pluri acknowledges; a task chip opens the thread, a reply lands in the worker's terminal and echoes in the timeline; Open Pane jumps to the pane; Re-dispatch revives a dead task. *(Builds clean; needs a live run.)*
+- [x] Live-run fix: dispatching typed `worker '<brief>'` as one PTY line, but the line lands before zsh leaves canonical mode, whose `MAX_CANON` (1024 bytes on macOS) silently mangles longer lines — briefs are 1–2KB, so claude never launched. The brief now goes to `{worktree}/.pluricode/brief.md` and the startup line stays short: `worker "$(cat '<brief path>')"`.
+- [ ] Verify (interactive): ask Pluri for a multi-task fan-out — card appears, Approve dispatches all workers and Pluri acknowledges; a task chip opens the thread, a reply lands in the worker's terminal and echoes in the timeline; Open Pane jumps to the pane; Re-dispatch revives a dead task. *(First run surfaced the brief-length bug above; re-run pending.)*
 
 ---
 
