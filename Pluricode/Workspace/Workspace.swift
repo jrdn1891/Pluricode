@@ -49,10 +49,8 @@ final class Workspace {
     }
 
     struct ResizeSession {
-        let splitID: UUID
-        let direction: TileDirection
-        var weights: [Float]
-        let highlightedPaneIDs: Set<UUID>
+        var weightsBySplit: [UUID: [Float]]
+        var highlightedPaneIDs: Set<UUID>
     }
 
     private var saveTask: Task<Void, Never>?
@@ -526,14 +524,8 @@ final class Workspace {
         )
     }
 
-    func beginResize(splitID: UUID, direction: TileDirection, weights: [Float], highlightedPaneIDs: Set<UUID>) {
-        resizeSession = ResizeSession(splitID: splitID, direction: direction, weights: weights, highlightedPaneIDs: highlightedPaneIDs)
-    }
-
-    func updateResize(weights: [Float]) {
-        guard var session = resizeSession else { return }
-        session.weights = weights
-        resizeSession = session
+    func updateResize(weightsBySplit: [UUID: [Float]], highlightedPaneIDs: Set<UUID>) {
+        resizeSession = ResizeSession(weightsBySplit: weightsBySplit, highlightedPaneIDs: highlightedPaneIDs)
     }
 
     func endResize() {
@@ -541,8 +533,11 @@ final class Workspace {
     }
 
     var resizePreview: (root: TileNode, highlightedIDs: Set<UUID>)? {
-        guard let session = resizeSession, let root = tiling.root else { return nil }
-        return (Tiling.setWeights(splitID: session.splitID, weights: session.weights, in: root), session.highlightedPaneIDs)
+        guard let session = resizeSession, var root = tiling.root else { return nil }
+        for (splitID, weights) in session.weightsBySplit {
+            root = Tiling.setWeights(splitID: splitID, weights: weights, in: root)
+        }
+        return (root, session.highlightedPaneIDs)
     }
 
     @discardableResult
