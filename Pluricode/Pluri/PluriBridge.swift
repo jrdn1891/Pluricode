@@ -60,6 +60,7 @@ final class PluriBridge {
         let repo: String?
         let branch: String?
         let startup: String?
+        let prompt: String?
         let workspace: String?
     }
 
@@ -120,7 +121,13 @@ final class PluriBridge {
             return Self.failure("no managed worktree on branch '\(branch)' in \(repo.name)")
         }
         sidebarState.refresh(repo)
-        workspace.openWorktreePane(repoID: repo.id, branch: branch, startupScript: cmd.startup)
+        let startup: String?
+        if let prompt = cmd.prompt, !prompt.isEmpty {
+            startup = "\(cmd.startup ?? PluriSettings.shared.effectiveWorkerScript) \(shellEscape(prompt))"
+        } else {
+            startup = cmd.startup
+        }
+        workspace.openWorktreePane(repoID: repo.id, branch: branch, startupScript: startup)
         return Self.success
     }
 
