@@ -228,13 +228,15 @@ final class PluriBridge {
         guard let path = workspaceStore.worktreePaths.path(forRepoID: repo.id, repoPath: repo.path, branch: branch) else {
             return Self.failure("no managed worktree on branch '\(branch)' in \(repo.name)")
         }
-        workspaceStore.deleteWorktree(
-            repo: repo,
-            worktree: Worktree(branch: branch, path: path, head: "", isPrimary: false),
-            pinStore: pinStore
-        )
-        registry.remove(repo: repo.path.standardizedFileURL.path, branch: branch)
-        sidebarState.refresh(repo)
+        Task {
+            await workspaceStore.deleteWorktree(
+                repo: repo,
+                worktree: Worktree(branch: branch, path: path, head: "", isPrimary: false),
+                pinStore: pinStore
+            )
+            registry.remove(repo: repo.path.standardizedFileURL.path, branch: branch)
+            sidebarState.refresh(repo)
+        }
         return Self.success
     }
 
