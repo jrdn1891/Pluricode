@@ -38,9 +38,11 @@ final class PluriBridge {
             guard name.hasSuffix(".json"), !name.hasSuffix(".result.json") else { continue }
             guard let data = try? Data(contentsOf: url) else { continue }
             try? FileManager.default.removeItem(at: url)
-            let result = handle(data)
             let resultName = url.deletingPathExtension().lastPathComponent + ".result.json"
-            try? result.write(to: Self.commandsDir.appendingPathComponent(resultName), options: .atomic)
+            Task {
+                let result = await handle(data)
+                try? result.write(to: Self.commandsDir.appendingPathComponent(resultName), options: .atomic)
+            }
         }
     }
 
@@ -53,7 +55,7 @@ final class PluriBridge {
         let workspace: String?
     }
 
-    private func handle(_ data: Data) -> Data {
+    private func handle(_ data: Data) async -> Data {
         let cmd: Command
         do {
             cmd = try JSONDecoder().decode(Command.self, from: data)
@@ -66,7 +68,7 @@ final class PluriBridge {
         case "propose":
             return propose(data)
         case "delete_worktree":
-            return deleteWorktree(cmd)
+            return await deleteWorktree(cmd)
         default:
             return Self.failure("unknown action '\(cmd.action)'; supported: open_pane, propose, delete_worktree")
         }
@@ -217,7 +219,7 @@ final class PluriBridge {
         return workspaceStore.focusWorkerPane(repoID: repo.id, branch: task.branch)
     }
 
-    private func deleteWorktree(_ cmd: Command) -> Data {
+    private func deleteWorktree(_ cmd: Command) async -> Data {
         guard let repoPath = cmd.repo, let branch = cmd.branch else {
             return Self.failure("delete_worktree needs 'repo' (path) and 'branch'")
         }
@@ -225,10 +227,10 @@ final class PluriBridge {
             return unknownRepo(repoPath)
         }
         workspaceStore.worktreePaths.invalidate(repoID: repo.id)
-        guard let path = workspaceStore.worktreePaths.path(forRepoID: repo.id, repoPath: repo.path, branch: branch) else {
+        guard let path = await workspaceStore.worktreePaths.resolve(forRepoID: repo.id, repoPath: repo.path, branch: branch) else {
             return Self.failure("no managed worktree on branch '\(branch)' in \(repo.name)")
         }
-        workspaceStore.deleteWorktree(
+        await workspaceStore.deleteWorktree(
             repo: repo,
             worktree: Worktree(branch: branch, path: path, head: "", isPrimary: false),
             pinStore: pinStore
