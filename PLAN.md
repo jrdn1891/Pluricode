@@ -227,9 +227,75 @@ Selection happens **directly on the running page**, not on a static capture: a m
 
 ---
 
+## Pluri — central orchestrator (M11–M15)
+
+A central agent ("Pluri") the user talks to in natural language; it sets up worktrees, prepares task briefs, dispatches worker sessions, and monitors them. Pluricode stays the dumb reliable hands: Pluri is the user's own Claude Code — no API keys, no LLM runtime in the app. The value is fan-out: one utterance containing N tasks across M repos becomes N parallel worker sessions. Workers are parallel by construction (separate PTYs in their own panes); Pluri only dispatches, so its own loop stays free.
+
+### M11 — Pluri in the toolbar
+
+**Goal**: the single entry point. An animated mascot lives in the toolbar; clicking it opens the workspace's Pluri pane — a terminal running `claude` in Pluri's home directory, primed with an orchestrator identity. Pluri can already investigate repos and create worktrees with plain git: the sidebar derives worktrees from `git worktree list`, so what Pluri sets up appears in the app with no IPC.
+
+- [x] `Pluri/PluriHome.swift`: home at `~/Library/Application Support/Pluricode/pluri/`; on pane start writes `CLAUDE.md` (orchestrator identity, worktree conventions, brief-drafting rules) and `repos.json` (registered-repo export, regenerated each start).
+- [x] `TabContent.pluri` case + all switch sites (TabBody, ghost pane, minimized chip, expanded card, `tabLabel`, `terminalPanes`).
+- [x] `Pluri/PluriPaneView.swift`: `TerminalHost` at the Pluri home with startup script `claude`.
+- [x] `Workspace.openPluri()`: dedup — focus an existing Pluri tab (restoring from minimized), else split right of the anchor pane.
+- [x] `Pluri/PluriMascotView.swift`: coral mascot with blinking eyes and hover bounce; toolbar button → `openPluri()`.
+- [ ] Verify (interactive): mascot animates; click opens Pluri running `claude`; second click focuses instead of duplicating; a worktree created by Pluri shows up in the sidebar. *(Builds clean; needs a live run to drive end-to-end.)*
+
+### M12 — Control surface
+
+**Goal**: give Pluri hands. A file-based command bridge under the Pluri home (`commands/` watched by the app, responses written back) plus a documented contract in `CLAUDE.md`, so Pluri can open a worktree pane and kick off a worker `claude "<brief>"` in it. Listing worktrees needs no bridge — it's `git worktree list`. Keep Pluri's turns short: anything slow (repo investigation) runs as Pluri's own background subagents.
+
+- [x] `Pluri/PluriBridge.swift`: DispatchSource watcher on `pluri/commands/`; handles `open_pane` `{repo, branch, startup}`; writes `{id}.result.json`; clears stale files at launch. Requests arrive via atomic `mv` (documented), so no partial reads.
+- [x] `Workspace.openWorktreePane(repoID:branch:startupScript:)`: pane inserted right of the anchor via `reinsertPane`; startup delivered through the existing `pendingDevScripts` channel; keyboard focus stays where the user is (Pluri's pane).
+- [x] Bridge invalidates `WorktreePaths` + worktree status caches and refreshes the sidebar, so worktrees Pluri just created with git resolve immediately.
+- [x] `PluriHome` `CLAUDE.md` documents the protocol with a copy-paste dispatch recipe; limits section now only covers monitoring (M13).
+- [x] Verify (interactive): asked Pluri to set up a worktree and dispatch a task — Pluri created the branch + worktree with git (appeared in the sidebar), the bridge opened a worker pane with the brief running, and the worker completed it. (Driven live during the M14 verify; "next to Pluri" predates M13 — Pluri is a window now, the pane opens at the workspace anchor.)
+
+### M13 — Pluri chat window
+
+**Goal**: Pluri leaves the tiling. Pulled ahead of status & events because the standalone surface is the user-facing priority; the bridge carries over unchanged. The mascot now opens a dedicated chat window driven by headless Claude Code: each user message spawns `claude -p --output-format stream-json --include-partial-messages` (resuming the session by id) in the Pluri home with the prompt on stdin — no shell escaping, no PTY, still the user's own auth. Headless mode cannot show terminal permission prompts (unmatched tools auto-deny), so the home gets a `.claude/settings.json` allow-list of what Pluri legitimately runs (git, gh, the bridge recipe, reads, subagents); approval lives where it belongs — in the conversation, before a fan-out dispatch.
+
+- [x] `Pluri/PluriSession.swift`: per-turn `claude -p` subprocess via the login shell; parses the NDJSON stream (text deltas, tool_use starts, partial tool input, result) into `PluriBlock`s; captures `session_id` and resumes it on the next turn; SIGINT to interrupt; stderr surfaces as an error block when a turn dies without a result.
+- [x] `Pluri/PluriChatView.swift`: transcript (user bubbles, streaming markdown text, compact tool-call capsules, errors), auto-scroll, multiline input with send/stop, new-conversation toolbar button, mascot empty state.
+- [x] `PluricodeApp`: `Window("Pluri")` scene; the toolbar mascot opens it (no workspace required anymore).
+- [x] `PluriHome.prepare` additionally writes `.claude/settings.json` (permission allow-list) and now runs per message, so `repos.json` is always fresh; identity updated for headless operation.
+- [x] `PluriSettings.command` ("Pluri command") replaces the pane setup script; the worker setup script is unchanged.
+- [x] Pane teardown: `TabContent.pluri`, `Workspace.openPluri()`, `PluriPaneView`, and all pane/header/expanded/minimized switch sites deleted.
+- [x] Live-run fixes: dispatch recipe moved to the Write tool + atomic `mv` (the headless shell guard rejects JSON heredocs, and the redirect sandbox mismatches the home path's space — scoped Write rules fail on the same, so the allow-list carries bare `Write`); `PluriBridge.start()` moved from the main window's `onAppear` to app init (the chat window can exist without the main window, leaving the bridge unarmed); stream deltas coalesce into a 10 Hz flush so the transcript doesn't re-layout per token (beachballed on long turns).
+- [ ] Verify (interactive): mascot opens the window; a message streams text and tool capsules live; a follow-up message continues the same session; a dispatch opens a worker pane in the workspace; stop interrupts; denied tools come back as a readable explanation.
+
+### M14 — Status & events
+
+**Goal**: the return channel. Worker sessions get Claude Code hooks that write status files under the Pluri home; the app watches them, badges panes (running / waiting / done), and posts worker events into Pluri's chat as resumed turns — the M13 transport makes PTY injection unnecessary. A persistent task registry file (task, repo, worktree, brief, status) makes orchestration state survive context compaction — the conversation is the UI, the registry is the truth.
+
+- [x] `Pluri/WorkerHooks.swift`: writes `{worktree}/.claude/settings.local.json` with `SessionStart`/`UserPromptSubmit`/`Notification`/`Stop`/`SessionEnd` hooks that dump the hook's stdin JSON into `pluri/events/` (uuid tmp + atomic `mv`). Installed by `TerminalPaneView` before any worktree terminal starts, so every claude session in a managed worktree reports — not just dispatched workers. Rewritten while the file holds only our hooks (stale dev/prod paths self-heal); left untouched once Claude Code merges its own keys in. Argv-dispatched briefs don't fire `UserPromptSubmit` (claude-code #17284), so `SessionStart` carries the running signal.
+- [x] `Pluri/PluriTaskRegistry.swift`: `pluri/tasks.json` — repo, branch, brief, status, timestamps; worktree path derived from the `{repo}/.pluricode/worktrees/{branch}` convention. Bridge `open_pane` with a `prompt` registers (re-dispatch on the same branch replaces); `delete_worktree` removes.
+- [x] `Pluri/PluriMonitor.swift`: drains `pluri/events/` (creation-date order) via `DirectoryWatcher` — extracted from `PluriBridge`, now shared. Maintains observable `statuses` keyed by worktree path: SessionStart/UserPromptSubmit → running, Notification → waiting, Stop → done, SessionEnd clears the badge. Registry status transitions of `done`/`waiting` post to Pluri's chat; the registry's own transition guard prevents duplicate posts across app restarts.
+- [x] `PluriSession.postEvent`: events queue while a turn is running and flush as one resumed turn when idle (and after `finish`); rendered as dim `bolt` system rows (`PluriBlock.Kind.event`) instead of user bubbles.
+- [x] `PaneHeader` worker-status dot (blue running / orange waiting / green done) next to the branch name, looked up by worktree path from `PluriMonitor` via SwiftUI environment.
+- [x] Identity: "Current limits" replaced by a Monitoring section — `tasks.json` is the app-maintained read-only truth, `[worker update]` turns arrive automatically, react briefly (`done` → inspect the worktree and summarize; `waiting` → relay; never self-dispatch follow-ups).
+- [x] Verify (interactive): dispatched a test task through Pluri — `settings.local.json` appeared in the worktree, the pane dot went blue then green, `tasks.json` flipped running → done seven seconds after dispatch, and the `[worker update]` turn landed in the chat with Pluri's summary. Not yet driven: the orange waiting state (worker ran with `--dangerously-skip-permissions`, so no permission prompt occurs). Known behavior: a worker killed by an app restart leaves its registry entry `running` until re-engaged — M15 territory.
+
+### M15 — Threads
+
+**Goal**: Slack-style threads in the chat window: thread root = task (from the M14 registry), thread replies route into the worker's PTY, worker pane one click away. Confirm-gate briefs render as approvable cards.
+
+- [x] `PluriTaskRegistry` is `@Observable` and each task carries an `updates` timeline (dispatched / running / waiting / done / reply, with messages); the monitor appends transitions, `register` seeds "dispatched". Old flat `tasks.json` becomes unreadable — registry resets (no-backwards-compat).
+- [x] Chat window: task chip bar (live status dots, sorted by recency) above the transcript; tapping opens the task's thread — brief, update timeline, reply field, status header.
+- [x] Thread replies route into the worker's PTY via `TerminalSession.submit` (extracted from `sendMarkup`) through `PluriBridge.reply`, and land in the timeline as `reply` updates. Workers resolved by `WorkspaceStore.workerPane` (tiled + minimized, stubs excluded).
+- [x] Worker pane one click away: "Open Pane" selects the workspace, restores from minimized, activates the right tab, focuses the terminal, raises the main window. With no live session the button becomes "Re-dispatch" — re-registers and starts a fresh worker with the original brief (also the recovery path for workers killed by an app restart).
+- [x] Confirm-gate: new bridge action `propose` `{tasks: [{repo, branch, prompt}]}` validates worktrees and stores a proposal; the chat renders it as a card with per-task briefs and Approve & Dispatch / Decline. Approve dispatches through the same core `open_pane` uses (extracted `PluriBridge.dispatch`); either way Pluri hears the outcome as an `[approval]` resumed turn.
+- [x] `waiting` no longer burns a Pluri turn — it surfaces in the thread (with the notification message) and the orange dot; only `done` still posts a `[worker update]` for the summary.
+- [x] Identity: fan-outs go through `propose` (worktrees first, end turn after proposing, never re-`open_pane` approved tasks); thread replies documented as user→worker, not through Pluri.
+- [x] Live-run fix: dispatching typed `worker '<brief>'` as one PTY line, but the line lands before zsh leaves canonical mode, whose `MAX_CANON` (1024 bytes on macOS) silently mangles longer lines — briefs are 1–2KB, so claude never launched. The brief now goes to `{worktree}/.pluricode/brief.md` and the startup line stays short: `worker "$(cat '<brief path>')"`.
+- [ ] Verify (interactive): ask Pluri for a multi-task fan-out — card appears, Approve dispatches all workers and Pluri acknowledges; a task chip opens the thread, a reply lands in the worker's terminal and echoes in the timeline; Open Pane jumps to the pane; Re-dispatch revives a dead task. *(First run surfaced the brief-length bug above; re-run pending.)*
+
+---
+
 ## Ordering
 
-M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last. M10 (browser) is independent of the task-list work; its three phases are sequential (each builds on the last).
+M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last. M10 (browser) is independent of the task-list work; its three phases are sequential (each builds on the last). M11 → M12 → M13 → M14 → M15 are sequential: each Pluri milestone proves the previous before adding machinery.
 
 ## Open decisions
 

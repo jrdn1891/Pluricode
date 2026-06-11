@@ -5,8 +5,12 @@ struct PluricodeApp: App {
     @State private var repoStore = RepoStore()
     @State private var taskListStore = TaskListStore()
     @State private var workspaceStore: WorkspaceStore
-    @State private var pinStore = PinStore()
-    @State private var sidebarState = SidebarState()
+    @State private var pinStore: PinStore
+    @State private var sidebarState: SidebarState
+    @State private var pluriBridge: PluriBridge
+    @State private var pluriSession: PluriSession
+    @State private var pluriMonitor: PluriMonitor
+    @State private var pluriRegistry: PluriTaskRegistry
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showPalette = false
     @State private var creatingWorkspace = false
@@ -16,12 +20,28 @@ struct PluricodeApp: App {
     init() {
         let repos = RepoStore()
         let lists = TaskListStore()
+        let sidebar = SidebarState()
+        let store = WorkspaceStore(repoStore: repos, taskListStore: lists)
+        let pins = PinStore()
         _repoStore = State(initialValue: repos)
         _taskListStore = State(initialValue: lists)
-        _workspaceStore = State(initialValue: WorkspaceStore(
+        _sidebarState = State(initialValue: sidebar)
+        _workspaceStore = State(initialValue: store)
+        _pinStore = State(initialValue: pins)
+        let registry = PluriTaskRegistry()
+        let session = PluriSession(repoStore: repos)
+        _pluriBridge = State(initialValue: PluriBridge(
             repoStore: repos,
-            taskListStore: lists
+            workspaceStore: store,
+            sidebarState: sidebar,
+            pinStore: pins,
+            registry: registry
         ))
+        _pluriSession = State(initialValue: session)
+        _pluriMonitor = State(initialValue: PluriMonitor(registry: registry, session: session))
+        _pluriRegistry = State(initialValue: registry)
+        pluriBridge.start()
+        pluriMonitor.start()
     }
 
     var body: some Scene {
@@ -44,6 +64,9 @@ struct PluricodeApp: App {
                 }
             }
             .toolbar {
+                ToolbarItem {
+                    PluriToolbarButton()
+                }
                 PaneCreationToolbar(
                     workspace: workspaceStore.selectedWorkspace
                 )
@@ -88,6 +111,7 @@ struct PluricodeApp: App {
                 NewWorkspaceSheet(workspaceStore: workspaceStore)
             }
             .confirmation($pendingConfirmation)
+            .environment(pluriMonitor)
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
@@ -103,12 +127,19 @@ struct PluricodeApp: App {
             }
         }
 
+        Window("Pluri", id: "pluri") {
+            PluriChatView(session: pluriSession, bridge: pluriBridge, registry: pluriRegistry)
+        }
+        .defaultSize(width: 460, height: 640)
+
         Settings {
             TabView {
                 PermissionsView()
                     .tabItem { Label("Permissions", systemImage: "lock.shield") }
                 TerminalSettingsView()
                     .tabItem { Label("Terminal", systemImage: "terminal") }
+                PluriSettingsView()
+                    .tabItem { Label("Pluri", systemImage: "sparkles") }
                 UpdatesSettingsView()
                     .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
             }
@@ -147,6 +178,19 @@ struct PluricodeApp: App {
                 }
             }
         }
+    }
+}
+
+struct PluriToolbarButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button {
+            openWindow(id: "pluri")
+        } label: {
+            PluriMascotView()
+        }
+        .help("Pluri — describe what you want to work on")
     }
 }
 

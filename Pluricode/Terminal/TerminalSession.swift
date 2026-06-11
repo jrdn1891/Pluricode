@@ -66,13 +66,9 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
 
     private func flushAttachmentInjection() -> String? {
         guard !pendingAttachments.isEmpty else { return nil }
-        let joined = pendingAttachments.map { Self.shellEscape($0.path) }.joined(separator: " ")
+        let joined = pendingAttachments.map { shellEscape($0.path) }.joined(separator: " ")
         pendingAttachments.removeAll()
         return " " + joined
-    }
-
-    private static func shellEscape(_ path: String) -> String {
-        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     private func noteActivity() {
@@ -108,14 +104,17 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         terminalView.process?.send(data: bytes[...])
     }
 
-    func sendMarkup(note: String, imagePath: String) {
-        let escaped = Self.shellEscape(imagePath)
-        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        let text = trimmed.isEmpty ? escaped : "\(trimmed) \(escaped)"
+    func submit(_ text: String) {
         terminalView.process?.send(data: Array(text.utf8)[...])
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.terminalView.process?.send(data: Array("\r".utf8)[...])
         }
+    }
+
+    func sendMarkup(note: String, imagePath: String) {
+        let escaped = shellEscape(imagePath)
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        submit(trimmed.isEmpty ? escaped : "\(trimmed) \(escaped)")
     }
 
     func saveScrollback(to dir: URL) {
@@ -305,7 +304,7 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
             onAttachImage?(PendingImageAttachment(path: url.path, displayName: url.lastPathComponent, thumbnail: thumb))
         }
         if !nonImageURLs.isEmpty {
-            let bytes = Array(nonImageURLs.map { Self.shellEscape($0.path) }.joined(separator: " ").utf8)
+            let bytes = Array(nonImageURLs.map { shellEscape($0.path) }.joined(separator: " ").utf8)
             process?.send(data: bytes[...])
         }
     }
@@ -354,9 +353,10 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
         do { try data.write(to: url); return url.path } catch { return nil }
     }
 
-    private static func shellEscape(_ path: String) -> String {
-        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
+}
+
+func shellEscape(_ text: String) -> String {
+    "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
 }
 
 private final class HoverObserver: NSResponder {

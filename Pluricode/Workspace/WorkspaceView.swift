@@ -1169,11 +1169,17 @@ private struct PaneHeader: View {
     let onClose: () -> Void
     let onPreview: (() -> Void)?
     @State private var devScript: String?
+    @Environment(PluriMonitor.self) private var monitor: PluriMonitor?
 
     private var isMerged: Bool {
         guard let tab = pane.tabs.first(where: { $0.id == tabID }),
               case .terminal(let repoID, let worktreeID) = tab.content else { return false }
         return workspace.worktreeStatusService.status(repoID: repoID, branch: worktreeID).isMerged
+    }
+
+    private var workerStatus: WorkerStatus? {
+        guard let monitor, let path = workspace.worktreePath(tabID: tabID) else { return nil }
+        return monitor.statuses[URL(fileURLWithPath: path).standardizedFileURL.path]
     }
 
     var body: some View {
@@ -1192,6 +1198,12 @@ private struct PaneHeader: View {
                 .font(.caption)
             Text(title)
                 .font(.system(size: 12, weight: .medium))
+            if let status = workerStatus {
+                Circle()
+                    .fill(status.color)
+                    .frame(width: 7, height: 7)
+                    .help(status.help)
+            }
             Spacer()
             if devScript != nil {
                 Button(action: { workspace.runDevScript(paneID: pane.id) }) {
@@ -1268,6 +1280,16 @@ private struct PaneHeader: View {
         let payload = TilingDragPayload(kind: .movePane(paneID: pane.id))
         workspace.beginDrag(payload)
         return payload
+    }
+}
+
+private extension WorkerStatus {
+    var help: String {
+        switch self {
+        case .running: "Agent is working"
+        case .waiting: "Agent is waiting for permission or input"
+        case .done: "Agent finished its turn"
+        }
     }
 }
 

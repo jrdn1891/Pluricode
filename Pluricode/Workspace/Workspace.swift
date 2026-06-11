@@ -293,6 +293,17 @@ final class Workspace {
         }
     }
 
+    func openWorktreePane(repoID: UUID, branch: String, startupScript: String?) {
+        let tab = Tab(content: .terminal(repoID: repoID, worktreeID: branch))
+        if let startupScript, !startupScript.isEmpty {
+            pendingDevScripts[tab.id] = startupScript
+        }
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
+            tiling.reinsertPane(Pane(tabs: [tab]), near: anchorPaneID, edge: .right)
+        }
+        scheduleSave()
+    }
+
     func agentSession(repoID: UUID, worktreeID: String, preferredTabID: UUID?) -> TerminalSession? {
         if let preferredTabID, let host = terminalHosts[preferredTabID] {
             return host.session
@@ -701,6 +712,39 @@ final class WorkspaceStore {
             return false
         }
         target.adoptHost(host, tabID: newPane.activeTabID)
+        return true
+    }
+
+    func workerPane(repoID: UUID, branch: String) -> (workspace: Workspace, paneID: UUID, tabID: UUID)? {
+        for ws in workspaces {
+            for pane in ws.tiling.panes + ws.minimizedPanes.map(\.pane) {
+                for tab in pane.tabs {
+                    guard case .terminal(let r, let b) = tab.content,
+                          r == repoID, b == branch,
+                          ws.terminalHosts[tab.id] != nil,
+                          ws.stubTabs[tab.id] == nil else { continue }
+                    return (ws, pane.id, tab.id)
+                }
+            }
+        }
+        return nil
+    }
+
+    @discardableResult
+    func focusWorkerPane(repoID: UUID, branch: String) -> Bool {
+        guard let (ws, paneID, tabID) = workerPane(repoID: repoID, branch: branch) else { return false }
+        selectedWorkspaceID = ws.id
+        saveSelection()
+        if ws.minimizedPanes.contains(where: { $0.pane.id == paneID }) {
+            ws.restoreMinimizedPane(paneID: paneID)
+        }
+        ws.setActiveTab(paneID: paneID, tabID: tabID)
+        ws.setFocus(paneID: paneID)
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows
+            .first { $0.canBecomeKey && $0.identifier?.rawValue.contains("pluri") != true && !($0 is NSPanel) }?
+            .makeKeyAndOrderFront(nil)
+        DispatchQueue.main.async { ws.terminalHosts[tabID]?.focusInput() }
         return true
     }
 
