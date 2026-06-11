@@ -63,13 +63,11 @@ enum ProcessRunner {
 
     private static func drain(_ pipe: Pipe) -> Task<Data, Never> {
         Task {
-            var data = Data()
-            do {
-                for try await byte in pipe.fileHandleForReading.bytes {
-                    data.append(byte)
+            await withCheckedContinuation { (continuation: CheckedContinuation<Data, Never>) in
+                DispatchQueue.global().async {
+                    continuation.resume(returning: pipe.fileHandleForReading.readDataToEndOfFile())
                 }
-            } catch {}
-            return data
+            }
         }
     }
 
