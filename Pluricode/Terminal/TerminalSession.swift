@@ -189,6 +189,9 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     private var hoverTrackingArea: NSTrackingArea?
     private lazy var hoverObserver = HoverObserver { [weak self] hovering in self?.onHoverChange?(hovering) }
     private var metalCancellable: AnyCancellable?
+    private var firstResponderObservation: NSKeyValueObservation?
+    private lazy var programCursorStyle: CursorStyle = getTerminal().options.cursorStyle
+    private var applyingFocusCursorStyle = false
 
     private let promiseQueue = OperationQueue()
 
@@ -205,7 +208,9 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     private static let instances = NSHashTable<ActivityAwareTerminalView>.weakObjects()
     private static let sharedMonitors: Void = {
         _ = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            for view in instances.allObjects { view.interceptReturn(event) }
+            for view in instances.allObjects {
+                if view.interceptReturn(event) { return nil }
+            }
             return event
         }
         _ = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
@@ -219,6 +224,10 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
         if window != nil {
             Self.instances.add(self)
             _ = Self.sharedMonitors
+            firstResponderObservation = window?.observe(\.firstResponder) { [weak self] _, _ in
+                self?.applyFocusCursorStyle()
+            }
+            applyFocusCursorStyle()
             if hoverTrackingArea == nil {
                 let area = NSTrackingArea(
                     rect: .zero,
@@ -231,6 +240,7 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
             }
         } else {
             Self.instances.remove(self)
+            firstResponderObservation = nil
             if let area = hoverTrackingArea { removeTrackingArea(area) }
             hoverTrackingArea = nil
             onHoverChange?(false)
@@ -254,12 +264,39 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
         try? setUseMetal(TerminalSettings.shared.useMetalRenderer)
     }
 
-    private func interceptReturn(_ event: NSEvent) {
-        guard event.keyCode == 36,
-              !event.modifierFlags.contains(.shift),
-              window?.firstResponder === self,
-              let injection = flushAttachments?() else { return }
-        process?.send(data: Array(injection.utf8)[...])
+    override func cursorStyleChanged(source: Terminal, newStyle: CursorStyle) {
+        super.cursorStyleChanged(source: source, newStyle: newStyle)
+        guard !applyingFocusCursorStyle else { return }
+        programCursorStyle = newStyle
+        DispatchQueue.main.async { [weak self] in self?.applyFocusCursorStyle() }
+    }
+
+    private func applyFocusCursorStyle() {
+        let focused = window?.firstResponder === self
+        applyingFocusCursorStyle = true
+        getTerminal().setCursorStyle(focused ? programCursorStyle : Self.steadyStyle(programCursorStyle))
+        applyingFocusCursorStyle = false
+    }
+
+    private static func steadyStyle(_ style: CursorStyle) -> CursorStyle {
+        switch style {
+        case .blinkBlock: return .steadyBlock
+        case .blinkUnderline: return .steadyUnderline
+        case .blinkBar: return .steadyBar
+        default: return style
+        }
+    }
+
+    private func interceptReturn(_ event: NSEvent) -> Bool {
+        guard event.keyCode == 36, window?.firstResponder === self else { return false }
+        if event.modifierFlags.contains(.shift) {
+            process?.send(data: Array("\u{1b}\r".utf8)[...])
+            return true
+        }
+        if let injection = flushAttachments?() {
+            process?.send(data: Array(injection.utf8)[...])
+        }
+        return false
     }
 
     override func dataReceived(slice: ArraySlice<UInt8>) {

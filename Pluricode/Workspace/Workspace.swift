@@ -345,9 +345,12 @@ final class Workspace {
 
     func expandPane(paneID: UUID) {
         expandedPaneID = paneID
+        focusedPaneID = paneID
+        pendingFocusPaneID = paneID
     }
 
     func collapseExpandedPane() {
+        pendingFocusPaneID = expandedPaneID
         expandedPaneID = nil
     }
 
