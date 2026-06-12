@@ -3,13 +3,13 @@
   <channel>
     <title>Pluricode</title>
     <item>
-      <title>1.2-nightly.20260611+55c281d</title>
-      <pubDate>Thu, 11 Jun 2026 15:01:15 +0000</pubDate>
+      <title>1.2-nightly.20260612+55c281d</title>
+      <pubDate>Fri, 12 Jun 2026 10:59:16 +0000</pubDate>
       <sparkle:channel>nightly</sparkle:channel>
       <sparkle:version>195</sparkle:version>
-      <sparkle:shortVersionString>1.2-nightly.20260611+55c281d</sparkle:shortVersionString>
+      <sparkle:shortVersionString>1.2-nightly.20260612+55c281d</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/jrdn1891/Pluricode/releases/download/nightly/Pluricode-nightly.zip" sparkle:edSignature="XmYmVq5cwl78wucJ14mxS9KicBCW7d+EfvookVckkMU30wn8IeKSEa4pPUymtxJnWJX9gXuswNeqVgy98xqRBw==" length="7749593" type="application/octet-stream" />
+      <enclosure url="https://github.com/jrdn1891/Pluricode/releases/download/nightly/Pluricode-nightly.zip" sparkle:edSignature="snyY46TOJhydhzpFZf+L8h7E2gGKUZFePbnvckserl+MV6rWx3ahF3Ovbn6qoPOKw+POkrrnMQ+v5NllV6sBBA==" length="7749596" type="application/octet-stream" />
     </item>
   </channel>
 </rss>
