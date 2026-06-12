@@ -205,12 +205,19 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     private static let instances = NSHashTable<ActivityAwareTerminalView>.weakObjects()
     private static let sharedMonitors: Void = {
         _ = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            for view in instances.allObjects { view.interceptReturn(event) }
+            for view in instances.allObjects {
+                if view.interceptReturn(event) { return nil }
+            }
             return event
         }
         _ = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
             for view in instances.allObjects { view.captureFocusIfHit(event) }
             return event
+        }
+        NotificationCenter.default.addObserver(forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main) { _ in
+            DispatchQueue.main.async {
+                for view in instances.allObjects { view.stopCaretBlinkIfUnfocused() }
+            }
         }
     }()
 
@@ -252,14 +259,31 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     private func applyMetalRenderer() {
         guard window != nil else { return }
         try? setUseMetal(TerminalSettings.shared.useMetalRenderer)
+        stopCaretBlinkIfUnfocused()
     }
 
-    private func interceptReturn(_ event: NSEvent) {
-        guard event.keyCode == 36,
-              !event.modifierFlags.contains(.shift),
-              window?.firstResponder === self,
-              let injection = flushAttachments?() else { return }
-        process?.send(data: Array(injection.utf8)[...])
+    override func cursorStyleChanged(source: Terminal, newStyle: CursorStyle) {
+        super.cursorStyleChanged(source: source, newStyle: newStyle)
+        stopCaretBlinkIfUnfocused()
+    }
+
+    private func stopCaretBlinkIfUnfocused() {
+        guard window?.firstResponder !== self,
+              let caret = subviews.first(where: { String(describing: type(of: $0)) == "CaretView" })?.layer else { return }
+        caret.removeAllAnimations()
+        caret.opacity = 1
+    }
+
+    private func interceptReturn(_ event: NSEvent) -> Bool {
+        guard event.keyCode == 36, window?.firstResponder === self else { return false }
+        if event.modifierFlags.contains(.shift) {
+            process?.send(data: Array("\u{1b}\r".utf8)[...])
+            return true
+        }
+        if let injection = flushAttachments?() {
+            process?.send(data: Array(injection.utf8)[...])
+        }
+        return false
     }
 
     override func dataReceived(slice: ArraySlice<UInt8>) {
