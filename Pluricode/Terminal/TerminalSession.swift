@@ -189,6 +189,9 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     private var hoverTrackingArea: NSTrackingArea?
     private lazy var hoverObserver = HoverObserver { [weak self] hovering in self?.onHoverChange?(hovering) }
     private var metalCancellable: AnyCancellable?
+    private var firstResponderObservation: NSKeyValueObservation?
+    private lazy var programCursorStyle: CursorStyle = getTerminal().options.cursorStyle
+    private var applyingFocusCursorStyle = false
 
     private let promiseQueue = OperationQueue()
 
@@ -214,11 +217,6 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
             for view in instances.allObjects { view.captureFocusIfHit(event) }
             return event
         }
-        NotificationCenter.default.addObserver(forName: NSWindow.didBecomeMainNotification, object: nil, queue: .main) { _ in
-            DispatchQueue.main.async {
-                for view in instances.allObjects { view.stopCaretBlinkIfUnfocused() }
-            }
-        }
     }()
 
     override func viewDidMoveToWindow() {
@@ -226,6 +224,10 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
         if window != nil {
             Self.instances.add(self)
             _ = Self.sharedMonitors
+            firstResponderObservation = window?.observe(\.firstResponder) { [weak self] _, _ in
+                self?.applyFocusCursorStyle()
+            }
+            applyFocusCursorStyle()
             if hoverTrackingArea == nil {
                 let area = NSTrackingArea(
                     rect: .zero,
@@ -238,6 +240,7 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
             }
         } else {
             Self.instances.remove(self)
+            firstResponderObservation = nil
             if let area = hoverTrackingArea { removeTrackingArea(area) }
             hoverTrackingArea = nil
             onHoverChange?(false)
@@ -259,19 +262,29 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     private func applyMetalRenderer() {
         guard window != nil else { return }
         try? setUseMetal(TerminalSettings.shared.useMetalRenderer)
-        stopCaretBlinkIfUnfocused()
     }
 
     override func cursorStyleChanged(source: Terminal, newStyle: CursorStyle) {
         super.cursorStyleChanged(source: source, newStyle: newStyle)
-        stopCaretBlinkIfUnfocused()
+        guard !applyingFocusCursorStyle else { return }
+        programCursorStyle = newStyle
+        DispatchQueue.main.async { [weak self] in self?.applyFocusCursorStyle() }
     }
 
-    private func stopCaretBlinkIfUnfocused() {
-        guard window?.firstResponder !== self,
-              let caret = subviews.first(where: { String(describing: type(of: $0)) == "CaretView" })?.layer else { return }
-        caret.removeAllAnimations()
-        caret.opacity = 1
+    private func applyFocusCursorStyle() {
+        let focused = window?.firstResponder === self
+        applyingFocusCursorStyle = true
+        getTerminal().setCursorStyle(focused ? programCursorStyle : Self.steadyStyle(programCursorStyle))
+        applyingFocusCursorStyle = false
+    }
+
+    private static func steadyStyle(_ style: CursorStyle) -> CursorStyle {
+        switch style {
+        case .blinkBlock: return .steadyBlock
+        case .blinkUnderline: return .steadyUnderline
+        case .blinkBar: return .steadyBar
+        default: return style
+        }
     }
 
     private func interceptReturn(_ event: NSEvent) -> Bool {
