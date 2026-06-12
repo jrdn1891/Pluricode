@@ -350,6 +350,7 @@ final class Workspace {
     }
 
     func collapseExpandedPane() {
+        pendingFocusPaneID = expandedPaneID
         expandedPaneID = nil
     }
 
