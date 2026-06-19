@@ -52,7 +52,6 @@
 		C878C31C08E33B2454F9E6DE /* LocalHostsWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D4FD99941538CCD095F8FC /* LocalHostsWidgetView.swift */; };
 		CAFE3849F50A463074800322 /* RepoSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */; };
 		DCDE0298F6E0858E03064C01 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861AC6957D983804F39D40DF /* main.swift */; };
-		E4B9C115E3094708A1A7036B /* PaneCreationToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77173B4968B004C4572C6516 /* PaneCreationToolbar.swift */; };
 		E4DA8CFC22DCB7A91DEC0918 /* TileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718374F2B635E5413EA4CC56 /* TileView.swift */; };
 		E8973038D7B03AFD54029DEF /* TerminalPaneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3AB0523B2C998E6BDF6FDB3 /* TerminalPaneView.swift */; };
 		E8CCF649FB23C81F5E17E9FF /* WorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1AE508972402DF38CAFBF8F /* WorkspaceView.swift */; };
@@ -82,7 +81,6 @@
 		72E043050E27961C20DFE8E3 /* SplitDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitDivider.swift; sourceTree = "<group>"; };
 		742F16B907FA39DBB0114F60 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7556EAC17FAC433C26ED641C /* WorktreePaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreePaths.swift; sourceTree = "<group>"; };
-		77173B4968B004C4572C6516 /* PaneCreationToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneCreationToolbar.swift; sourceTree = "<group>"; };
 		77255FBFCC92A10AB02A025B /* CommandPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandPalette.swift; sourceTree = "<group>"; };
 		81D5E95380E73034E3F874CF /* BrowserPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserPaneView.swift; sourceTree = "<group>"; };
 		835064814C58E7F4AAE43D35 /* Keyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keyboard.swift; sourceTree = "<group>"; };
@@ -238,7 +236,6 @@
 				49CBB28DBEB1E236A8D06740 /* LocalHostRegistry.swift */,
 				98D4FD99941538CCD095F8FC /* LocalHostsWidgetView.swift */,
 				CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */,
-				77173B4968B004C4572C6516 /* PaneCreationToolbar.swift */,
 				D79713EC727834622CEEF2EF /* TaskListStore.swift */,
 				45E91297C034C82CF173906F /* TaskPaneView.swift */,
 				BDC77F2E641969738B4482B5 /* TerminalHost.swift */,
@@ -369,7 +366,6 @@
 				AFE23BE23AAB889F92202451 /* LocalHostRegistry.swift in Sources */,
 				C878C31C08E33B2454F9E6DE /* LocalHostsWidgetView.swift in Sources */,
 				0DC403F2FCB7A4D30384AEB7 /* NewWorkspaceSheet.swift in Sources */,
-				E4B9C115E3094708A1A7036B /* PaneCreationToolbar.swift in Sources */,
 				1FF2534862D523B586A00545 /* PermissionsService.swift in Sources */,
 				93E709A761D2947E0F687A71 /* PermissionsView.swift in Sources */,
 				585484B172F60EB3A21E8D7C /* PinStore.swift in Sources */,

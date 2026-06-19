@@ -481,28 +481,6 @@ final class Workspace {
         return tiling.panes.first?.id
     }
 
-    enum PaneCreationAction {
-        case addNew
-        case splitRight
-        case splitDown
-
-        var edge: TileEdge? {
-            switch self {
-            case .addNew: nil
-            case .splitRight: .right
-            case .splitDown: .bottom
-            }
-        }
-    }
-
-    func performPaneCreation(_ action: PaneCreationAction, content: TabContent) {
-        if let edge = action.edge, let anchor = anchorPaneID {
-            splitPane(paneID: anchor, edge: edge, content: content)
-        } else {
-            addPane(content)
-        }
-    }
-
     func pane(id: UUID) -> Pane? {
         Self.findPane(id: id, in: tiling.root)
     }
