@@ -67,9 +67,6 @@ struct PluricodeApp: App {
                 ToolbarItem {
                     PluriToolbarButton()
                 }
-                PaneCreationToolbar(
-                    workspace: workspaceStore.selectedWorkspace
-                )
                 ToolbarItemGroup {
                     Picker("Appearance", selection: $appearanceModeRaw) {
                         ForEach(AppearanceMode.allCases, id: \.rawValue) { mode in
