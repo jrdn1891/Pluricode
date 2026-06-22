@@ -26,15 +26,23 @@ private struct AttachmentChip: View {
     let attachment: PendingImageAttachment
     let onRemove: () -> Void
     @State private var hovering = false
+    @State private var previewing = false
 
     var body: some View {
         HStack(spacing: 6) {
-            thumbnail
-            Text(attachment.displayName)
-                .font(.system(size: 11, weight: .medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(maxWidth: 140)
+            Button { previewing = true } label: {
+                HStack(spacing: 6) {
+                    thumbnail
+                    Text(attachment.displayName)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: 140)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $previewing, arrowEdge: .bottom) { preview }
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 12))
@@ -69,6 +77,17 @@ private struct AttachmentChip: View {
                 .font(.system(size: 14))
                 .foregroundStyle(.secondary)
                 .frame(width: 22, height: 22)
+        }
+    }
+
+    @ViewBuilder
+    private var preview: some View {
+        if let nsImage = attachment.thumbnail {
+            Image(nsImage: nsImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: 400, maxHeight: 400)
+                .padding(8)
         }
     }
 }
