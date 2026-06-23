@@ -7,10 +7,9 @@ struct PluricodeApp: App {
     @State private var workspaceStore: WorkspaceStore
     @State private var pinStore: PinStore
     @State private var sidebarState: SidebarState
-    @State private var pluriBridge: PluriBridge
-    @State private var pluriSession: PluriSession
     @State private var pluriMonitor: PluriMonitor
-    @State private var pluriRegistry: PluriTaskRegistry
+    @State private var pluriBackend: LocalPluriBackend
+    @State private var pluriServer: PluriServer
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showPalette = false
     @State private var creatingWorkspace = false
@@ -30,17 +29,18 @@ struct PluricodeApp: App {
         _pinStore = State(initialValue: pins)
         let registry = PluriTaskRegistry()
         let session = PluriSession(repoStore: repos)
-        _pluriBridge = State(initialValue: PluriBridge(
+        let bridge = PluriBridge(
             repoStore: repos,
             workspaceStore: store,
             sidebarState: sidebar,
             pinStore: pins,
             registry: registry
-        ))
-        _pluriSession = State(initialValue: session)
+        )
+        let backend = LocalPluriBackend(session: session, bridge: bridge, registry: registry)
         _pluriMonitor = State(initialValue: PluriMonitor(registry: registry, session: session))
-        _pluriRegistry = State(initialValue: registry)
-        pluriBridge.start()
+        _pluriBackend = State(initialValue: backend)
+        _pluriServer = State(initialValue: PluriServer(backend: backend))
+        bridge.start()
         pluriMonitor.start()
     }
 
@@ -125,7 +125,7 @@ struct PluricodeApp: App {
         }
 
         Window("Pluri", id: "pluri") {
-            PluriChatView(session: pluriSession, bridge: pluriBridge, registry: pluriRegistry)
+            PluriChatView(backend: pluriBackend)
         }
         .defaultSize(width: 460, height: 640)
 
@@ -137,6 +137,8 @@ struct PluricodeApp: App {
                     .tabItem { Label("Terminal", systemImage: "terminal") }
                 PluriSettingsView()
                     .tabItem { Label("Pluri", systemImage: "sparkles") }
+                PluriServerSettingsView(server: pluriServer)
+                    .tabItem { Label("Mobile", systemImage: "iphone") }
                 UpdatesSettingsView()
                     .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
             }

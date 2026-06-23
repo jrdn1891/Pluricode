@@ -10,18 +10,16 @@ extension WorkerStatus {
     }
 }
 
-struct PluriChatView: View {
-    let session: PluriSession
-    let bridge: PluriBridge
-    let registry: PluriTaskRegistry
+struct PluriChatView<Backend: PluriChatBackend>: View {
+    let backend: Backend
     @State private var draft = ""
     @State private var openTaskID: String?
     @FocusState private var inputFocused: Bool
 
     var body: some View {
         Group {
-            if let id = openTaskID, let task = registry.tasks.first(where: { $0.id == id }) {
-                TaskThreadView(task: task, bridge: bridge, onBack: { openTaskID = nil })
+            if let id = openTaskID, let task = backend.tasks.first(where: { $0.id == id }) {
+                TaskThreadView(backend: backend, task: task, onBack: { openTaskID = nil })
             } else {
                 chat
             }
@@ -31,16 +29,16 @@ struct PluriChatView: View {
 
     private var chat: some View {
         VStack(spacing: 0) {
-            if !registry.tasks.isEmpty {
+            if !backend.tasks.isEmpty {
                 taskChips
                 Divider()
             }
-            if session.blocks.isEmpty {
+            if backend.blocks.isEmpty {
                 emptyState
             } else {
                 transcript
             }
-            if registry.proposal != nil {
+            if backend.proposal != nil {
                 proposalCard
             }
             Divider()
@@ -49,13 +47,13 @@ struct PluriChatView: View {
         .toolbar {
             ToolbarItem {
                 Button {
-                    session.clear()
+                    backend.clearConversation()
                     inputFocused = true
                 } label: {
                     Image(systemName: "square.and.pencil")
                 }
                 .help("New conversation")
-                .disabled(session.blocks.isEmpty || session.isRunning)
+                .disabled(backend.blocks.isEmpty || backend.isRunning)
             }
         }
         .onAppear { inputFocused = true }
@@ -64,7 +62,7 @@ struct PluriChatView: View {
     private var taskChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(registry.tasks.sorted { $0.updatedAt > $1.updatedAt }) { task in
+                ForEach(backend.tasks.sorted { $0.updatedAt > $1.updatedAt }) { task in
                     Button {
                         openTaskID = task.id
                     } label: {
@@ -90,12 +88,12 @@ struct PluriChatView: View {
 
     private var proposalCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            let items = registry.proposal ?? []
+            let items = backend.proposal ?? []
             Label("Pluri proposes \(items.count) task\(items.count == 1 ? "" : "s")", systemImage: "tray.full")
                 .font(.system(size: 12, weight: .semibold))
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(item.repo.name) · \(item.branch)")
+                    Text("\(item.repoName) · \(item.branch)")
                         .font(.system(size: 11, weight: .medium))
                     Text(item.prompt)
                         .font(.system(size: 11))
@@ -106,13 +104,10 @@ struct PluriChatView: View {
             HStack {
                 Spacer()
                 Button("Decline") {
-                    registry.proposal = nil
-                    session.postEvent("[approval] The user declined the proposed tasks.")
+                    backend.declineProposal()
                 }
                 Button("Approve & Dispatch") {
-                    let count = registry.proposal?.count ?? 0
-                    bridge.approveProposal()
-                    session.postEvent("[approval] The user approved the proposal — \(count) worker\(count == 1 ? "" : "s") dispatched.")
+                    backend.approveProposal()
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -142,10 +137,10 @@ struct PluriChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(session.blocks) { block in
+                    ForEach(backend.blocks) { block in
                         PluriBlockRow(block: block)
                     }
-                    if session.isRunning {
+                    if backend.isRunning {
                         HStack(spacing: 8) {
                             PluriMascotView(size: 16)
                             ProgressView()
@@ -158,7 +153,7 @@ struct PluriChatView: View {
                 }
                 .padding(14)
             }
-            .onChange(of: session.blocks) {
+            .onChange(of: backend.blocks) {
                 proxy.scrollTo("bottom")
             }
         }
@@ -171,8 +166,8 @@ struct PluriChatView: View {
                 .lineLimit(1...6)
                 .focused($inputFocused)
                 .onSubmit(sendDraft)
-            if session.isRunning {
-                Button(action: session.interrupt) {
+            if backend.isRunning {
+                Button(action: backend.interrupt) {
                     Image(systemName: "stop.circle.fill")
                         .font(.system(size: 20))
                         .foregroundStyle(.red)
@@ -194,21 +189,21 @@ struct PluriChatView: View {
     }
 
     private func sendDraft() {
-        guard !session.isRunning else { return }
-        session.send(draft)
+        guard !backend.isRunning else { return }
+        backend.send(draft)
         draft = ""
     }
 }
 
-private struct TaskThreadView: View {
+private struct TaskThreadView<Backend: PluriChatBackend>: View {
+    let backend: Backend
     let task: PluriTask
-    let bridge: PluriBridge
     let onBack: () -> Void
     @State private var reply = ""
     @FocusState private var replyFocused: Bool
 
     private var hasLiveWorker: Bool {
-        bridge.workerSession(for: task) != nil
+        backend.hasLiveWorker(task)
     }
 
     var body: some View {
@@ -262,11 +257,11 @@ private struct TaskThreadView: View {
             Spacer()
             if hasLiveWorker {
                 Button("Open Pane") {
-                    bridge.focusWorkerPane(for: task)
+                    backend.focusWorkerPane(task)
                 }
             } else {
                 Button("Re-dispatch") {
-                    _ = bridge.redispatch(task)
+                    backend.redispatch(task)
                 }
                 .help("Start a fresh worker on this worktree with the original brief")
             }
@@ -301,7 +296,7 @@ private struct TaskThreadView: View {
     private func sendReply() {
         let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        guard bridge.reply(to: task, text: text) else { return }
+        backend.reply(to: task, text: text)
         reply = ""
     }
 }

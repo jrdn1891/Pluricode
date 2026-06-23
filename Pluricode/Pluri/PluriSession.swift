@@ -1,19 +1,5 @@
 import Foundation
 
-struct PluriBlock: Identifiable, Equatable {
-    enum Kind: Equatable {
-        case user
-        case event
-        case text
-        case tool(name: String)
-        case error
-    }
-
-    let id = UUID()
-    let kind: Kind
-    var content: String
-}
-
 @MainActor
 @Observable
 final class PluriSession {

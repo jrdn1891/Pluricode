@@ -1,50 +1,6 @@
 import Foundation
 import Observation
 
-enum WorkerStatus: String, Codable {
-    case running, waiting, done
-}
-
-struct PluriTaskUpdate: Codable, Hashable, Identifiable {
-    enum Kind: String, Codable {
-        case dispatched, running, waiting, done, reply
-    }
-
-    let id: UUID
-    let date: Date
-    let kind: Kind
-    let message: String?
-
-    init(kind: Kind, message: String? = nil) {
-        self.id = UUID()
-        self.date = Date()
-        self.kind = kind
-        self.message = message
-    }
-}
-
-struct PluriTask: Codable, Hashable, Identifiable {
-    let repo: String
-    let branch: String
-    let brief: String
-    var status: WorkerStatus
-    let dispatchedAt: Date
-    var updatedAt: Date
-    var updates: [PluriTaskUpdate]
-
-    var id: String { "\(repo)#\(branch)" }
-
-    var repoName: String {
-        URL(fileURLWithPath: repo).lastPathComponent
-    }
-
-    var worktreePath: String {
-        URL(fileURLWithPath: repo)
-            .appendingPathComponent(".pluricode/worktrees/\(branch)")
-            .standardizedFileURL.path
-    }
-}
-
 struct ProposalItem: Identifiable {
     let id = UUID()
     let repo: RepoEntry

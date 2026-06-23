@@ -64,9 +64,9 @@ final class PluriBridge {
         }
         switch cmd.action {
         case "open_pane":
-            return openPane(cmd)
+            return await openPane(cmd)
         case "propose":
-            return propose(data)
+            return await propose(data)
         case "delete_worktree":
             return await deleteWorktree(cmd)
         default:
@@ -98,26 +98,26 @@ final class PluriBridge {
         return workspaceStore.createWorkspace(name: name)
     }
 
-    private func openPane(_ cmd: Command) -> Data {
+    private func openPane(_ cmd: Command) async -> Data {
         guard let repoPath = cmd.repo, let branch = cmd.branch else {
             return Self.failure("open_pane needs 'repo' (path) and 'branch'")
         }
         guard let repo = repo(at: repoPath) else {
             return unknownRepo(repoPath)
         }
-        if let error = dispatch(repo: repo, branch: branch, prompt: cmd.prompt, startup: cmd.startup, workspaceName: cmd.workspace) {
+        if let error = await dispatch(repo: repo, branch: branch, prompt: cmd.prompt, startup: cmd.startup, workspaceName: cmd.workspace) {
             return Self.failure(error)
         }
         return Self.success
     }
 
-    private func dispatch(repo: RepoEntry, branch: String, prompt: String?, startup: String?, workspaceName: String? = nil) -> String? {
+    private func dispatch(repo: RepoEntry, branch: String, prompt: String?, startup: String?, workspaceName: String? = nil) async -> String? {
         guard let workspace = resolveWorkspace(workspaceName) else {
             return "no workspace selected in Pluricode; pass 'workspace' (name) to create one"
         }
         workspaceStore.worktreePaths.invalidate(repoID: repo.id)
         workspaceStore.worktreeStatusService.invalidate(repoID: repo.id)
-        guard let worktreePath = workspaceStore.worktreePaths.path(forRepoID: repo.id, repoPath: repo.path, branch: branch) else {
+        guard let worktreePath = await workspaceStore.worktreePaths.resolve(forRepoID: repo.id, repoPath: repo.path, branch: branch) else {
             return "no managed worktree on branch '\(branch)' in \(repo.name)"
         }
         sidebarState.refresh(repo)
@@ -156,7 +156,7 @@ final class PluriBridge {
         let tasks: [Item]
     }
 
-    private func propose(_ data: Data) -> Data {
+    private func propose(_ data: Data) async -> Data {
         let cmd: ProposeCommand
         do {
             cmd = try JSONDecoder().decode(ProposeCommand.self, from: data)
@@ -172,7 +172,7 @@ final class PluriBridge {
                 return unknownRepo(task.repo)
             }
             workspaceStore.worktreePaths.invalidate(repoID: repo.id)
-            guard workspaceStore.worktreePaths.path(forRepoID: repo.id, repoPath: repo.path, branch: task.branch) != nil else {
+            guard await workspaceStore.worktreePaths.resolve(forRepoID: repo.id, repoPath: repo.path, branch: task.branch) != nil else {
                 return Self.failure("no managed worktree on branch '\(task.branch)' in \(repo.name); create worktrees before proposing")
             }
             guard !task.prompt.isEmpty else {
@@ -184,19 +184,19 @@ final class PluriBridge {
         return Self.success
     }
 
-    func approveProposal() {
+    func approveProposal() async {
         guard let items = registry.proposal else { return }
         registry.proposal = nil
         for item in items {
-            _ = dispatch(repo: item.repo, branch: item.branch, prompt: item.prompt, startup: nil)
+            _ = await dispatch(repo: item.repo, branch: item.branch, prompt: item.prompt, startup: nil)
         }
     }
 
-    func redispatch(_ task: PluriTask) -> String? {
+    func redispatch(_ task: PluriTask) async -> String? {
         guard let repo = repo(at: task.repo) else {
             return "repo '\(task.repo)' is no longer registered"
         }
-        return dispatch(repo: repo, branch: task.branch, prompt: task.brief, startup: nil)
+        return await dispatch(repo: repo, branch: task.branch, prompt: task.brief, startup: nil)
     }
 
     func workerSession(for task: PluriTask) -> TerminalSession? {
