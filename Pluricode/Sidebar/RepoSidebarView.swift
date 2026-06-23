@@ -134,6 +134,7 @@ struct RepoSidebarView: View {
         }
         .sheet(item: $newWorktreeRepo) { repo in
             NewWorktreeSheet(repo: repo) { _ in
+                sidebarState.expanded.insert(repo.id)
                 workspaceStore.worktreePaths.invalidate(repoID: repo.id)
                 workspaceStore.worktreeStatusService.invalidate(repoID: repo.id)
                 sidebarState.refresh(repo)
