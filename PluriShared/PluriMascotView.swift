@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct PluriMascotView: View {
     var size: CGFloat = 20
@@ -24,8 +23,10 @@ struct PluriMascotView: View {
         .scaleEffect(hovering ? 1.15 : 1)
         .rotationEffect(.degrees(hovering ? -7 : 0))
         .animation(.spring(response: 0.3, dampingFraction: 0.55), value: hovering)
+        #if os(macOS)
         .onHover { hovering = $0 }
         .background(GazeTracker(reach: size * 0.09) { gaze = $0 })
+        #endif
         .task { await blink() }
     }
 
@@ -45,6 +46,9 @@ struct PluriMascotView: View {
         }
     }
 }
+
+#if os(macOS)
+import AppKit
 
 private struct GazeTracker: NSViewRepresentable {
     let reach: CGFloat
@@ -97,3 +101,4 @@ private struct GazeTracker: NSViewRepresentable {
         }
     }
 }
+#endif
