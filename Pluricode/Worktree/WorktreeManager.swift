@@ -18,6 +18,12 @@ final class WorktreeManager {
 
     func createWorktree(name: String, baseBranch: String) async throws -> URL {
         let path = worktreeRoot.appendingPathComponent(name)
+        let target = path.standardizedFileURL.path
+        if let existing = try? await listWorktrees(), existing.contains(where: {
+            URL(fileURLWithPath: $0.path).standardizedFileURL.path == target
+        }) {
+            return path
+        }
         if baseBranch.hasPrefix("origin/") {
             _ = try? await run("git", args: ["-C", repoRoot.path, "fetch", "origin", "--quiet"])
         }
