@@ -19,36 +19,28 @@ final class WorktreeManager {
     func createWorktree(name: String, baseBranch: String) async throws -> URL {
         let path = worktreeRoot.appendingPathComponent(name)
         let target = path.standardizedFileURL.path
-        let registered = (try? await listWorktrees()) ?? []
-        if registered.contains(where: {
-            URL(fileURLWithPath: $0.path).standardizedFileURL.path == target
-        }) {
-            return path
+
+        func isRegistered() async -> Bool {
+            guard let all = try? await listWorktrees() else { return false }
+            return all.contains { URL(fileURLWithPath: $0.path).standardizedFileURL.path == target }
         }
-        if !registered.isEmpty {
-            try? FileManager.default.removeItem(at: path)
-            _ = try? await run("git", args: ["-C", repoRoot.path, "worktree", "prune"])
-        }
+
+        if await isRegistered() { return path }
+
         if baseBranch.hasPrefix("origin/") {
             _ = try? await run("git", args: ["-C", repoRoot.path, "fetch", "origin", "--quiet"])
         }
-        let result = try await run("git", args: [
-            "-C", repoRoot.path,
-            "worktree", "add",
-            path.path,
-            "-b", name,
-            baseBranch
-        ])
-        if result.status != 0 {
-            let fallback = try await run("git", args: [
-                "-C", repoRoot.path,
-                "worktree", "add",
-                path.path,
-                baseBranch
-            ])
-            if fallback.status != 0 {
-                throw WorktreeError.createFailed(fallback.stderr)
-            }
+
+        for attempt in 0..<2 {
+            let added = try await run("git", args: ["-C", repoRoot.path, "worktree", "add", path.path, "-b", name, baseBranch])
+            if added.status == 0 { return path }
+            let fallback = try await run("git", args: ["-C", repoRoot.path, "worktree", "add", path.path, baseBranch])
+            if fallback.status == 0 { return path }
+
+            if await isRegistered() { return path }
+            guard attempt == 0 else { throw WorktreeError.createFailed(fallback.stderr) }
+            try? FileManager.default.removeItem(at: path)
+            _ = try? await run("git", args: ["-C", repoRoot.path, "worktree", "prune"])
         }
         return path
     }
