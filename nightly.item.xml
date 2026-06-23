@@ -1,9 +1,9 @@
     <item>
-      <title>1.3-nightly.20260622+f5914d5</title>
-      <pubDate>Mon, 22 Jun 2026 12:45:06 +0000</pubDate>
+      <title>1.4-nightly.20260623+ede1348</title>
+      <pubDate>Tue, 23 Jun 2026 10:29:05 +0000</pubDate>
       <sparkle:channel>nightly</sparkle:channel>
-      <sparkle:version>204</sparkle:version>
-      <sparkle:shortVersionString>1.3-nightly.20260622+f5914d5</sparkle:shortVersionString>
+      <sparkle:version>205</sparkle:version>
+      <sparkle:shortVersionString>1.4-nightly.20260623+ede1348</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/jrdn1891/Pluricode/releases/download/nightly/Pluricode-nightly.zip" sparkle:edSignature="V335A6LrByazqeNiQoUJH2LW5z0mEGRMs2lqfFyKMSCN7ktg9LAwSXoaYJlRUikEfnCvV6CuNB4TVcypxqunBA==" length="7677325" type="application/octet-stream" />
+      <enclosure url="https://github.com/jrdn1891/Pluricode/releases/download/nightly/Pluricode-nightly.zip" sparkle:edSignature="9YxvewwvWLVgju5UBGeIyuUlFIppjqimGGaS5mmgnYgeenDUI1o0LwWAUHyYlZphzk7LiUdUEjFu65N7EcxaDg==" length="7677320" type="application/octet-stream" />
     </item>
