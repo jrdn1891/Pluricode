@@ -147,6 +147,11 @@ struct RepoSidebarView: View {
                     oldBranch: target.worktree.branch,
                     newBranch: newBranch
                 )
+                workspaceStore.renameWorktreeReferences(
+                    repoID: target.repo.id,
+                    oldBranch: target.worktree.branch,
+                    newBranch: newBranch
+                )
                 workspaceStore.worktreePaths.invalidate(repoID: target.repo.id)
                 workspaceStore.worktreeStatusService.invalidate(repoID: target.repo.id)
                 sidebarState.refresh(target.repo)

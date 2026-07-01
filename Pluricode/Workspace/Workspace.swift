@@ -304,6 +304,42 @@ final class Workspace {
         scheduleSave()
     }
 
+    func renameWorktreeReferences(repoID: UUID, oldBranch: String, newBranch: String) {
+        func renamed(_ content: TabContent) -> TabContent? {
+            switch content {
+            case .terminal(let r, let w) where r == repoID && w == oldBranch:
+                return .terminal(repoID: r, worktreeID: newBranch)
+            case .browser(let r, let w, let url) where r == repoID && w == oldBranch:
+                return .browser(repoID: r, worktreeID: newBranch, url: url)
+            default:
+                return nil
+            }
+        }
+        var changed = false
+        for pane in tiling.panes where pane.tabs.contains(where: { renamed($0.content) != nil }) {
+            tiling.updatePane(pane.id) { p in
+                for i in p.tabs.indices where renamed(p.tabs[i].content) != nil {
+                    p.tabs[i].content = renamed(p.tabs[i].content)!
+                }
+            }
+            changed = true
+        }
+        for i in minimizedPanes.indices where minimizedPanes[i].pane.tabs.contains(where: { renamed($0.content) != nil }) {
+            let old = minimizedPanes[i]
+            var tabs = old.pane.tabs
+            for j in tabs.indices where renamed(tabs[j].content) != nil {
+                tabs[j].content = renamed(tabs[j].content)!
+            }
+            minimizedPanes[i] = MinimizedPane(
+                pane: Pane(id: old.pane.id, tabs: tabs, activeTabID: old.pane.activeTabID),
+                hint: old.hint,
+                minimizedAt: old.minimizedAt
+            )
+            changed = true
+        }
+        if changed { scheduleSave() }
+    }
+
     func agentSession(repoID: UUID, worktreeID: String, preferredTabID: UUID?) -> TerminalSession? {
         if let preferredTabID, let host = terminalHosts[preferredTabID] {
             return host.session
@@ -773,6 +809,13 @@ final class WorkspaceStore {
         _ = try? await ProcessRunner.run("git", args: ["-C", repo.path.path, "branch", "-D", worktree.branch])
         worktreePaths.invalidate(repoID: repo.id)
         worktreeStatusService.invalidate(repoID: repo.id)
+    }
+
+    func renameWorktreeReferences(repoID: UUID, oldBranch: String, newBranch: String) {
+        guard oldBranch != newBranch else { return }
+        for ws in workspaces {
+            ws.renameWorktreeReferences(repoID: repoID, oldBranch: oldBranch, newBranch: newBranch)
+        }
     }
 
     func removePanes(repoID: UUID, worktreeID: String) {
