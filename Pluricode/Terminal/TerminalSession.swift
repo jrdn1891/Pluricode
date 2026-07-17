@@ -189,6 +189,8 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     private var hoverTrackingArea: NSTrackingArea?
     private lazy var hoverObserver = HoverObserver { [weak self] hovering in self?.onHoverChange?(hovering) }
     private var metalCancellable: AnyCancellable?
+    private var scrollerFadeItem: DispatchWorkItem?
+    private let overlayScroller = OverlayScroller(frame: NSRect(x: 0, y: 0, width: 16, height: 64))
     private var firstResponderObservation: NSKeyValueObservation?
     private lazy var programCursorStyle: CursorStyle = getTerminal().options.cursorStyle
     private var applyingFocusCursorStyle = false
@@ -201,6 +203,20 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
         registerForDraggedTypes(registeredDraggedTypes + [.fileURL, .tiff, .png] + promiseTypes)
         metalCancellable = TerminalSettings.shared.$useMetalRenderer
             .sink { [weak self] _ in self?.applyMetalRenderer() }
+        subviews.compactMap { $0 as? NSScroller }.first?.isHidden = true
+        overlayScroller.translatesAutoresizingMaskIntoConstraints = false
+        overlayScroller.scrollerStyle = .overlay
+        overlayScroller.isHidden = true
+        overlayScroller.alphaValue = 0
+        overlayScroller.target = self
+        overlayScroller.action = #selector(overlayScrollerActivated)
+        addSubview(overlayScroller)
+        NSLayoutConstraint.activate([
+            overlayScroller.trailingAnchor.constraint(equalTo: trailingAnchor),
+            overlayScroller.topAnchor.constraint(equalTo: topAnchor),
+            overlayScroller.bottomAnchor.constraint(equalTo: bottomAnchor),
+            overlayScroller.widthAnchor.constraint(equalToConstant: NSScroller.scrollerWidth(for: .regular, scrollerStyle: .overlay)),
+        ])
     }
 
     required init?(coder: NSCoder) { super.init(coder: coder) }
@@ -262,6 +278,59 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
     private func applyMetalRenderer() {
         guard window != nil else { return }
         try? setUseMetal(TerminalSettings.shared.useMetalRenderer)
+        subviews = subviews.filter { $0 !== overlayScroller } + [overlayScroller]
+    }
+
+    override func scrolled(source: TerminalView, position: Double) {
+        super.scrolled(source: source, position: position)
+        flashScroller()
+    }
+
+    @objc private func overlayScrollerActivated() {
+        switch overlayScroller.hitPart {
+        case .knob:
+            scroll(toPosition: overlayScroller.doubleValue)
+        case .decrementPage:
+            pageUp()
+        case .incrementPage:
+            pageDown()
+        default:
+            break
+        }
+    }
+
+    private func flashScroller() {
+        guard canScroll, scrollPosition < 1 else { return }
+        overlayScroller.isEnabled = true
+        overlayScroller.doubleValue = scrollPosition
+        overlayScroller.knobProportion = scrollThumbsize
+        overlayScroller.isHidden = false
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            overlayScroller.animator().alphaValue = 1
+        }
+        scheduleScrollerFade()
+    }
+
+    private func scheduleScrollerFade() {
+        scrollerFadeItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in self?.fadeScrollerUnlessHovered() }
+        scrollerFadeItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: item)
+    }
+
+    private func fadeScrollerUnlessHovered() {
+        if let window, overlayScroller.frame.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) {
+            scheduleScrollerFade()
+            return
+        }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.25
+            overlayScroller.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            guard let self, self.overlayScroller.alphaValue == 0 else { return }
+            self.overlayScroller.isHidden = true
+        })
     }
 
     override func cursorStyleChanged(source: Terminal, newStyle: CursorStyle) {
@@ -394,6 +463,12 @@ private final class ActivityAwareTerminalView: LocalProcessTerminalView {
 
 func shellEscape(_ text: String) -> String {
     "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
+}
+
+private final class OverlayScroller: NSScroller {
+    override func draw(_ dirtyRect: NSRect) {
+        drawKnob()
+    }
 }
 
 private final class HoverObserver: NSResponder {
