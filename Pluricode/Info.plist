@@ -2,41 +2,41 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key>
-	<string>Pluricode</string>
 	<key>CFBundleDisplayName</key>
 	<string>Pluricode</string>
-	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.4.1</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>Pluricode</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.5</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
-	<key>NSMainStoryboardFile</key>
-	<string></string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Pluricode forwards microphone access to command-line tools you launch in its terminals (e.g. transcription or voice agents).</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Pluricode forwards camera access to command-line tools you launch in its terminals (e.g. demo recorders).</string>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>Pluricode forwards Automation access to command-line tools you launch in its terminals (e.g. osascript, AppleScript).</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Pluricode forwards Automation access to command-line tools you launch in its terminals (e.g. osascript, AppleScript).</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Pluricode forwards camera access to command-line tools you launch in its terminals (e.g. demo recorders).</string>
+	<key>NSMainStoryboardFile</key>
+	<string></string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Pluricode forwards microphone access to command-line tools you launch in its terminals (e.g. transcription or voice agents).</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 	<key>SUFeedURL</key>
 	<string>https://jrdn1891.github.io/Pluricode/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>CdxZRo6+Bh8okVpsZZRpcNpYql2luYhZLyIZ5GQd5FY=</string>
-	<key>SUEnableAutomaticChecks</key>
-	<true/>
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 </dict>
