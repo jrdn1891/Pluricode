@@ -56,7 +56,7 @@ final class NotchController: NSObject {
         let hosting = NotchHostingView(rootView: NotchView(store: store, monitor: monitor, model: model))
         hosting.autoresizingMask = [.width, .height]
         let panel = NotchPanel(
-            contentRect: NSRect(x: 0, y: 0, width: NotchMetrics.minCollapsedBodyWidth, height: 60),
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 60),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -98,7 +98,10 @@ final class NotchController: NSObject {
         let topInset = hasNotch
             ? screen.safeAreaInsets.top
             : screen.frame.maxY - screen.visibleFrame.maxY
-        model.geometry = NotchGeometry(topInset: topInset, hasNotch: hasNotch)
+        let left = screen.auxiliaryTopLeftArea?.width ?? 0
+        let right = screen.auxiliaryTopRightArea?.width ?? 0
+        let cameraWidth = hasNotch ? screen.frame.width - left - right : 0
+        model.geometry = NotchGeometry(topInset: topInset, hasNotch: hasNotch, cameraWidth: cameraWidth)
 
         let topRadius = model.isExpanded ? NotchMetrics.expandedTopRadius : NotchMetrics.collapsedTopRadius
         let bodyWidth: CGFloat
@@ -106,13 +109,8 @@ final class NotchController: NSObject {
         if model.isExpanded {
             bodyWidth = NotchMetrics.expandedBodyWidth
             contentHeight = NotchMetrics.expandedContentHeight
-        } else if hasNotch {
-            let left = screen.auxiliaryTopLeftArea?.width ?? 0
-            let right = screen.auxiliaryTopRightArea?.width ?? 0
-            bodyWidth = max(screen.frame.width - left - right, NotchMetrics.minCollapsedBodyWidth)
-            contentHeight = NotchMetrics.collapsedHang
         } else {
-            bodyWidth = NotchMetrics.minCollapsedBodyWidth
+            bodyWidth = cameraWidth + NotchMetrics.mascotEar * 2
             contentHeight = NotchMetrics.collapsedHang
         }
         let width = bodyWidth + topRadius * 2

@@ -8,12 +8,14 @@ enum NotchMetrics {
     static let collapsedHang: CGFloat = 0
     static let expandedContentHeight: CGFloat = 420
     static let expandedBodyWidth: CGFloat = 360
-    static let minCollapsedBodyWidth: CGFloat = 180
+    static let mascotEar: CGFloat = 34
+    static let collapsedMascotSize: CGFloat = 16
 }
 
 struct NotchGeometry: Equatable {
     var topInset: CGFloat = 0
     var hasNotch: Bool = false
+    var cameraWidth: CGFloat = 0
 }
 
 @Observable
@@ -81,12 +83,12 @@ struct NotchView: View {
         Group {
             if model.isExpanded {
                 expanded(overview)
+                    .padding(.horizontal, topRadius)
             } else {
-                Color.clear
+                collapsed()
+                    .padding(.horizontal, topRadius)
             }
         }
-        .padding(.top, model.geometry.topInset)
-        .padding(.horizontal, topRadius)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background { Color.black.padding(-50) }
         .mask { NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius) }
@@ -116,15 +118,27 @@ struct NotchView: View {
         }
     }
 
+    private func collapsed() -> some View {
+        mascotBand()
+    }
+
+    private func mascotBand() -> some View {
+        PluriMascotView(size: NotchMetrics.collapsedMascotSize)
+            .offset(x: model.geometry.cameraWidth / 2 + NotchMetrics.mascotEar / 2)
+            .frame(maxWidth: .infinity)
+            .frame(height: model.geometry.topInset)
+    }
+
     private func expanded(_ overview: AgentOverview) -> some View {
         VStack(spacing: 0) {
+            mascotBand()
             HStack(spacing: 16) {
                 counter(overview.working, color: .blue, symbol: "circle.fill")
                 counter(overview.waiting, color: .orange, symbol: "exclamationmark.circle.fill", emphasize: true)
                 counter(overview.idle, color: Color.secondary, symbol: "circle")
                 Spacer()
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 10)
             .padding(.vertical, 8)
             Divider().overlay(Color.white.opacity(0.12))
             if overview.groups.isEmpty {
