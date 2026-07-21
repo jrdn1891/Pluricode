@@ -6,7 +6,7 @@ enum NotchMetrics {
     static let expandedTopRadius: CGFloat = 13
     static let expandedBottomRadius: CGFloat = 22
     static let collapsedHang: CGFloat = 0
-    static let expandedContentHeight: CGFloat = 420
+    static let expandedContentHeight: CGFloat = 210
     static let expandedBodyWidth: CGFloat = 360
     static let mascotEar: CGFloat = 34
     static let collapsedMascotSize: CGFloat = 16
