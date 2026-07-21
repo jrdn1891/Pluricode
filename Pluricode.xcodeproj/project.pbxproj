@@ -9,8 +9,10 @@
 /* Begin PBXBuildFile section */
 		06326AFE850E788295307D48 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742F16B907FA39DBB0114F60 /* Theme.swift */; };
 		07587D98DC7B2F5EF8635D93 /* PluriSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A046DDFC2D686C469E21BA43 /* PluriSession.swift */; };
+		084AB90DBE7D019EC55C0115 /* NotchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F05C2AD97CA80D9DF1AF56BA /* NotchView.swift */; };
 		0AA7F4FACDF7353E5E86EC24 /* DirectoryWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15565F890172CEB6B07AA56A /* DirectoryWatcher.swift */; };
 		0ABBDE650077385E661ECD1B /* ProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69A3E23A2A5CE1735F8D522D /* ProcessRunner.swift */; };
+		0C71EB7039F8E2F78EF0C635 /* AgentOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A223496F77112C9CAADE933 /* AgentOverview.swift */; };
 		0DC403F2FCB7A4D30384AEB7 /* NewWorkspaceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */; };
 		149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E37A72F9CD0A1326611CB3C /* Worktree.swift */; };
 		14F9FF119D799707FCEF2F08 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9800670AB5C4F9EF61E843E /* Updater.swift */; };
@@ -59,6 +61,7 @@
 		AFE23BE23AAB889F92202451 /* LocalHostRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49CBB28DBEB1E236A8D06740 /* LocalHostRegistry.swift */; };
 		B6E37DE9AFF07D74294B1F49 /* PluriSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96512E0F34E744DEFE098223 /* PluriSettings.swift */; };
 		B96489B35C3F17B8A9FD1F22 /* PluriPairing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065515018075EF79019CB7AA /* PluriPairing.swift */; };
+		BAA834CC35DE264281655476 /* NotchController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD78B92CABC5FB0A761229B /* NotchController.swift */; };
 		C3E20C407416C65B86E7C30F /* PluriChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BD77080A2D11D1A0C7F167 /* PluriChatView.swift */; };
 		C878C31C08E33B2454F9E6DE /* LocalHostsWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98D4FD99941538CCD095F8FC /* LocalHostsWidgetView.swift */; };
 		CAFE3849F50A463074800322 /* RepoSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBB6C15034E6056127A0B82 /* RepoSidebarView.swift */; };
@@ -81,6 +84,7 @@
 		00BD77080A2D11D1A0C7F167 /* PluriChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriChatView.swift; sourceTree = "<group>"; };
 		04A3591F4D52D920EBF984E5 /* PermissionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsService.swift; sourceTree = "<group>"; };
 		065515018075EF79019CB7AA /* PluriPairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriPairing.swift; sourceTree = "<group>"; };
+		0A223496F77112C9CAADE933 /* AgentOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentOverview.swift; sourceTree = "<group>"; };
 		0E105E5A80CFDC4A1D8A36A8 /* RepoConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepoConfig.swift; sourceTree = "<group>"; };
 		0F6723A6A2AD807D7B9378D1 /* WorktreeStatusService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorktreeStatusService.swift; sourceTree = "<group>"; };
 		15565F890172CEB6B07AA56A /* DirectoryWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryWatcher.swift; sourceTree = "<group>"; };
@@ -90,6 +94,7 @@
 		2701F83AE83DE7286C13ED90 /* PinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinStore.swift; sourceTree = "<group>"; };
 		2930668F5C69CC2A8017FAD8 /* PluriServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriServer.swift; sourceTree = "<group>"; };
 		311D5BA84A083B24731CB565 /* TerminalSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSession.swift; sourceTree = "<group>"; };
+		3BD78B92CABC5FB0A761229B /* NotchController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchController.swift; sourceTree = "<group>"; };
 		3FC9D8BDCC278B049082D355 /* PluriModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriModels.swift; sourceTree = "<group>"; };
 		432F1B21B466B030EA0F8AA3 /* PluriChatBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriChatBackend.swift; sourceTree = "<group>"; };
 		45E91297C034C82CF173906F /* TaskPaneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskPaneView.swift; sourceTree = "<group>"; };
@@ -133,6 +138,7 @@
 		D73E8B37818B718BE8D743D3 /* TerminalSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSettings.swift; sourceTree = "<group>"; };
 		D79713EC727834622CEEF2EF /* TaskListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskListStore.swift; sourceTree = "<group>"; };
 		E51531C29C12EE1422D22A11 /* PluriServerSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriServerSettingsView.swift; sourceTree = "<group>"; };
+		F05C2AD97CA80D9DF1AF56BA /* NotchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchView.swift; sourceTree = "<group>"; };
 		F1AE508972402DF38CAFBF8F /* WorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceView.swift; sourceTree = "<group>"; };
 		F591025ADD66235E64D75352 /* PluriTaskRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriTaskRegistry.swift; sourceTree = "<group>"; };
 		F6AFDED7F57A3194994FA945 /* LocalPluriBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPluriBackend.swift; sourceTree = "<group>"; };
@@ -157,6 +163,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		11415DB38AE085C912E92D4C /* Notch */ = {
+			isa = PBXGroup;
+			children = (
+				0A223496F77112C9CAADE933 /* AgentOverview.swift */,
+				3BD78B92CABC5FB0A761229B /* NotchController.swift */,
+				F05C2AD97CA80D9DF1AF56BA /* NotchView.swift */,
+			);
+			path = Notch;
+			sourceTree = "<group>";
+		};
 		145B0E32D3C6D3E615657E49 /* CommandPalette */ = {
 			isa = PBXGroup;
 			children = (
@@ -327,6 +343,7 @@
 				742F16B907FA39DBB0114F60 /* Theme.swift */,
 				145B0E32D3C6D3E615657E49 /* CommandPalette */,
 				D05E9F1DFAAA2D4E739BC72D /* Model */,
+				11415DB38AE085C912E92D4C /* Notch */,
 				4003EE5707EC74A3735B719F /* Permissions */,
 				6A393B1FBDCC071EAA477633 /* Pluri */,
 				558E3CCEDDBF1FBDEA742319 /* Sidebar */,
@@ -452,6 +469,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0C71EB7039F8E2F78EF0C635 /* AgentOverview.swift in Sources */,
 				A7474169AFC652EE29ABF746 /* AttachmentChipsOverlay.swift in Sources */,
 				820CCAAFAB80B9E444259E54 /* BrowserHost.swift in Sources */,
 				6FBDD4B05827295807F38FCC /* BrowserPaneView.swift in Sources */,
@@ -464,6 +482,8 @@
 				C878C31C08E33B2454F9E6DE /* LocalHostsWidgetView.swift in Sources */,
 				7CD5777DFC34036271680768 /* LocalPluriBackend.swift in Sources */,
 				0DC403F2FCB7A4D30384AEB7 /* NewWorkspaceSheet.swift in Sources */,
+				BAA834CC35DE264281655476 /* NotchController.swift in Sources */,
+				084AB90DBE7D019EC55C0115 /* NotchView.swift in Sources */,
 				1FF2534862D523B586A00545 /* PermissionsService.swift in Sources */,
 				93E709A761D2947E0F687A71 /* PermissionsView.swift in Sources */,
 				585484B172F60EB3A21E8D7C /* PinStore.swift in Sources */,
