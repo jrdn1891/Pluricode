@@ -1,10 +1,18 @@
 import Foundation
 import Observation
 
+struct WorkerState: Equatable {
+    var status: WorkerStatus
+    var message: String?
+    var activity: String?
+    var changedAt: Date
+}
+
 @MainActor
 @Observable
 final class PluriMonitor {
-    private(set) var statuses: [String: WorkerStatus] = [:]
+    private(set) var statuses: [String: WorkerState] = [:]
+    var onWaiting: ((String) -> Void)?
 
     private let registry: PluriTaskRegistry
     private let session: PluriSession
@@ -43,26 +51,69 @@ final class PluriMonitor {
         let hook_event_name: String
         let cwd: String
         let message: String?
+        let tool_name: String?
+        let tool_input: ToolInput?
+
+        struct ToolInput: Decodable {
+            let file_path: String?
+            let command: String?
+        }
     }
 
     private func handle(_ event: HookEvent) {
         let path = URL(fileURLWithPath: event.cwd).standardizedFileURL.path
-        let status: WorkerStatus
-        switch event.hook_event_name {
-        case "SessionStart", "UserPromptSubmit": status = .running
-        case "Notification": status = .waiting
-        case "Stop": status = .done
-        case "SessionEnd":
+        if event.hook_event_name == "SessionEnd" {
             statuses.removeValue(forKey: path)
             return
-        default:
-            return
         }
-        guard statuses[path] != status else { return }
-        statuses[path] = status
-        guard let task = registry.updateStatus(status, message: event.message, atWorktreePath: path) else { return }
-        if status == .done {
+        let status: WorkerStatus
+        switch event.hook_event_name {
+        case "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse": status = .running
+        case "Notification": status = .waiting
+        case "Stop": status = .done
+        default: return
+        }
+        let previousStatus = statuses[path]?.status
+        let statusChanged = previousStatus != status
+        var state = statuses[path] ?? WorkerState(status: status, message: nil, activity: nil, changedAt: Date())
+        state.status = status
+        switch event.hook_event_name {
+        case "PreToolUse": state.activity = Self.activity(for: event)
+        case "PostToolUse": state.activity = nil
+        case "SessionStart", "UserPromptSubmit": state.activity = nil; state.message = nil
+        case "Notification": state.message = event.message
+        case "Stop": state.activity = nil
+        default: break
+        }
+        if statusChanged { state.changedAt = Date() }
+        guard statuses[path] != state else { return }
+        statuses[path] = state
+        if statusChanged, status == .waiting { onWaiting?(path) }
+        if statusChanged, let task = registry.updateStatus(status, message: event.message, atWorktreePath: path), status == .done {
             session.postEvent("[worker update] \(task.repoName) / \(task.branch): done — the worker finished its turn.")
+        }
+    }
+
+    private static func activity(for event: HookEvent) -> String? {
+        guard let tool = event.tool_name else { return nil }
+        let file = event.tool_input?.file_path.map { ($0 as NSString).lastPathComponent }
+        switch tool {
+        case "Edit", "MultiEdit", "Write", "NotebookEdit":
+            return file.map { "Editing \($0)" } ?? "Editing"
+        case "Read", "NotebookRead":
+            return file.map { "Reading \($0)" } ?? "Reading"
+        case "Bash":
+            guard let command = event.tool_input?.command else { return "Running command" }
+            let firstLine = command.split(separator: "\n").first.map(String.init) ?? command
+            return "Running " + (firstLine.count > 36 ? firstLine.prefix(36) + "…" : firstLine)
+        case "Grep", "Glob":
+            return "Searching"
+        case "Task":
+            return "Delegating"
+        case "WebFetch", "WebSearch":
+            return "Browsing"
+        default:
+            return tool
         }
     }
 }

@@ -10,6 +10,8 @@ struct PluricodeApp: App {
     @State private var pluriMonitor: PluriMonitor
     @State private var pluriBackend: LocalPluriBackend
     @State private var pluriServer: PluriServer
+    @State private var notch: NotchController
+    @AppStorage("notchEnabled") private var notchEnabled = true
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showPalette = false
     @State private var creatingWorkspace = false
@@ -37,11 +39,13 @@ struct PluricodeApp: App {
             registry: registry
         )
         let backend = LocalPluriBackend(session: session, bridge: bridge, registry: registry)
-        _pluriMonitor = State(initialValue: PluriMonitor(registry: registry, session: session))
+        let monitor = PluriMonitor(registry: registry, session: session)
+        _pluriMonitor = State(initialValue: monitor)
         _pluriBackend = State(initialValue: backend)
         _pluriServer = State(initialValue: PluriServer(backend: backend))
+        _notch = State(initialValue: NotchController(store: store, monitor: monitor))
         bridge.start()
-        pluriMonitor.start()
+        monitor.start()
     }
 
     var body: some Scene {
@@ -87,9 +91,13 @@ struct PluricodeApp: App {
             .navigationTitle(workspaceStore.selectedWorkspace?.name ?? "Pluricode")
             .onAppear {
                 (AppearanceMode(rawValue: appearanceModeRaw) ?? .system).apply()
+                notch.install(enabled: notchEnabled)
             }
             .onChange(of: appearanceModeRaw) { _, newValue in
                 (AppearanceMode(rawValue: newValue) ?? .system).apply()
+            }
+            .onChange(of: notchEnabled) { _, enabled in
+                notch.apply(enabled: enabled)
             }
             .sheet(isPresented: $showPalette) {
                 CommandPaletteView(

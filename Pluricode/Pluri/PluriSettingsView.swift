@@ -2,16 +2,35 @@ import SwiftUI
 
 struct PluriSettingsView: View {
     @ObservedObject private var settings = PluriSettings.shared
+    @AppStorage("notchEnabled") private var notchEnabled = true
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 commandRow
                 workerSetupScriptRow
+                notchRow
             }
             .padding(20)
         }
         .frame(width: 540, height: 520)
+    }
+
+    private var notchRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle(isOn: $notchEnabled) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Notch").font(.headline)
+                    Text("Show a status panel at the notch that tracks your agents across workspaces and alerts you when one needs input.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var commandRow: some View {

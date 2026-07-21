@@ -16,4 +16,5 @@ xcodebuild -project Pluricode.xcodeproj -scheme Pluricode -configuration Debug \
 /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'Pluricode Dev'" "$APP/Contents/Info.plist"
 codesign --force --deep --sign "$SIGN_ID" "$APP"
 
+pkill -f "$APP/Contents/MacOS/Pluricode" || true
 open -n "$APP"

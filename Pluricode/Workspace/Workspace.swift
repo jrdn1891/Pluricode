@@ -747,6 +747,11 @@ final class WorkspaceStore {
         return nil
     }
 
+    func agentSession(repoID: UUID, branch: String) -> TerminalSession? {
+        guard let (ws, _, tabID) = workerPane(repoID: repoID, branch: branch) else { return nil }
+        return ws.terminalHosts[tabID]?.session
+    }
+
     @discardableResult
     func focusWorkerPane(repoID: UUID, branch: String) -> Bool {
         guard let (ws, paneID, tabID) = workerPane(repoID: repoID, branch: branch) else { return false }

@@ -15,7 +15,7 @@ enum WorkerHooks {
         let events = eventsDir.path
         let command = "f=\"$(/usr/bin/uuidgen)\" && cat > \"\(events)/$f.tmp\" && mv \"\(events)/$f.tmp\" \"\(events)/$f.json\""
         let hook: [String: Any] = ["hooks": [["type": "command", "command": command]]]
-        let names = ["SessionStart", "UserPromptSubmit", "Notification", "Stop", "SessionEnd"]
+        let names = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Notification", "Stop", "SessionEnd"]
         let settings: [String: Any] = ["hooks": names.reduce(into: [String: Any]()) { $0[$1] = [hook] }]
         try? FileManager.default.createDirectory(at: claudeDir, withIntermediateDirectories: true)
         if let data = try? JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys]) {

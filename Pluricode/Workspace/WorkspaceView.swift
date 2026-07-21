@@ -1179,7 +1179,7 @@ private struct PaneHeader: View {
 
     private var workerStatus: WorkerStatus? {
         guard let monitor, let path = workspace.worktreePath(tabID: tabID) else { return nil }
-        return monitor.statuses[URL(fileURLWithPath: path).standardizedFileURL.path]
+        return monitor.statuses[URL(fileURLWithPath: path).standardizedFileURL.path]?.status
     }
 
     var body: some View {
