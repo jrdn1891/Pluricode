@@ -3,12 +3,12 @@
   <channel>
     <title>Pluricode</title>
     <item>
-      <title>1.5</title>
-      <pubDate>Fri, 17 Jul 2026 16:20:40 +0000</pubDate>
-      <sparkle:version>216</sparkle:version>
-      <sparkle:shortVersionString>1.5</sparkle:shortVersionString>
+      <title>1.6</title>
+      <pubDate>Tue, 21 Jul 2026 13:41:55 +0000</pubDate>
+      <sparkle:version>225</sparkle:version>
+      <sparkle:shortVersionString>1.6</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/jrdn1891/Pluricode/releases/download/v1.5/Pluricode-1.5.dmg" sparkle:edSignature="6sgkzlZSnAd6l2+HKrlVO1mYmHX0t2FaM4Vspj4+GY//ex6Cv36LkFbQgBIePJHyY4jTd6eudkTORx8XKrTEBw==" length="8701634" type="application/octet-stream" />
+      <enclosure url="https://github.com/jrdn1891/Pluricode/releases/download/v1.6/Pluricode-1.6.dmg" sparkle:edSignature="xMWTUp5G/sICKYUACm/eMYP9SzpLZdh8NoItqDaWXOnrBrVYi8girRvAMxqH5B8DJ/Rx71qs+1Blk9/fhqVHCQ==" length="8960344" type="application/octet-stream" />
     </item>
     <item>
       <title>1.5-nightly.20260718+893d243</title>
