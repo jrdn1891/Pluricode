@@ -77,23 +77,28 @@ struct NotchView: View {
     private var bottomRadius: CGFloat {
         model.isExpanded ? NotchMetrics.expandedBottomRadius : NotchMetrics.collapsedBottomRadius
     }
+    private var bodyWidth: CGFloat {
+        model.isExpanded
+            ? NotchMetrics.expandedBodyWidth
+            : model.geometry.cameraWidth + NotchMetrics.mascotEar * 2
+    }
+    private var shapeHeight: CGFloat {
+        model.geometry.topInset + (model.isExpanded ? NotchMetrics.expandedContentHeight : 0)
+    }
 
     var body: some View {
         let overview = AgentOverview.build(workspaces: store.workspaces, statuses: monitor.statuses)
         Group {
             if model.isExpanded {
                 expanded(overview)
-                    .padding(.horizontal, topRadius)
             } else {
                 collapsed()
-                    .padding(.horizontal, topRadius)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, topRadius)
+        .frame(width: bodyWidth + topRadius * 2, height: shapeHeight, alignment: .top)
         .background { Color.black.padding(-50) }
         .mask { NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius) }
-        .ignoresSafeArea()
-        .environment(\.colorScheme, .dark)
         .onChange(of: model.selectedAgentID) { _, id in
             inputFocused = id != nil
         }
@@ -105,6 +110,9 @@ struct NotchView: View {
             isHovering = hovering
             updateExpansion()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .ignoresSafeArea()
+        .environment(\.colorScheme, .dark)
     }
 
     private func updateExpansion() {

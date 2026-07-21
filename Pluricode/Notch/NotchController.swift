@@ -45,7 +45,7 @@ final class NotchController: NSObject {
     func apply(enabled: Bool) {
         guard let panel else { return }
         if enabled {
-            layout(animated: false)
+            layout()
             panel.orderFrontRegardless()
         } else {
             panel.orderOut(nil)
@@ -74,12 +74,10 @@ final class NotchController: NSObject {
 
     private func trackModel() {
         withObservationTracking {
-            _ = model.isExpanded
             _ = model.selectedAgentID
         } onChange: { [weak self] in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.layout(animated: true)
                 if self.model.selectedAgentID != nil {
                     self.panel?.makeKeyAndOrderFront(nil)
                 }
@@ -89,10 +87,10 @@ final class NotchController: NSObject {
     }
 
     @objc private func screenChanged() {
-        layout(animated: false)
+        layout()
     }
 
-    private func layout(animated: Bool) {
+    private func layout() {
         guard let panel, let screen = notchScreen() else { return }
         let hasNotch = screen.safeAreaInsets.top > 0
         let topInset = hasNotch
@@ -103,25 +101,15 @@ final class NotchController: NSObject {
         let cameraWidth = hasNotch ? screen.frame.width - left - right : 0
         model.geometry = NotchGeometry(topInset: topInset, hasNotch: hasNotch, cameraWidth: cameraWidth)
 
-        let topRadius = model.isExpanded ? NotchMetrics.expandedTopRadius : NotchMetrics.collapsedTopRadius
-        let bodyWidth: CGFloat
-        let contentHeight: CGFloat
-        if model.isExpanded {
-            bodyWidth = NotchMetrics.expandedBodyWidth
-            contentHeight = NotchMetrics.expandedContentHeight
-        } else {
-            bodyWidth = cameraWidth + NotchMetrics.mascotEar * 2
-            contentHeight = NotchMetrics.collapsedHang
-        }
-        let width = bodyWidth + topRadius * 2
-        let height = topInset + contentHeight
+        let width = NotchMetrics.expandedBodyWidth + NotchMetrics.expandedTopRadius * 2 + 40
+        let height = topInset + NotchMetrics.expandedContentHeight + 40
         let frame = NSRect(
             x: screen.frame.midX - width / 2,
             y: screen.frame.maxY - height,
             width: width,
             height: height
         )
-        panel.setFrame(frame, display: true, animate: animated && panel.isVisible)
+        panel.setFrame(frame, display: true)
     }
 
     private func notchScreen() -> NSScreen? {
