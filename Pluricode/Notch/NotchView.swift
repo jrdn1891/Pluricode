@@ -167,7 +167,7 @@ struct NotchView: View {
                 .fill(row.state?.status.color ?? Color(nsColor: .tertiaryLabelColor))
                 .frame(width: 7, height: 7)
                 .padding(.top, 4)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(row.label)
                     .font(.system(size: 12, weight: .medium))
                 if let detail = row.detail {
@@ -175,6 +175,13 @@ struct NotchView: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
+                }
+                if row.state?.status == .waiting {
+                    HStack(spacing: 6) {
+                        quickButton("Allow", color: .green) { sendKeys(to: row, "\r") }
+                        quickButton("Deny", color: Color(nsColor: .systemRed)) { sendKeys(to: row, "\u{1b}") }
+                    }
+                    .padding(.top, 1)
                 }
             }
             Spacer(minLength: 6)
@@ -227,6 +234,22 @@ struct NotchView: View {
         guard !text.isEmpty else { return }
         store.agentSession(repoID: row.repoID, branch: row.branch)?.submit(text)
         draft = ""
+    }
+
+    private func sendKeys(to row: AgentRow, _ keys: String) {
+        store.agentSession(repoID: row.repoID, branch: row.branch)?.sendKeys(keys)
+    }
+
+    private func quickButton(_ title: String, color: Color, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(color)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(color.opacity(0.18), in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func selectedRow(_ overview: AgentOverview) -> AgentRow? {

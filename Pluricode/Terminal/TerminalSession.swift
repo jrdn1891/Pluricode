@@ -111,6 +111,10 @@ final class TerminalSession: NSObject, LocalProcessTerminalViewDelegate, Observa
         }
     }
 
+    func sendKeys(_ keys: String) {
+        terminalView.process?.send(data: Array(keys.utf8)[...])
+    }
+
     func sendMarkup(note: String, imagePath: String) {
         let escaped = shellEscape(imagePath)
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
