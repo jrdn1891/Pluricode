@@ -117,7 +117,6 @@ final class NotchController: NSObject {
     }
 
     private func agentWentWaiting(_ path: String) {
-        model.isExpanded = true
         guard let row = agentRow(forPath: path) else { return }
         let content = UNMutableNotificationContent()
         content.title = "\(row.branch) needs your input"

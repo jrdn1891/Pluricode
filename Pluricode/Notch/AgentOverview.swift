@@ -4,7 +4,6 @@ struct AgentRow: Identifiable {
     let id: String
     let repoID: UUID
     let branch: String
-    let label: String
     let state: WorkerState?
 
     var detail: String? {
@@ -17,12 +16,22 @@ struct AgentRow: Identifiable {
         guard let text, !text.isEmpty else { return nil }
         return text
     }
+
+    var priority: Int {
+        switch state?.status {
+        case .waiting: 0
+        case .running: 1
+        default: 2
+        }
+    }
 }
 
 struct WorkspaceGroup: Identifiable {
     let id: UUID
     let name: String
     let rows: [AgentRow]
+
+    var priority: Int { rows.map(\.priority).min() ?? 2 }
 }
 
 struct AgentOverview {
@@ -52,7 +61,7 @@ extension AgentOverview {
                         .standardizedFileURL.path
                     guard seen.insert(path).inserted else { continue }
                     let state = statuses[path]
-                    rows.append(AgentRow(id: path, repoID: repoID, branch: branch, label: branch, state: state))
+                    rows.append(AgentRow(id: path, repoID: repoID, branch: branch, state: state))
                     switch state?.status {
                     case .running: working += 1
                     case .waiting: waiting += 1
@@ -60,10 +69,15 @@ extension AgentOverview {
                     }
                 }
             }
-            if !rows.isEmpty {
-                groups.append(WorkspaceGroup(id: workspace.id, name: workspace.name, rows: rows))
-            }
+            guard !rows.isEmpty else { continue }
+            let ordered = rows.enumerated()
+                .sorted { ($0.element.priority, $0.offset) < ($1.element.priority, $1.offset) }
+                .map(\.element)
+            groups.append(WorkspaceGroup(id: workspace.id, name: workspace.name, rows: ordered))
         }
-        return AgentOverview(groups: groups, working: working, waiting: waiting, idle: idle)
+        let orderedGroups = groups.enumerated()
+            .sorted { ($0.element.priority, $0.offset) < ($1.element.priority, $1.offset) }
+            .map(\.element)
+        return AgentOverview(groups: orderedGroups, working: working, waiting: waiting, idle: idle)
     }
 }

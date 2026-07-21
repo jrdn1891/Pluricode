@@ -92,13 +92,14 @@ struct NotchView: View {
             if model.isExpanded {
                 expanded(overview)
             } else {
-                collapsed()
+                collapsed(overview)
             }
         }
         .padding(.horizontal, topRadius)
         .frame(width: bodyWidth + topRadius * 2, height: shapeHeight, alignment: .top)
         .background { Color.black.padding(-50) }
         .mask { NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius) }
+        .contentShape(NotchShape(topCornerRadius: topRadius, bottomCornerRadius: bottomRadius))
         .onChange(of: model.selectedAgentID) { _, id in
             inputFocused = id != nil
         }
@@ -126,8 +127,11 @@ struct NotchView: View {
         }
     }
 
-    private func collapsed() -> some View {
-        mascotBand()
+    private func collapsed(_ overview: AgentOverview) -> some View {
+        ZStack {
+            mascotBand()
+            collapsedBadge(overview)
+        }
     }
 
     private func mascotBand() -> some View {
@@ -135,6 +139,26 @@ struct NotchView: View {
             .offset(x: model.geometry.cameraWidth / 2 + NotchMetrics.mascotEar / 2)
             .frame(maxWidth: .infinity)
             .frame(height: model.geometry.topInset)
+    }
+
+    @ViewBuilder
+    private func collapsedBadge(_ overview: AgentOverview) -> some View {
+        if let signal = collapsedSignal(overview) {
+            Text("\(signal.count)")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: NotchMetrics.collapsedMascotSize, height: NotchMetrics.collapsedMascotSize)
+                .background(signal.color, in: Circle())
+                .offset(x: -(model.geometry.cameraWidth / 2 + NotchMetrics.mascotEar / 2))
+                .frame(maxWidth: .infinity)
+                .frame(height: model.geometry.topInset)
+        }
+    }
+
+    private func collapsedSignal(_ overview: AgentOverview) -> (color: Color, count: Int)? {
+        if overview.waiting > 0 { return (.orange, overview.waiting) }
+        if overview.working > 0 { return (.blue, overview.working) }
+        return nil
     }
 
     private func expanded(_ overview: AgentOverview) -> some View {
@@ -190,7 +214,7 @@ struct NotchView: View {
                 .frame(width: 7, height: 7)
                 .padding(.top, 4)
             VStack(alignment: .leading, spacing: 4) {
-                Text(row.label)
+                Text(row.branch)
                     .font(.system(size: 12, weight: .medium))
                 if let detail = row.detail {
                     Text(detail)
