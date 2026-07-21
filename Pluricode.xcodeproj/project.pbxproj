@@ -56,6 +56,7 @@
 		99EAA5BA43DBEFF39BC75180 /* TaskListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79713EC727834622CEEF2EF /* TaskListStore.swift */; };
 		9BA48262D7C491D52BC53471 /* TerminalSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868643F98C559E20E51603B7 /* TerminalSettingsView.swift */; };
 		A0CCAF61AEC9D24285FE50CF /* WorkerHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDCFE9F2C0F1978C8D2A101C /* WorkerHooks.swift */; };
+		17C422BEA3474FCBACFC0159 /* TranscriptReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33B799A249594AAE8C15E250 /* TranscriptReader.swift */; };
 		A6DFE38A4389E68A2314D9CF /* PluriTaskRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = F591025ADD66235E64D75352 /* PluriTaskRegistry.swift */; };
 		A7474169AFC652EE29ABF746 /* AttachmentChipsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 567B1387A9B6036FC0E00DA9 /* AttachmentChipsOverlay.swift */; };
 		AFE23BE23AAB889F92202451 /* LocalHostRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49CBB28DBEB1E236A8D06740 /* LocalHostRegistry.swift */; };
@@ -147,6 +148,7 @@
 		FC246AB1895B3F4814510E30 /* PluricodeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluricodeApp.swift; sourceTree = "<group>"; };
 		FCC7BCD7DE9AEC025D52DBD4 /* Pluricode.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pluricode.entitlements; sourceTree = "<group>"; };
 		FDCFE9F2C0F1978C8D2A101C /* WorkerHooks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkerHooks.swift; sourceTree = "<group>"; };
+		33B799A249594AAE8C15E250 /* TranscriptReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptReader.swift; sourceTree = "<group>"; };
 		FE8AB47F454F2441245C020A /* PairingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -243,6 +245,7 @@
 				96512E0F34E744DEFE098223 /* PluriSettings.swift */,
 				658E63739A71DF77F181FC44 /* PluriSettingsView.swift */,
 				F591025ADD66235E64D75352 /* PluriTaskRegistry.swift */,
+				33B799A249594AAE8C15E250 /* TranscriptReader.swift */,
 				FDCFE9F2C0F1978C8D2A101C /* WorkerHooks.swift */,
 			);
 			path = Pluri;
@@ -520,6 +523,7 @@
 				E4DA8CFC22DCB7A91DEC0918 /* TileView.swift in Sources */,
 				14F9FF119D799707FCEF2F08 /* Updater.swift in Sources */,
 				A0CCAF61AEC9D24285FE50CF /* WorkerHooks.swift in Sources */,
+				17C422BEA3474FCBACFC0159 /* TranscriptReader.swift in Sources */,
 				3CF42E98A3C2F985EE4A3FE4 /* Workspace.swift in Sources */,
 				E8CCF649FB23C81F5E17E9FF /* WorkspaceView.swift in Sources */,
 				149675CB65D121A6DC58AC1F /* Worktree.swift in Sources */,

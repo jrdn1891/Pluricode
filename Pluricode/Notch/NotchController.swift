@@ -102,7 +102,7 @@ final class NotchController: NSObject {
         model.geometry = NotchGeometry(topInset: topInset, hasNotch: hasNotch, cameraWidth: cameraWidth)
 
         let width = NotchMetrics.expandedBodyWidth + NotchMetrics.expandedTopRadius * 2 + 40
-        let height = topInset + NotchMetrics.expandedContentHeight + 40
+        let height = topInset + NotchMetrics.focusedContentHeight + 40
         let frame = NSRect(
             x: screen.frame.midX - width / 2,
             y: screen.frame.maxY - height,
