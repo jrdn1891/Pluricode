@@ -103,7 +103,8 @@ final class PluriMonitor {
     private func loadResponse(transcriptPath: String, worktreePath: String) {
         DispatchQueue.global(qos: .userInitiated).async {
             let url = URL(fileURLWithPath: transcriptPath)
-            for delay in Self.responseReadDelays {
+            let delays: [TimeInterval] = [0, 0.2, 0.4, 0.6, 0.8, 1, 1, 1.5, 1.5, 2]
+            for delay in delays {
                 if delay > 0 { Thread.sleep(forTimeInterval: delay) }
                 guard let text = TranscriptReader.lastAssistantText(at: url) else { continue }
                 Task { @MainActor [weak self] in
@@ -115,8 +116,6 @@ final class PluriMonitor {
             }
         }
     }
-
-    private static let responseReadDelays: [TimeInterval] = [0, 0.2, 0.4, 0.6, 0.8, 1, 1, 1.5, 1.5, 2]
 
     private static func activity(for event: HookEvent) -> String? {
         guard let tool = event.tool_name else { return nil }
