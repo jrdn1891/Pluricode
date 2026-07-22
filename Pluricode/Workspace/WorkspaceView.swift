@@ -693,14 +693,7 @@ private struct SimulatorContent: View {
                     Image(nsImage: frame)
                         .resizable()
                     if host.isLive, !host.markup.isMarkingUp {
-                        GeometryReader { geo in
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .gesture(SpatialTapGesture().onEnded { value in
-                                    host.sendTap(x: value.location.x / geo.size.width,
-                                                 y: value.location.y / geo.size.height)
-                                })
-                        }
+                        SimulatorInputView(host: host)
                     }
                     if host.markup.isMarkingUp {
                         MarkupSelectionOverlay(
@@ -878,6 +871,56 @@ private struct SimulatorEmptyState: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 24)
+    }
+}
+
+// Forwards mouse and keyboard input over the live device frame: a click taps, a drag swipes
+// (scroll / page switch), and typing goes to the device once the view has key focus.
+private struct SimulatorInputView: NSViewRepresentable {
+    let host: SimulatorHost
+
+    func makeNSView(context: Context) -> InputNSView {
+        let view = InputNSView()
+        view.host = host
+        return view
+    }
+
+    func updateNSView(_ nsView: InputNSView, context: Context) { nsView.host = host }
+
+    final class InputNSView: NSView {
+        weak var host: SimulatorHost?
+        private var downPoint: NSPoint?
+
+        override var isFlipped: Bool { true }          // top-left origin, matching device coordinates
+        override var acceptsFirstResponder: Bool { true }
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        private func normalized(_ p: NSPoint) -> (Double, Double) {
+            (Double(p.x / max(bounds.width, 1)), Double(p.y / max(bounds.height, 1)))
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            window?.makeFirstResponder(self)
+            downPoint = convert(event.locationInWindow, from: nil)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            guard let start = downPoint else { return }
+            downPoint = nil
+            let end = convert(event.locationInWindow, from: nil)
+            let (sx, sy) = normalized(start)
+            let (ex, ey) = normalized(end)
+            if hypot(end.x - start.x, end.y - start.y) < bounds.width * 0.02 {
+                host?.sendTap(x: ex, y: ey)
+            } else {
+                host?.sendSwipe(x0: sx, y0: sy, x1: ex, y1: ey)
+            }
+        }
+
+        override func keyDown(with event: NSEvent) {
+            guard let text = event.characters, !text.isEmpty else { return super.keyDown(with: event) }
+            host?.sendText(text)
+        }
     }
 }
 

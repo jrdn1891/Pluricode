@@ -13,8 +13,10 @@
 // Protocol:
 //   argv[1]   booted device UDID (or "booted" for the first booted simulator)
 //   stdout    length-prefixed frames: <4-byte big-endian uint32 length><JPEG bytes>
-//   stdin     "tap <fx> <fy>\n" — a tap at normalized (0..1) coordinates from the top-left.
-//             "home\n"          — a Home button press.
+//   stdin     "tap <fx> <fy>\n"                 — a tap at normalized (0..1) coordinates.
+//             "swipe <fx0> <fy0> <fx1> <fy1>\n" — a drag from one normalized point to another.
+//             "char <codepoint>\n"              — type one Unicode character.
+//             "home\n"                          — a Home button press.
 //             EOF closes the stream (clean shutdown when the parent goes away).
 //   stderr    human-readable logs
 //   env       DEVELOPER_DIR selects the Xcode whose CoreSimulator service to attach
@@ -95,6 +97,83 @@ static void homeButton(void) {
     });
 }
 
+// A drag is a touch-down, a run of interpolated moves, and a touch-up.
+static void swipe(double fx0, double fy0, double fx1, double fy1) {
+    unsigned w = atomic_load(&gScreenW), h = atomic_load(&gScreenH);
+    if (!gHID || !gIndigo || !w || !h) return;
+    CGSize s = CGSizeMake(w, h);
+    double x0 = fx0 * w, y0 = fy0 * h, x1 = fx1 * w, y1 = fy1 * h;
+    dispatch_async(gSendQueue, ^{
+        sendTouch(1, s, x0, y0);
+        usleep(16000);
+        int steps = 20;
+        for (int i = 1; i <= steps; i++) {
+            double t = (double)i / steps;
+            sendTouch(1, s, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
+            usleep(12000);
+        }
+        sendTouch(2, s, x1, y1);
+    });
+}
+
+// USB HID keyboard usage code for a Unicode character, plus whether Shift is needed.
+static int usbKeyForChar(unsigned c, BOOL *shift) {
+    *shift = NO;
+    if (c >= 'a' && c <= 'z') return 4 + (c - 'a');
+    if (c >= 'A' && c <= 'Z') { *shift = YES; return 4 + (c - 'A'); }
+    if (c >= '1' && c <= '9') return 30 + (c - '1');
+    switch (c) {
+        case '0': return 39;
+        case '\n': case '\r': return 40;      // Return
+        case 0x08: case 0x7f: return 42;      // Delete/Backspace
+        case '\t': return 43;
+        case ' ': return 44;
+        case '-': return 45;  case '_': *shift = YES; return 45;
+        case '=': return 46;  case '+': *shift = YES; return 46;
+        case '[': return 47;  case '{': *shift = YES; return 47;
+        case ']': return 48;  case '}': *shift = YES; return 48;
+        case '\\': return 49; case '|': *shift = YES; return 49;
+        case ';': return 51;  case ':': *shift = YES; return 51;
+        case '\'': return 52; case '"': *shift = YES; return 52;
+        case '`': return 53;  case '~': *shift = YES; return 53;
+        case ',': return 54;  case '<': *shift = YES; return 54;
+        case '.': return 55;  case '>': *shift = YES; return 55;
+        case '/': return 56;  case '?': *shift = YES; return 56;
+        case '!': *shift = YES; return 30;
+        case '@': *shift = YES; return 31;
+        case '#': *shift = YES; return 32;
+        case '$': *shift = YES; return 33;
+        case '%': *shift = YES; return 34;
+        case '^': *shift = YES; return 35;
+        case '&': *shift = YES; return 36;
+        case '*': *shift = YES; return 37;
+        case '(': *shift = YES; return 38;
+        case ')': *shift = YES; return 39;
+    }
+    return 0;
+}
+
+static void keyEvent(int direction, unsigned usb) {
+    NSData *msg = ((NSData *(*)(id, SEL, int, unsigned))objc_msgSend)(
+        gIndigo, sel_getUid("keyboardWithDirection:keyCode:"), direction, usb);
+    ((void(*)(id, SEL, void *, BOOL, dispatch_queue_t, void (^)(void)))objc_msgSend)(
+        gHID, sel_getUid("sendWithMessage:freeWhenDone:completionQueue:completion:"),
+        (void *)msg.bytes, NO, gSendQueue, ^{ (void)msg; });
+}
+
+static void sendCharacter(unsigned codepoint) {
+    if (!gHID || !gIndigo) return;
+    BOOL shift = NO;
+    int usb = usbKeyForChar(codepoint, &shift);
+    if (!usb) return;
+    dispatch_async(gSendQueue, ^{
+        if (shift) { keyEvent(1, 225); usleep(8000); }   // Left Shift down
+        keyEvent(1, usb); usleep(12000);
+        keyEvent(2, usb);
+        if (shift) { usleep(8000); keyEvent(2, 225); }   // Left Shift up
+    });
+}
+
 static NSString *developerDir(void) {
     char *env = getenv("DEVELOPER_DIR");
     return env ? [NSString stringWithUTF8String:env] : @"/Applications/Xcode.app/Contents/Developer";
@@ -171,6 +250,10 @@ int main(int argc, char **argv) { @autoreleasepool {
             NSArray<NSString *> *parts = [line componentsSeparatedByString:@" "];
             if (parts.count == 3 && [parts[0] isEqualToString:@"tap"])
                 tap(parts[1].doubleValue, parts[2].doubleValue);
+            else if (parts.count == 5 && [parts[0] isEqualToString:@"swipe"])
+                swipe(parts[1].doubleValue, parts[2].doubleValue, parts[3].doubleValue, parts[4].doubleValue);
+            else if (parts.count == 2 && [parts[0] isEqualToString:@"char"])
+                sendCharacter((unsigned)parts[1].integerValue);
             else if (parts.count == 1 && [parts[0] isEqualToString:@"home"])
                 homeButton();
         }

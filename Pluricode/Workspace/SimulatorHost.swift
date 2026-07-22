@@ -56,6 +56,21 @@ final class SimulatorHost {
         try? stdin.write(contentsOf: Data("tap \(fx) \(fy)\n".utf8))
     }
 
+    /// Drags from one normalized point to another (scroll / swipe), via the live helper.
+    func sendSwipe(x0: Double, y0: Double, x1: Double, y1: Double) {
+        guard let stdin = liveStdin else { return }
+        func c(_ v: Double) -> Double { min(max(v, 0), 1) }
+        try? stdin.write(contentsOf: Data("swipe \(c(x0)) \(c(y0)) \(c(x1)) \(c(y1))\n".utf8))
+    }
+
+    /// Types the characters of a string one Unicode scalar at a time, via the live helper.
+    func sendText(_ text: String) {
+        guard let stdin = liveStdin else { return }
+        for scalar in text.unicodeScalars {
+            try? stdin.write(contentsOf: Data("char \(scalar.value)\n".utf8))
+        }
+    }
+
     /// Presses the Home button, via the live helper.
     func sendHome() {
         try? liveStdin?.write(contentsOf: Data("home\n".utf8))
