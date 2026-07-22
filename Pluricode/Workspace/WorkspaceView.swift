@@ -186,6 +186,7 @@ private struct GhostPane: View {
         case .tasks: return "checklist"
         case .widget(let kind): return kind.systemImage
         case .browser: return "globe"
+        case .simulator: return "iphone"
         }
     }
 
@@ -200,6 +201,8 @@ private struct GhostPane: View {
         case .widget(let kind):
             return kind.label
         case .browser(_, let worktreeID, _):
+            return worktreeID
+        case .simulator(_, let worktreeID):
             return worktreeID
         }
     }
@@ -286,6 +289,14 @@ private struct TabBody: View {
                 repoID: repoID,
                 worktreeID: worktreeID,
                 url: url,
+                workspace: workspace
+            )
+        case .simulator(let repoID, let worktreeID):
+            SimulatorPaneBody(
+                pane: pane,
+                tabID: tab.id,
+                repoID: repoID,
+                worktreeID: worktreeID,
                 workspace: workspace
             )
         }
@@ -391,12 +402,12 @@ private struct BrowserContent: View {
             if url == nil, host?.currentURL == nil {
                 BrowserEmptyState()
             }
-            if let host, host.isMarkingUp {
+            if let host, host.markup.isMarkingUp {
                 MarkupSelectionOverlay(
-                    host: host,
+                    markup: host.markup,
                     agentAvailable: agentAvailable,
                     onSend: sendMarkup,
-                    onCancel: host.cancelMarkup
+                    onCancel: host.markup.cancel
                 )
             }
         }
@@ -405,13 +416,13 @@ private struct BrowserContent: View {
     private func sendMarkup() {
         guard let host,
               let session = workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID) else { return }
-        let rects = host.markupRects
-        let note = host.markupNote
+        let rects = host.markup.rects
+        let note = host.markup.note
         host.captureSnapshot { image in
             guard let image,
-                  let path = BrowserHost.writeTempPNG(BrowserHost.annotate(image, rects: rects)) else { return }
+                  let path = Markup.writeTempPNG(Markup.annotate(image, rects: rects)) else { return }
             session.sendMarkup(note: note, imagePath: path)
-            host.cancelMarkup()
+            host.markup.cancel()
         }
     }
 }
@@ -465,7 +476,7 @@ private struct BrowserHeader: View {
             Button(action: toggleMarkup) {
                 Image(systemName: "pencil.tip.crop.circle")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle((host?.isMarkingUp == true) ? Color.accentColor : .secondary)
+                    .foregroundStyle((host?.markup.isMarkingUp == true) ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
             .disabled(host == nil)
@@ -568,7 +579,7 @@ private struct BrowserHeader: View {
 
     private func toggleMarkup() {
         guard let host else { return }
-        if host.isMarkingUp { host.cancelMarkup() } else { host.beginMarkup() }
+        if host.markup.isMarkingUp { host.markup.cancel() } else { host.markup.begin() }
     }
 
     private func syncAddress() {
@@ -606,8 +617,263 @@ private struct BrowserEmptyState: View {
     }
 }
 
+private struct SimulatorPaneBody: View {
+    let pane: Pane
+    let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let workspace: Workspace
+
+    var body: some View {
+        let isExpanded = workspace.expandedPaneID == pane.id
+        VStack(alignment: .leading, spacing: 0) {
+            SimulatorHeader(
+                pane: pane,
+                tabID: tabID,
+                worktreeID: worktreeID,
+                repoName: workspace.repo(id: repoID)?.name,
+                repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
+                workspace: workspace,
+                isExpanded: isExpanded,
+                onExpand: {
+                    if isExpanded { workspace.collapseExpandedPane() }
+                    else { workspace.expandPane(paneID: pane.id) }
+                }
+            )
+            if isExpanded {
+                ExpandedPanePlaceholder()
+            } else {
+                GeometryReader { geo in
+                    SimulatorContent(tabID: tabID, repoID: repoID, worktreeID: worktreeID, workspace: workspace)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .overlay {
+                            if workspace.dragSession != nil {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onDrop(
+                                        of: [.plainText],
+                                        delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
+                                    )
+                            }
+                        }
+                }
+            }
+        }
+        .onAppear {
+            if workspace.simulatorHosts[tabID] == nil {
+                workspace.simulatorHosts[tabID] = SimulatorHost(
+                    tabID: tabID,
+                    repoID: repoID,
+                    worktreeID: worktreeID,
+                    originTabID: workspace.consumePendingPreviewOrigin(tabID: tabID)
+                )
+            }
+        }
+    }
+}
+
+private struct SimulatorContent: View {
+    let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let workspace: Workspace
+
+    private var host: SimulatorHost? { workspace.simulatorHosts[tabID] }
+
+    private var agentAvailable: Bool {
+        guard let host else { return false }
+        return workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID) != nil
+    }
+
+    var body: some View {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+            if let host, let frame = host.frame {
+                ZStack {
+                    Image(nsImage: frame)
+                        .resizable()
+                    if host.isLive, !host.markup.isMarkingUp {
+                        GeometryReader { geo in
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .gesture(SpatialTapGesture().onEnded { value in
+                                    host.sendTap(x: value.location.x / geo.size.width,
+                                                 y: value.location.y / geo.size.height)
+                                })
+                        }
+                    }
+                    if host.markup.isMarkingUp {
+                        MarkupSelectionOverlay(
+                            markup: host.markup,
+                            agentAvailable: agentAvailable,
+                            onSend: sendMarkup,
+                            onCancel: host.markup.cancel
+                        )
+                    }
+                }
+                .aspectRatio(frame.size.width / frame.size.height, contentMode: .fit)
+                .padding(8)
+            } else {
+                SimulatorEmptyState()
+            }
+        }
+    }
+
+    private func sendMarkup() {
+        guard let host, let frame = host.frame,
+              let session = workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID),
+              let path = Markup.writeTempPNG(Markup.annotate(frame, rects: host.markup.rects)) else { return }
+        session.sendMarkup(note: host.markup.note, imagePath: path)
+        host.markup.cancel()
+    }
+}
+
+private struct SimulatorExpandedContent: View {
+    let pane: Pane
+    let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let workspace: Workspace
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SimulatorHeader(
+                pane: pane,
+                tabID: tabID,
+                worktreeID: worktreeID,
+                repoName: workspace.repo(id: repoID)?.name,
+                repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
+                workspace: workspace,
+                isExpanded: true,
+                onExpand: { workspace.collapseExpandedPane() }
+            )
+            SimulatorContent(tabID: tabID, repoID: repoID, worktreeID: worktreeID, workspace: workspace)
+        }
+    }
+}
+
+private struct SimulatorHeader: View {
+    let pane: Pane
+    let tabID: UUID
+    let worktreeID: String
+    let repoName: String?
+    let repoColor: Color?
+    let workspace: Workspace
+    let isExpanded: Bool
+    let onExpand: () -> Void
+
+    private var host: SimulatorHost? { workspace.simulatorHosts[tabID] }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            dragHandle
+            Text(host?.deviceName ?? "No simulator")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(host?.deviceName == nil ? Color.secondary : Color.primary)
+            Spacer()
+            Button(action: toggleMarkup) {
+                Image(systemName: "pencil.tip.crop.circle")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle((host?.markup.isMarkingUp == true) ? Color.accentColor : .secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(host?.frame == nil)
+            .help("Mark up the simulator for this worktree's agent")
+            Button(action: onExpand) {
+                Image(systemName: isExpanded
+                    ? "arrow.down.right.and.arrow.up.left"
+                    : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(isExpanded ? "Collapse" : "Expand")
+            if !isExpanded, workspace.canMinimize(paneID: pane.id) {
+                Button(action: { workspace.minimizePane(paneID: pane.id) }) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Minimize pane")
+            }
+            if !isExpanded {
+                Button(action: { workspace.closeTab(paneID: pane.id, tabID: tabID) }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(headerBackground)
+        .contentShape(Rectangle())
+        .onTapGesture { workspace.setFocus(paneID: pane.id) }
+        .draggable(beginMoveDrag()) {
+            HStack(spacing: 6) {
+                Image(systemName: "iphone")
+                Text(worktreeID)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    private var dragHandle: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(repoColor ?? .accentColor)
+                .frame(width: 10, height: 10)
+            Image(systemName: "iphone")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+        }
+        .help(worktreeID)
+    }
+
+    private var headerBackground: Color {
+        if let repoColor { return repoColor.opacity(0.12) }
+        return Color.secondary.opacity(0.1)
+    }
+
+    private func toggleMarkup() {
+        guard let host else { return }
+        if host.markup.isMarkingUp { host.markup.cancel() } else { host.markup.begin() }
+    }
+
+    private func beginMoveDrag() -> TilingDragPayload {
+        let payload = TilingDragPayload(kind: .movePane(paneID: pane.id))
+        workspace.beginDrag(payload)
+        return payload
+    }
+}
+
+private struct SimulatorEmptyState: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "iphone")
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+            Text("Waiting for a booted simulator…")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text("Boot a device in Simulator.app or ask the agent to run one, and it will appear here.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 24)
+    }
+}
+
 private struct MarkupSelectionOverlay: View {
-    let host: BrowserHost
+    let markup: Markup
     let agentAvailable: Bool
     let onSend: () -> Void
     let onCancel: () -> Void
@@ -628,11 +894,11 @@ private struct MarkupSelectionOverlay: View {
                             }
                             .onEnded { value in
                                 let rect = normalizedRect(value.startLocation, value.location, geo.size)
-                                if rect.width > 0.004, rect.height > 0.004 { host.markupRects.append(rect) }
+                                if rect.width > 0.004, rect.height > 0.004 { markup.rects.append(rect) }
                                 current = nil
                             }
                     )
-                if host.markupRects.isEmpty, current == nil {
+                if markup.rects.isEmpty, current == nil {
                     Text("Drag to mark up an area")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -642,14 +908,14 @@ private struct MarkupSelectionOverlay: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                         .allowsHitTesting(false)
                 }
-                ForEach(Array(host.markupRects.enumerated()), id: \.offset) { _, rect in
+                ForEach(Array(markup.rects.enumerated()), id: \.offset) { _, rect in
                     box(rect, in: geo.size)
                 }
                 if let current {
                     box(current, in: geo.size)
                 }
-                if let anchor = host.markupRects.last {
-                    MarkupCommentField(host: host, agentAvailable: agentAvailable, onSend: onSend, onCancel: onCancel)
+                if let anchor = markup.rects.last {
+                    MarkupCommentField(markup: markup, agentAvailable: agentAvailable, onSend: onSend, onCancel: onCancel)
                         .frame(width: fieldWidth)
                         .offset(commentOffset(anchor, in: geo.size))
                 }
@@ -687,7 +953,7 @@ private struct MarkupSelectionOverlay: View {
 }
 
 private struct MarkupCommentField: View {
-    @Bindable var host: BrowserHost
+    @Bindable var markup: Markup
     let agentAvailable: Bool
     let onSend: () -> Void
     let onCancel: () -> Void
@@ -695,8 +961,8 @@ private struct MarkupCommentField: View {
     var body: some View {
         HStack(spacing: 6) {
             MarkupNoteField(
-                text: $host.markupNote,
-                focusToken: host.markupRects.count,
+                text: $markup.note,
+                focusToken: markup.rects.count,
                 onSubmit: { if agentAvailable { onSend() } },
                 onCancel: onCancel
             )
@@ -948,7 +1214,15 @@ private struct TerminalPaneBody: View {
                         originTabID: tabID,
                         nearPaneID: pane.id
                     )
-                }
+                },
+                onSimulator: SimulatorHost.simulatorInstalled ? {
+                    workspace.openSimulator(
+                        repoID: repoID,
+                        worktreeID: worktreeID,
+                        originTabID: tabID,
+                        nearPaneID: pane.id
+                    )
+                } : nil
             )
             if isExpanded {
                 ExpandedPanePlaceholder()
@@ -1168,6 +1442,7 @@ private struct PaneHeader: View {
     let onExpand: () -> Void
     let onClose: () -> Void
     let onPreview: (() -> Void)?
+    let onSimulator: (() -> Void)?
     @State private var devScript: String?
     @Environment(PluriMonitor.self) private var monitor: PluriMonitor?
 
@@ -1222,6 +1497,15 @@ private struct PaneHeader: View {
                 }
                 .buttonStyle(.plain)
                 .help("Preview this worktree's local server in a built-in browser")
+            }
+            if let onSimulator {
+                Button(action: onSimulator) {
+                    Image(systemName: "iphone")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Preview the iOS Simulator for this worktree's agent")
             }
             Button(action: onExpand) {
                 Image(systemName: isExpanded
@@ -1469,6 +1753,7 @@ private struct MinimizedPaneChip: View {
         case .tasks: "checklist"
         case .widget(let kind): kind.systemImage
         case .browser: "globe"
+        case .simulator: "iphone"
         }
     }
 
@@ -1481,6 +1766,7 @@ private struct MinimizedPaneChip: View {
         case .tasks(let listID): return workspace.taskListStore.list(id: listID)?.name ?? "Tasks"
         case .widget(let kind): return kind.label
         case .browser(_, let worktreeID, _): return worktreeID
+        case .simulator(_, let worktreeID): return worktreeID
         }
     }
 }
@@ -1552,6 +1838,14 @@ private struct ExpandedPaneCard: View {
                 url: url,
                 workspace: workspace
             )
+        case .simulator(let repoID, let worktreeID):
+            SimulatorExpandedContent(
+                pane: pane,
+                tabID: pane.activeTabID,
+                repoID: repoID,
+                worktreeID: worktreeID,
+                workspace: workspace
+            )
         case .tasks, .widget:
             EmptyView()
         }
@@ -1578,7 +1872,8 @@ private struct TerminalExpandedContent: View {
                 onActivate: { workspace.setFocus(paneID: pane.id) },
                 onExpand: { workspace.collapseExpandedPane() },
                 onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) },
-                onPreview: nil
+                onPreview: nil,
+                onSimulator: nil
             )
             if let targetID = workspace.stubTabs[tabID] {
                 SessionMovedBody(

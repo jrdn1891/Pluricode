@@ -22,6 +22,7 @@ xcodebuild -project Pluricode.xcodeproj -scheme Pluricode -configuration Release
 
 BUILD_NUMBER=$(git rev-list --count HEAD)
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUMBER}" build/Pluricode.app/Contents/Info.plist
+./build-plurisim.sh build/Pluricode.app
 codesign --force --deep --sign - build/Pluricode.app
 
 DMG="build/Pluricode-${VERSION}.dmg"

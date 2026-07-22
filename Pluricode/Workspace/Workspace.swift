@@ -24,8 +24,9 @@ final class Workspace {
     let worktreeStatusService: WorktreeStatusService
     var terminalHosts: [UUID: TerminalHost] = [:]
     var browserHosts: [UUID: BrowserHost] = [:]
+    var simulatorHosts: [UUID: SimulatorHost] = [:]
     var pendingDevScripts: [UUID: String] = [:]
-    var pendingBrowserOrigins: [UUID: UUID] = [:]
+    var pendingPreviewOrigins: [UUID: UUID] = [:]
     var stubTabs: [UUID: UUID] = [:]
     var minimizedPanes: [MinimizedPane] = []
     @ObservationIgnored weak var store: WorkspaceStore?
@@ -83,6 +84,7 @@ final class Workspace {
         save()
         for host in terminalHosts.values { host.teardown() }
         for host in browserHosts.values { host.teardown() }
+        for host in simulatorHosts.values { host.teardown() }
     }
 
     static var rootDir: URL {
@@ -240,8 +242,9 @@ final class Workspace {
             host.teardown()
         }
         browserHosts.removeValue(forKey: tabID)?.teardown()
+        simulatorHosts.removeValue(forKey: tabID)?.teardown()
         pendingDevScripts.removeValue(forKey: tabID)
-        pendingBrowserOrigins.removeValue(forKey: tabID)
+        pendingPreviewOrigins.removeValue(forKey: tabID)
         stubTabs.removeValue(forKey: tabID)
         store?.localHostRegistry.remove(tabID: tabID)
     }
@@ -262,8 +265,8 @@ final class Workspace {
         pendingDevScripts.removeValue(forKey: tabID)
     }
 
-    func consumePendingBrowserOrigin(tabID: UUID) -> UUID? {
-        pendingBrowserOrigins.removeValue(forKey: tabID)
+    func consumePendingPreviewOrigin(tabID: UUID) -> UUID? {
+        pendingPreviewOrigins.removeValue(forKey: tabID)
     }
 
     func openBrowser(repoID: UUID, worktreeID: String, url: URL? = nil, originTabID: UUID?, nearPaneID: UUID?) {
@@ -289,7 +292,24 @@ final class Workspace {
             addPane(content)
         }
         if let originTabID, let pid = focusedPaneID, let tabID = pane(id: pid)?.activeTabID {
-            pendingBrowserOrigins[tabID] = originTabID
+            pendingPreviewOrigins[tabID] = originTabID
+        }
+    }
+
+    func openSimulator(repoID: UUID, worktreeID: String, originTabID: UUID?, nearPaneID: UUID?) {
+        if let (paneID, tab) = findSimulatorTab(repoID: repoID, worktreeID: worktreeID) {
+            setActiveTab(paneID: paneID, tabID: tab.id)
+            setFocus(paneID: paneID)
+            return
+        }
+        let content: TabContent = .simulator(repoID: repoID, worktreeID: worktreeID)
+        if let nearPaneID {
+            splitPane(paneID: nearPaneID, edge: .right, content: content)
+        } else {
+            addPane(content)
+        }
+        if let originTabID, let pid = focusedPaneID, let tabID = pane(id: pid)?.activeTabID {
+            pendingPreviewOrigins[tabID] = originTabID
         }
     }
 
@@ -311,6 +331,8 @@ final class Workspace {
                 return .terminal(repoID: r, worktreeID: newBranch)
             case .browser(let r, let w, let url) where r == repoID && w == oldBranch:
                 return .browser(repoID: r, worktreeID: newBranch, url: url)
+            case .simulator(let r, let w) where r == repoID && w == oldBranch:
+                return .simulator(repoID: r, worktreeID: newBranch)
             default:
                 return nil
             }
@@ -358,6 +380,17 @@ final class Workspace {
         for pane in tiling.panes {
             for tab in pane.tabs {
                 if case .browser(let r, let w, _) = tab.content, r == repoID, w == worktreeID {
+                    return (pane.id, tab)
+                }
+            }
+        }
+        return nil
+    }
+
+    private func findSimulatorTab(repoID: UUID, worktreeID: String) -> (paneID: UUID, tab: Tab)? {
+        for pane in tiling.panes {
+            for tab in pane.tabs {
+                if case .simulator(let r, let w) = tab.content, r == repoID, w == worktreeID {
                     return (pane.id, tab)
                 }
             }
@@ -439,6 +472,7 @@ final class Workspace {
         case .widget(let kind): return kind.label
         case .tasks: return fallback
         case .browser(_, let worktreeID, _): return worktreeID
+        case .simulator(_, let worktreeID): return worktreeID
         }
     }
 
@@ -478,7 +512,7 @@ final class Workspace {
         tiling.panes.filter {
             switch $0.activeTab.content {
             case .terminal, .shell: return true
-            case .tasks, .widget, .browser: return false
+            case .tasks, .widget, .browser, .simulator: return false
             }
         }
     }

@@ -22,7 +22,7 @@ struct BrowserPaneView: NSViewRepresentable {
             tabID: tabID,
             repoID: repoID,
             worktreeID: worktreeID,
-            originTabID: workspace.consumePendingBrowserOrigin(tabID: tabID)
+            originTabID: workspace.consumePendingPreviewOrigin(tabID: tabID)
         )
         host.onURLChange = { [weak workspace, tabID] url in
             workspace?.updateBrowserURL(tabID: tabID, url: url)
