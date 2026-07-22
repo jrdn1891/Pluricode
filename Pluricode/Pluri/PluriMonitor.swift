@@ -6,6 +6,7 @@ struct WorkerState: Equatable {
     var message: String?
     var activity: String?
     var changedAt: Date
+    var lastResponse: String?
 }
 
 @MainActor
@@ -50,6 +51,7 @@ final class PluriMonitor {
     private struct HookEvent: Decodable {
         let hook_event_name: String
         let cwd: String
+        let transcript_path: String?
         let message: String?
         let tool_name: String?
         let tool_input: ToolInput?
@@ -66,26 +68,30 @@ final class PluriMonitor {
             statuses.removeValue(forKey: path)
             return
         }
+        let previousStatus = statuses[path]?.status
         let status: WorkerStatus
         switch event.hook_event_name {
-        case "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse": status = .running
-        case "Notification": status = .waiting
+        case "UserPromptSubmit", "PreToolUse", "PostToolUse": status = .running
+        case "Notification": status = previousStatus == .done ? .done : .waiting
         case "Stop": status = .done
         default: return
         }
-        let previousStatus = statuses[path]?.status
         let statusChanged = previousStatus != status
-        var state = statuses[path] ?? WorkerState(status: status, message: nil, activity: nil, changedAt: Date())
+        var state = statuses[path] ?? WorkerState(status: status, message: nil, activity: nil, changedAt: Date(), lastResponse: nil)
         state.status = status
         switch event.hook_event_name {
         case "PreToolUse": state.activity = Self.activity(for: event)
         case "PostToolUse": state.activity = nil
-        case "SessionStart", "UserPromptSubmit": state.activity = nil; state.message = nil
-        case "Notification": state.message = event.message
+        case "UserPromptSubmit": state.activity = nil; state.message = nil
+        case "Notification": state.message = status == .waiting ? event.message : nil
         case "Stop": state.activity = nil
         default: break
         }
         if statusChanged { state.changedAt = Date() }
+        if event.hook_event_name == "Stop" || event.hook_event_name == "Notification",
+           let transcript = event.transcript_path {
+            loadResponse(transcriptPath: transcript, worktreePath: path)
+        }
         guard statuses[path] != state else { return }
         statuses[path] = state
         if statusChanged, status == .waiting { onWaiting?(path) }
@@ -93,6 +99,24 @@ final class PluriMonitor {
             session.postEvent("[worker update] \(task.repoName) / \(task.branch): done — the worker finished its turn.")
         }
     }
+
+    private func loadResponse(transcriptPath: String, worktreePath: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let url = URL(fileURLWithPath: transcriptPath)
+            for delay in Self.responseReadDelays {
+                if delay > 0 { Thread.sleep(forTimeInterval: delay) }
+                guard let text = TranscriptReader.lastAssistantText(at: url) else { continue }
+                Task { @MainActor [weak self] in
+                    guard let self, var state = self.statuses[worktreePath] else { return }
+                    state.lastResponse = text
+                    self.statuses[worktreePath] = state
+                }
+                return
+            }
+        }
+    }
+
+    private static let responseReadDelays: [TimeInterval] = [0, 0.2, 0.4, 0.6, 0.8, 1, 1, 1.5, 1.5, 2]
 
     private static func activity(for event: HookEvent) -> String? {
         guard let tool = event.tool_name else { return nil }
