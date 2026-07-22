@@ -302,7 +302,7 @@ final class Workspace {
             setFocus(paneID: paneID)
             return
         }
-        let content: TabContent = .simulator(repoID: repoID, worktreeID: worktreeID)
+        let content: TabContent = .simulator(repoID: repoID, worktreeID: worktreeID, udid: nil)
         if let nearPaneID {
             splitPane(paneID: nearPaneID, edge: .right, content: content)
         } else {
@@ -331,8 +331,8 @@ final class Workspace {
                 return .terminal(repoID: r, worktreeID: newBranch)
             case .browser(let r, let w, let url) where r == repoID && w == oldBranch:
                 return .browser(repoID: r, worktreeID: newBranch, url: url)
-            case .simulator(let r, let w) where r == repoID && w == oldBranch:
-                return .simulator(repoID: r, worktreeID: newBranch)
+            case .simulator(let r, let w, let udid) where r == repoID && w == oldBranch:
+                return .simulator(repoID: r, worktreeID: newBranch, udid: udid)
             default:
                 return nil
             }
@@ -390,12 +390,27 @@ final class Workspace {
     private func findSimulatorTab(repoID: UUID, worktreeID: String) -> (paneID: UUID, tab: Tab)? {
         for pane in tiling.panes {
             for tab in pane.tabs {
-                if case .simulator(let r, let w) = tab.content, r == repoID, w == worktreeID {
+                if case .simulator(let r, let w, _) = tab.content, r == repoID, w == worktreeID {
                     return (pane.id, tab)
                 }
             }
         }
         return nil
+    }
+
+    /// Pins a simulator pane to a specific device: persists the choice and restreams to it.
+    func selectSimulatorDevice(tabID: UUID, udid: String?) {
+        for pane in tiling.panes {
+            guard let tab = pane.tabs.first(where: { $0.id == tabID }),
+                  case .simulator(let repoID, let worktreeID, _) = tab.content else { continue }
+            tiling.updatePane(pane.id) { p in
+                guard let idx = p.tabs.firstIndex(where: { $0.id == tabID }) else { return }
+                p.tabs[idx].content = .simulator(repoID: repoID, worktreeID: worktreeID, udid: udid)
+            }
+            scheduleSave()
+            break
+        }
+        simulatorHosts[tabID]?.selectDevice(udid)
     }
 
     func updateBrowserURL(tabID: UUID, url: URL) {
@@ -472,7 +487,7 @@ final class Workspace {
         case .widget(let kind): return kind.label
         case .tasks: return fallback
         case .browser(_, let worktreeID, _): return worktreeID
-        case .simulator(_, let worktreeID): return worktreeID
+        case .simulator(_, let worktreeID, _): return worktreeID
         }
     }
 

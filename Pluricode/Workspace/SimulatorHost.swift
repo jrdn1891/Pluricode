@@ -13,6 +13,9 @@ final class SimulatorHost {
     var deviceName: String?
     var isLive = false
 
+    /// The device this pane is pinned to, or nil to follow the first booted device.
+    @ObservationIgnored private var pinnedUDID: String?
+
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var liveProcess: Process?
     @ObservationIgnored private var liveStdin: FileHandle?
@@ -33,11 +36,12 @@ final class SimulatorHost {
         UserDefaults.standard.bool(forKey: liveStreamKey) && helperURL != nil
     }
 
-    init(tabID: UUID, repoID: UUID, worktreeID: String, originTabID: UUID?) {
+    init(tabID: UUID, repoID: UUID, worktreeID: String, originTabID: UUID?, pinnedUDID: String?) {
         self.tabID = tabID
         self.repoID = repoID
         self.worktreeID = worktreeID
         self.originTabID = originTabID
+        self.pinnedUDID = pinnedUDID
         start()
     }
 
@@ -87,7 +91,7 @@ final class SimulatorHost {
 
     private func runLiveLoop() async {
         while !Task.isCancelled {
-            let device = Self.firstBootedDevice()
+            let device = resolveDevice()
             await MainActor.run {
                 self.deviceName = device?.name
                 if device == nil { self.frame = nil }
@@ -96,10 +100,26 @@ final class SimulatorHost {
                 try? await Task.sleep(for: .seconds(2))
                 continue
             }
-            await streamHelper(udid: udid)   // returns when the helper exits (device gone/error)
+            await streamHelper(udid: udid)   // returns when the helper exits (device gone/switched)
             await MainActor.run { self.frame = nil; self.isLive = false }
             if !Task.isCancelled { try? await Task.sleep(for: .seconds(1)) }
         }
+    }
+
+    /// The device to show: the pinned one (booting it if needed), else the first booted device.
+    private func resolveDevice() -> BootedDevice? {
+        guard let pinnedUDID else { return Self.firstBootedDevice() }
+        guard let info = Self.deviceInfo(udid: pinnedUDID) else { return Self.firstBootedDevice() }
+        if info.state == "Booted" { return BootedDevice(udid: pinnedUDID, name: info.name) }
+        Self.boot(udid: pinnedUDID)   // kick off boot; the loop retries until it is ready
+        return nil
+    }
+
+    /// Pins the pane to a device (nil follows the first booted) and restarts streaming.
+    func selectDevice(_ udid: String?) {
+        pinnedUDID = udid
+        if let udid { Self.boot(udid: udid) }
+        liveProcess?.terminate()   // interrupt the current stream so the loop re-resolves
     }
 
     private func streamHelper(udid: String) async {
@@ -170,30 +190,22 @@ final class SimulatorHost {
     // MARK: - simctl screenshot fallback
 
     private func runScreenshotLoop() async {
-        var udid: String?
         while !Task.isCancelled {
-            if udid == nil {
-                let device = Self.firstBootedDevice()
-                udid = device?.udid
-                await MainActor.run {
-                    self.deviceName = device?.name
-                    if device == nil { self.frame = nil }
-                }
-                if udid == nil {
-                    try? await Task.sleep(for: .seconds(2))
-                    continue
-                }
+            let device = resolveDevice()
+            await MainActor.run {
+                self.deviceName = device?.name
+                if device == nil { self.frame = nil }
+            }
+            guard let udid = device?.udid else {
+                try? await Task.sleep(for: .seconds(2))
+                continue
             }
             let paused = await MainActor.run { self.markup.isMarkingUp }
-            if !paused, let current = udid {
-                if Self.xcrun(["simctl", "io", current, "screenshot", self.framePath]) != nil,
-                   let data = try? Data(contentsOf: URL(fileURLWithPath: self.framePath)),
-                   let image = NSImage(data: data) {
-                    await MainActor.run { self.frame = image }
-                } else {
-                    udid = nil
-                    continue
-                }
+            if !paused,
+               Self.xcrun(["simctl", "io", udid, "screenshot", self.framePath]) != nil,
+               let data = try? Data(contentsOf: URL(fileURLWithPath: self.framePath)),
+               let image = NSImage(data: data) {
+                await MainActor.run { self.frame = image }
             }
             try? await Task.sleep(for: .milliseconds(250))
         }
@@ -214,6 +226,65 @@ final class SimulatorHost {
         guard let data = xcrun(["simctl", "list", "devices", "booted", "-j"]),
               let list = try? JSONDecoder().decode(DeviceList.self, from: data) else { return nil }
         return list.devices.values.flatMap { $0 }.first
+    }
+
+    struct DeviceOption: Identifiable, Hashable {
+        let udid: String
+        let name: String
+        let runtime: String
+        let isBooted: Bool
+        var id: String { udid }
+    }
+
+    private struct FullEntry: Decodable {
+        let udid: String
+        let name: String
+        let state: String
+        let isAvailable: Bool?
+    }
+
+    private struct FullList: Decodable {
+        let devices: [String: [FullEntry]]
+    }
+
+    private static func fullList() -> FullList? {
+        guard let data = xcrun(["simctl", "list", "devices", "-j"]) else { return nil }
+        return try? JSONDecoder().decode(FullList.self, from: data)
+    }
+
+    /// Available simulators for the picker, booted ones first, then grouped by runtime and name.
+    static func availableDevices() -> [DeviceOption] {
+        guard let list = fullList() else { return [] }
+        var options: [DeviceOption] = []
+        for (runtimeKey, devices) in list.devices {
+            let runtime = prettyRuntime(runtimeKey)
+            for d in devices where d.isAvailable != false {
+                options.append(DeviceOption(udid: d.udid, name: d.name, runtime: runtime, isBooted: d.state == "Booted"))
+            }
+        }
+        return options.sorted {
+            ($0.isBooted ? 0 : 1, $0.runtime, $0.name) < ($1.isBooted ? 0 : 1, $1.runtime, $1.name)
+        }
+    }
+
+    private static func deviceInfo(udid: String) -> (name: String, state: String)? {
+        guard let list = fullList() else { return nil }
+        for devices in list.devices.values {
+            if let d = devices.first(where: { $0.udid == udid }) { return (d.name, d.state) }
+        }
+        return nil
+    }
+
+    private static func boot(udid: String) {
+        _ = xcrun(["simctl", "boot", udid])   // harmless no-op if already booted
+    }
+
+    // com.apple.CoreSimulator.SimRuntime.iOS-26-2 -> "iOS 26.2"
+    private static func prettyRuntime(_ key: String) -> String {
+        guard let tail = key.components(separatedBy: ".SimRuntime.").last else { return key }
+        let parts = tail.components(separatedBy: "-")
+        guard parts.count >= 2 else { return tail }
+        return parts[0] + " " + parts[1...].joined(separator: ".")
     }
 
     private static func xcrun(_ args: [String]) -> Data? {

@@ -202,7 +202,7 @@ private struct GhostPane: View {
             return kind.label
         case .browser(_, let worktreeID, _):
             return worktreeID
-        case .simulator(_, let worktreeID):
+        case .simulator(_, let worktreeID, _):
             return worktreeID
         }
     }
@@ -291,12 +291,13 @@ private struct TabBody: View {
                 url: url,
                 workspace: workspace
             )
-        case .simulator(let repoID, let worktreeID):
+        case .simulator(let repoID, let worktreeID, let udid):
             SimulatorPaneBody(
                 pane: pane,
                 tabID: tab.id,
                 repoID: repoID,
                 worktreeID: worktreeID,
+                udid: udid,
                 workspace: workspace
             )
         }
@@ -622,6 +623,7 @@ private struct SimulatorPaneBody: View {
     let tabID: UUID
     let repoID: UUID
     let worktreeID: String
+    let udid: String?
     let workspace: Workspace
 
     var body: some View {
@@ -665,7 +667,8 @@ private struct SimulatorPaneBody: View {
                     tabID: tabID,
                     repoID: repoID,
                     worktreeID: worktreeID,
-                    originTabID: workspace.consumePendingPreviewOrigin(tabID: tabID)
+                    originTabID: workspace.consumePendingPreviewOrigin(tabID: tabID),
+                    pinnedUDID: udid
                 )
             }
         }
@@ -755,14 +758,20 @@ private struct SimulatorHeader: View {
     let isExpanded: Bool
     let onExpand: () -> Void
 
+    @State private var devices: [SimulatorHost.DeviceOption] = []
+
     private var host: SimulatorHost? { workspace.simulatorHosts[tabID] }
+
+    private var pinnedUDID: String? {
+        guard let tab = pane.tabs.first(where: { $0.id == tabID }),
+              case .simulator(_, _, let udid) = tab.content else { return nil }
+        return udid
+    }
 
     var body: some View {
         HStack(spacing: 8) {
             dragHandle
-            Text(host?.deviceName ?? "No simulator")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(host?.deviceName == nil ? Color.secondary : Color.primary)
+            devicePicker
             Spacer()
             if host?.isLive == true {
                 Button(action: { host?.sendHome() }) {
@@ -836,6 +845,52 @@ private struct SimulatorHeader: View {
                 .font(.caption)
         }
         .help(worktreeID)
+    }
+
+    private var devicePicker: some View {
+        Menu {
+            Button(action: { select(nil) }) {
+                pickerLabel("First booted device", selected: pinnedUDID == nil)
+            }
+            let runtimes = Array(Set(devices.map(\.runtime))).sorted()
+            ForEach(runtimes, id: \.self) { runtime in
+                Section(runtime) {
+                    ForEach(devices.filter { $0.runtime == runtime }) { device in
+                        Button(action: { select(device.udid) }) {
+                            pickerLabel(device.isBooted ? "\(device.name)  ●" : device.name,
+                                        selected: pinnedUDID == device.udid)
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(host?.deviceName ?? "Select device")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(host?.deviceName == nil ? Color.secondary : Color.primary)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .task(id: host?.deviceName) { await refreshDevices() }
+    }
+
+    @ViewBuilder
+    private func pickerLabel(_ title: String, selected: Bool) -> some View {
+        if selected { Label(title, systemImage: "checkmark") } else { Text(title) }
+    }
+
+    private func refreshDevices() async {
+        devices = await Task.detached(priority: .userInitiated) { SimulatorHost.availableDevices() }.value
+    }
+
+    private func select(_ udid: String?) {
+        workspace.selectSimulatorDevice(tabID: tabID, udid: udid)
+        Task { await refreshDevices() }
     }
 
     private var headerBackground: Color {
@@ -1818,7 +1873,7 @@ private struct MinimizedPaneChip: View {
         case .tasks(let listID): return workspace.taskListStore.list(id: listID)?.name ?? "Tasks"
         case .widget(let kind): return kind.label
         case .browser(_, let worktreeID, _): return worktreeID
-        case .simulator(_, let worktreeID): return worktreeID
+        case .simulator(_, let worktreeID, _): return worktreeID
         }
     }
 }
@@ -1890,7 +1945,7 @@ private struct ExpandedPaneCard: View {
                 url: url,
                 workspace: workspace
             )
-        case .simulator(let repoID, let worktreeID):
+        case .simulator(let repoID, let worktreeID, _):
             SimulatorExpandedContent(
                 pane: pane,
                 tabID: pane.activeTabID,
