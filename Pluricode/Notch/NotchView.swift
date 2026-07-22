@@ -64,6 +64,26 @@ struct NotchShape: Shape {
     }
 }
 
+struct WorkingSpinner: View {
+    var size: CGFloat
+    var color: Color = .blue
+
+    @State private var angle = 0.0
+
+    var body: some View {
+        Circle()
+            .trim(from: 0.15, to: 1.0)
+            .stroke(color, style: StrokeStyle(lineWidth: max(1.2, size * 0.18), lineCap: .round))
+            .frame(width: size, height: size)
+            .rotationEffect(.degrees(angle))
+            .onAppear {
+                withAnimation(.linear(duration: 0.7).repeatForever(autoreverses: false)) {
+                    angle = 360
+                }
+            }
+    }
+}
+
 struct NotchView: View {
     let store: WorkspaceStore
     let monitor: PluriMonitor
@@ -234,15 +254,17 @@ struct NotchView: View {
 
     @ViewBuilder
     private func responseBody(_ row: AgentRow) -> some View {
-        if let text = row.state?.lastResponse {
-            ScrollView {
-                Text(text)
-                    .font(.system(size: 12))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+        if row.state?.status == .running {
+            VStack(spacing: 0) {
+                workingBanner(row)
+                if let text = row.state?.lastResponse {
+                    responseScroll(text)
+                } else {
+                    Spacer(minLength: 0)
+                }
             }
+        } else if let text = row.state?.lastResponse {
+            responseScroll(text)
         } else {
             Text(responsePlaceholder(row))
                 .font(.system(size: 12))
@@ -251,12 +273,43 @@ struct NotchView: View {
         }
     }
 
-    private func responsePlaceholder(_ row: AgentRow) -> String {
-        switch row.state?.status {
-        case .running: return "Working…"
-        case .waiting: return row.state?.message ?? "Waiting for your input"
-        default: return "No response yet"
+    private func responseScroll(_ text: String) -> some View {
+        ScrollView {
+            Text(text)
+                .font(.system(size: 12))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
         }
+    }
+
+    private func workingBanner(_ row: AgentRow) -> some View {
+        HStack(spacing: 8) {
+            WorkingSpinner(size: 12)
+            Text(row.state?.activity ?? "Working…")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func statusDot(_ row: AgentRow, size: CGFloat) -> some View {
+        if row.state?.status == .running {
+            WorkingSpinner(size: size)
+        } else {
+            Circle()
+                .fill(row.state?.status.color ?? Color(nsColor: .tertiaryLabelColor))
+                .frame(width: size, height: size)
+        }
+    }
+
+    private func responsePlaceholder(_ row: AgentRow) -> String {
+        row.state?.status == .waiting ? (row.state?.message ?? "Waiting for your input") : "No response yet"
     }
 
     private func section(_ group: WorkspaceGroup) -> some View {
@@ -272,9 +325,7 @@ struct NotchView: View {
 
     private func agentRow(_ row: AgentRow) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Circle()
-                .fill(row.state?.status.color ?? Color(nsColor: .tertiaryLabelColor))
-                .frame(width: 7, height: 7)
+            statusDot(row, size: 8)
                 .padding(.top, 4)
             VStack(alignment: .leading, spacing: 4) {
                 Text(row.branch)

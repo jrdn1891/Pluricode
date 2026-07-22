@@ -71,7 +71,7 @@ final class PluriMonitor {
         let previousStatus = statuses[path]?.status
         let status: WorkerStatus
         switch event.hook_event_name {
-        case "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse": status = .running
+        case "UserPromptSubmit", "PreToolUse", "PostToolUse": status = .running
         case "Notification": status = previousStatus == .done ? .done : .waiting
         case "Stop": status = .done
         default: return
@@ -82,7 +82,7 @@ final class PluriMonitor {
         switch event.hook_event_name {
         case "PreToolUse": state.activity = Self.activity(for: event)
         case "PostToolUse": state.activity = nil
-        case "SessionStart", "UserPromptSubmit": state.activity = nil; state.message = nil
+        case "UserPromptSubmit": state.activity = nil; state.message = nil
         case "Notification": state.message = status == .waiting ? event.message : nil
         case "Stop": state.activity = nil
         default: break
