@@ -771,6 +771,15 @@ private struct SimulatorHeader: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(host?.deviceName == nil ? Color.secondary : Color.primary)
             Spacer()
+            if host?.isLive == true {
+                Button(action: { host?.sendHome() }) {
+                    Image(systemName: "house")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Press the Home button")
+            }
             Button(action: toggleMarkup) {
                 Image(systemName: "pencil.tip.crop.circle")
                     .font(.system(size: 11, weight: .semibold))

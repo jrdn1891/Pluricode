@@ -56,6 +56,11 @@ final class SimulatorHost {
         try? stdin.write(contentsOf: Data("tap \(fx) \(fy)\n".utf8))
     }
 
+    /// Presses the Home button, via the live helper.
+    func sendHome() {
+        try? liveStdin?.write(contentsOf: Data("home\n".utf8))
+    }
+
     private func start() {
         let live = Self.liveStreamEnabled
         pollTask = Task.detached(priority: .utility) { [weak self] in

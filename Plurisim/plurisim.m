@@ -14,6 +14,7 @@
 //   argv[1]   booted device UDID (or "booted" for the first booted simulator)
 //   stdout    length-prefixed frames: <4-byte big-endian uint32 length><JPEG bytes>
 //   stdin     "tap <fx> <fy>\n" — a tap at normalized (0..1) coordinates from the top-left.
+//             "home\n"          — a Home button press.
 //             EOF closes the stream (clean shutdown when the parent goes away).
 //   stderr    human-readable logs
 //   env       DEVELOPER_DIR selects the Xcode whose CoreSimulator service to attach
@@ -75,6 +76,22 @@ static void tap(double fx, double fy) {
     sendTouch(1, screen, px, py);  // down
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), gSendQueue, ^{
         sendTouch(2, screen, px, py);  // up
+    });
+}
+
+static void sendButton(int direction, int button) {
+    NSData *msg = ((NSData *(*)(id, SEL, int, int))objc_msgSend)(
+        gIndigo, sel_getUid("buttonWithDirection:button:"), direction, button);
+    ((void(*)(id, SEL, void *, BOOL, dispatch_queue_t, void (^)(void)))objc_msgSend)(
+        gHID, sel_getUid("sendWithMessage:freeWhenDone:completionQueue:completion:"),
+        (void *)msg.bytes, NO, gSendQueue, ^{ (void)msg; });
+}
+
+static void homeButton(void) {
+    if (!gHID || !gIndigo) return;
+    sendButton(1, 2);  // HomeButton down
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC), gSendQueue, ^{
+        sendButton(2, 2);  // HomeButton up
     });
 }
 
@@ -154,6 +171,8 @@ int main(int argc, char **argv) { @autoreleasepool {
             NSArray<NSString *> *parts = [line componentsSeparatedByString:@" "];
             if (parts.count == 3 && [parts[0] isEqualToString:@"tap"])
                 tap(parts[1].doubleValue, parts[2].doubleValue);
+            else if (parts.count == 1 && [parts[0] isEqualToString:@"home"])
+                homeButton();
         }
     };
 
