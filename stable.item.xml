@@ -1,8 +1,8 @@
     <item>
-      <title>1.7</title>
-      <pubDate>Wed, 22 Jul 2026 10:13:10 +0000</pubDate>
-      <sparkle:version>230</sparkle:version>
-      <sparkle:shortVersionString>1.7</sparkle:shortVersionString>
+      <title>1.8</title>
+      <pubDate>Thu, 23 Jul 2026 09:16:59 +0000</pubDate>
+      <sparkle:version>239</sparkle:version>
+      <sparkle:shortVersionString>1.8</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/jrdn1891/Pluricode/releases/download/v1.7/Pluricode-1.7.dmg" sparkle:edSignature="n18pfY4E2cKkCfN84JOpRGkBWadbazUiPI08nVQ1x/ZIOA7Fa4bNDap6Dvn637oCVNPw76g0apgIGbT/zTNBDw==" length="9021160" type="application/octet-stream" />
+      <enclosure url="https://github.com/jrdn1891/Pluricode/releases/download/v1.8/Pluricode-1.8.dmg" sparkle:edSignature="s5gVA5I3ROVhD632LAXy7d8mz+MJEqqUYyc/6oeGHsPLTN7Bhv8bwDwrgztUduLRk0t+aF5SMDY9UMibI65nDQ==" length="9260454" type="application/octet-stream" />
     </item>
