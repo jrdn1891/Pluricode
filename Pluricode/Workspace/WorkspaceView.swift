@@ -390,6 +390,10 @@ private struct BrowserContent: View {
         return workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID) != nil
     }
 
+    private var discoveredURL: URL? {
+        workspace.discoveredURL(repoID: repoID, worktreeID: worktreeID)
+    }
+
     var body: some View {
         ZStack {
             BrowserPaneView(
@@ -401,7 +405,7 @@ private struct BrowserContent: View {
             )
             .id(tabID)
             if url == nil, host?.currentURL == nil {
-                BrowserEmptyState()
+                BrowserEmptyState(devServerStarting: workspace.hasDevTab(repoID: repoID, worktreeID: worktreeID))
             }
             if let host, host.markup.isMarkingUp {
                 MarkupSelectionOverlay(
@@ -411,6 +415,11 @@ private struct BrowserContent: View {
                     onCancel: host.markup.cancel
                 )
             }
+        }
+        .onChange(of: discoveredURL) { _, newURL in
+            guard let newURL, let host, host.currentURL == nil else { return }
+            host.load(newURL)
+            workspace.updateBrowserURL(tabID: tabID, url: newURL)
         }
     }
 
@@ -599,18 +608,31 @@ private struct BrowserHeader: View {
 }
 
 private struct BrowserEmptyState: View {
+    let devServerStarting: Bool
+
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "globe")
-                .font(.system(size: 28))
-                .foregroundStyle(.secondary)
-            Text("Waiting for a dev server on this worktree…")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text("Start your dev server, then click Preview again — or type a URL above.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            if devServerStarting {
+                ProgressView().controlSize(.small)
+                Text("Starting the dev server…")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("The preview will open automatically once it's running.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                Image(systemName: "globe")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.secondary)
+                Text("Waiting for a dev server on this worktree…")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("Start your dev server, then click Preview again — or type a URL above.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 24)

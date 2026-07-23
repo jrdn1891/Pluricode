@@ -269,11 +269,34 @@ final class Workspace {
         pendingPreviewOrigins.removeValue(forKey: tabID)
     }
 
-    func openBrowser(repoID: UUID, worktreeID: String, url: URL? = nil, originTabID: UUID?, nearPaneID: UUID?) {
-        let resolved = url ?? store?.localHostRegistry.entries
+    /// The most recently discovered local dev-server URL for a worktree, if any.
+    func discoveredURL(repoID: UUID, worktreeID: String) -> URL? {
+        store?.localHostRegistry.entries
             .filter { $0.repoID == repoID && $0.branch == worktreeID }
             .sorted { $0.discoveredAt > $1.discoveredAt }
             .first?.url
+    }
+
+    /// Whether this worktree already has a running "dev" tab (dev script launched).
+    func hasDevTab(repoID: UUID, worktreeID: String) -> Bool {
+        tiling.panes.contains { pane in
+            pane.tabs.contains {
+                if case .terminal(let r, let w) = $0.content { return r == repoID && w == worktreeID && $0.name == "dev" }
+                return false
+            }
+        }
+    }
+
+    func openBrowser(repoID: UUID, worktreeID: String, url: URL? = nil, originTabID: UUID?, nearPaneID: UUID?) {
+        let resolved = url ?? discoveredURL(repoID: repoID, worktreeID: worktreeID)
+
+        // For less-technical users: if nothing is serving yet and the repo has a dev script,
+        // start it so the preview fills in on its own once the server is up.
+        if resolved == nil, let nearPaneID,
+           !hasDevTab(repoID: repoID, worktreeID: worktreeID),
+           devScript(paneID: nearPaneID) != nil {
+            runDevScript(paneID: nearPaneID)
+        }
 
         if let (paneID, tab) = findBrowserTab(repoID: repoID, worktreeID: worktreeID) {
             setActiveTab(paneID: paneID, tabID: tab.id)
