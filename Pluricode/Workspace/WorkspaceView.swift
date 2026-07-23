@@ -186,6 +186,7 @@ private struct GhostPane: View {
         case .tasks: return "checklist"
         case .widget(let kind): return kind.systemImage
         case .browser: return "globe"
+        case .simulator: return "iphone"
         }
     }
 
@@ -200,6 +201,8 @@ private struct GhostPane: View {
         case .widget(let kind):
             return kind.label
         case .browser(_, let worktreeID, _):
+            return worktreeID
+        case .simulator(_, let worktreeID, _):
             return worktreeID
         }
     }
@@ -286,6 +289,15 @@ private struct TabBody: View {
                 repoID: repoID,
                 worktreeID: worktreeID,
                 url: url,
+                workspace: workspace
+            )
+        case .simulator(let repoID, let worktreeID, let udid):
+            SimulatorPaneBody(
+                pane: pane,
+                tabID: tab.id,
+                repoID: repoID,
+                worktreeID: worktreeID,
+                udid: udid,
                 workspace: workspace
             )
         }
@@ -378,6 +390,10 @@ private struct BrowserContent: View {
         return workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID) != nil
     }
 
+    private var discoveredURL: URL? {
+        workspace.discoveredURL(repoID: repoID, worktreeID: worktreeID)
+    }
+
     var body: some View {
         ZStack {
             BrowserPaneView(
@@ -389,29 +405,34 @@ private struct BrowserContent: View {
             )
             .id(tabID)
             if url == nil, host?.currentURL == nil {
-                BrowserEmptyState()
+                BrowserEmptyState(devServerStarting: workspace.hasDevTab(repoID: repoID, worktreeID: worktreeID))
             }
-            if let host, host.isMarkingUp {
+            if let host, host.markup.isMarkingUp {
                 MarkupSelectionOverlay(
-                    host: host,
+                    markup: host.markup,
                     agentAvailable: agentAvailable,
                     onSend: sendMarkup,
-                    onCancel: host.cancelMarkup
+                    onCancel: host.markup.cancel
                 )
             }
+        }
+        .onChange(of: discoveredURL) { _, newURL in
+            guard let newURL, let host, host.currentURL == nil else { return }
+            host.load(newURL)
+            workspace.updateBrowserURL(tabID: tabID, url: newURL)
         }
     }
 
     private func sendMarkup() {
         guard let host,
               let session = workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID) else { return }
-        let rects = host.markupRects
-        let note = host.markupNote
+        let rects = host.markup.rects
+        let note = host.markup.note
         host.captureSnapshot { image in
             guard let image,
-                  let path = BrowserHost.writeTempPNG(BrowserHost.annotate(image, rects: rects)) else { return }
+                  let path = Markup.writeTempPNG(Markup.annotate(image, rects: rects)) else { return }
             session.sendMarkup(note: note, imagePath: path)
-            host.cancelMarkup()
+            host.markup.cancel()
         }
     }
 }
@@ -465,7 +486,7 @@ private struct BrowserHeader: View {
             Button(action: toggleMarkup) {
                 Image(systemName: "pencil.tip.crop.circle")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle((host?.isMarkingUp == true) ? Color.accentColor : .secondary)
+                    .foregroundStyle((host?.markup.isMarkingUp == true) ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
             .disabled(host == nil)
@@ -568,7 +589,7 @@ private struct BrowserHeader: View {
 
     private func toggleMarkup() {
         guard let host else { return }
-        if host.isMarkingUp { host.cancelMarkup() } else { host.beginMarkup() }
+        if host.markup.isMarkingUp { host.markup.cancel() } else { host.markup.begin() }
     }
 
     private func syncAddress() {
@@ -587,18 +608,31 @@ private struct BrowserHeader: View {
 }
 
 private struct BrowserEmptyState: View {
+    let devServerStarting: Bool
+
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "globe")
-                .font(.system(size: 28))
-                .foregroundStyle(.secondary)
-            Text("Waiting for a dev server on this worktree…")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text("Start your dev server, then click Preview again — or type a URL above.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            if devServerStarting {
+                ProgressView().controlSize(.small)
+                Text("Starting the dev server…")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("The preview will open automatically once it's running.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                Image(systemName: "globe")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.secondary)
+                Text("Waiting for a dev server on this worktree…")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("Start your dev server, then click Preview again — or type a URL above.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 24)
@@ -606,8 +640,369 @@ private struct BrowserEmptyState: View {
     }
 }
 
+private struct SimulatorPaneBody: View {
+    let pane: Pane
+    let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let udid: String?
+    let workspace: Workspace
+
+    var body: some View {
+        let isExpanded = workspace.expandedPaneID == pane.id
+        VStack(alignment: .leading, spacing: 0) {
+            SimulatorHeader(
+                pane: pane,
+                tabID: tabID,
+                worktreeID: worktreeID,
+                repoName: workspace.repo(id: repoID)?.name,
+                repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
+                workspace: workspace,
+                isExpanded: isExpanded,
+                onExpand: {
+                    if isExpanded { workspace.collapseExpandedPane() }
+                    else { workspace.expandPane(paneID: pane.id) }
+                }
+            )
+            if isExpanded {
+                ExpandedPanePlaceholder()
+            } else {
+                GeometryReader { geo in
+                    SimulatorContent(tabID: tabID, repoID: repoID, worktreeID: worktreeID, workspace: workspace)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .overlay {
+                            if workspace.dragSession != nil {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onDrop(
+                                        of: [.plainText],
+                                        delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
+                                    )
+                            }
+                        }
+                }
+            }
+        }
+        .onAppear {
+            if workspace.simulatorHosts[tabID] == nil {
+                workspace.simulatorHosts[tabID] = SimulatorHost(
+                    tabID: tabID,
+                    repoID: repoID,
+                    worktreeID: worktreeID,
+                    originTabID: workspace.consumePendingPreviewOrigin(tabID: tabID),
+                    pinnedUDID: udid
+                )
+            }
+        }
+    }
+}
+
+private struct SimulatorContent: View {
+    let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let workspace: Workspace
+
+    private var host: SimulatorHost? { workspace.simulatorHosts[tabID] }
+
+    private var agentAvailable: Bool {
+        guard let host else { return false }
+        return workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID) != nil
+    }
+
+    var body: some View {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+            if let host, let frame = host.frame {
+                ZStack {
+                    Image(nsImage: frame)
+                        .resizable()
+                    if host.isLive, !host.markup.isMarkingUp {
+                        SimulatorInputView(host: host)
+                    }
+                    if host.markup.isMarkingUp {
+                        MarkupSelectionOverlay(
+                            markup: host.markup,
+                            agentAvailable: agentAvailable,
+                            onSend: sendMarkup,
+                            onCancel: host.markup.cancel
+                        )
+                    }
+                }
+                .aspectRatio(frame.size.width / frame.size.height, contentMode: .fit)
+                .padding(8)
+            } else {
+                SimulatorEmptyState()
+            }
+        }
+    }
+
+    private func sendMarkup() {
+        guard let host, let frame = host.frame,
+              let session = workspace.agentSession(repoID: repoID, worktreeID: worktreeID, preferredTabID: host.originTabID),
+              let path = Markup.writeTempPNG(Markup.annotate(frame, rects: host.markup.rects)) else { return }
+        session.sendMarkup(note: host.markup.note, imagePath: path)
+        host.markup.cancel()
+    }
+}
+
+private struct SimulatorExpandedContent: View {
+    let pane: Pane
+    let tabID: UUID
+    let repoID: UUID
+    let worktreeID: String
+    let workspace: Workspace
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SimulatorHeader(
+                pane: pane,
+                tabID: tabID,
+                worktreeID: worktreeID,
+                repoName: workspace.repo(id: repoID)?.name,
+                repoColor: workspace.repo(id: repoID)?.resolvedColor.swiftUIColor,
+                workspace: workspace,
+                isExpanded: true,
+                onExpand: { workspace.collapseExpandedPane() }
+            )
+            SimulatorContent(tabID: tabID, repoID: repoID, worktreeID: worktreeID, workspace: workspace)
+        }
+    }
+}
+
+private struct SimulatorHeader: View {
+    let pane: Pane
+    let tabID: UUID
+    let worktreeID: String
+    let repoName: String?
+    let repoColor: Color?
+    let workspace: Workspace
+    let isExpanded: Bool
+    let onExpand: () -> Void
+
+    @State private var devices: [SimulatorHost.DeviceOption] = []
+
+    private var host: SimulatorHost? { workspace.simulatorHosts[tabID] }
+
+    private var pinnedUDID: String? {
+        guard let tab = pane.tabs.first(where: { $0.id == tabID }),
+              case .simulator(_, _, let udid) = tab.content else { return nil }
+        return udid
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            dragHandle
+            devicePicker
+            Spacer()
+            if host?.isLive == true {
+                Button(action: { host?.sendHome() }) {
+                    Image(systemName: "house")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Press the Home button")
+            }
+            Button(action: toggleMarkup) {
+                Image(systemName: "pencil.tip.crop.circle")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle((host?.markup.isMarkingUp == true) ? Color.accentColor : .secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(host?.frame == nil)
+            .help("Mark up the simulator for this worktree's agent")
+            Button(action: onExpand) {
+                Image(systemName: isExpanded
+                    ? "arrow.down.right.and.arrow.up.left"
+                    : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(isExpanded ? "Collapse" : "Expand")
+            if !isExpanded, workspace.canMinimize(paneID: pane.id) {
+                Button(action: { workspace.minimizePane(paneID: pane.id) }) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Minimize pane")
+            }
+            if !isExpanded {
+                Button(action: { workspace.closeTab(paneID: pane.id, tabID: tabID) }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(headerBackground)
+        .contentShape(Rectangle())
+        .onTapGesture { workspace.setFocus(paneID: pane.id) }
+        .draggable(beginMoveDrag()) {
+            HStack(spacing: 6) {
+                Image(systemName: "iphone")
+                Text(worktreeID)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.accentColor.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    private var dragHandle: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(repoColor ?? .accentColor)
+                .frame(width: 10, height: 10)
+            Image(systemName: "iphone")
+                .foregroundStyle(.secondary)
+                .font(.caption)
+        }
+        .help(worktreeID)
+    }
+
+    private var devicePicker: some View {
+        Menu {
+            Button(action: { select(nil) }) {
+                pickerLabel("First booted device", selected: pinnedUDID == nil)
+            }
+            let runtimes = Array(Set(devices.map(\.runtime))).sorted()
+            ForEach(runtimes, id: \.self) { runtime in
+                Section(runtime) {
+                    ForEach(devices.filter { $0.runtime == runtime }) { device in
+                        Button(action: { select(device.udid) }) {
+                            pickerLabel(device.isBooted ? "\(device.name)  ●" : device.name,
+                                        selected: pinnedUDID == device.udid)
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(host?.deviceName ?? "Select device")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(host?.deviceName == nil ? Color.secondary : Color.primary)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .task(id: host?.deviceName) { await refreshDevices() }
+    }
+
+    @ViewBuilder
+    private func pickerLabel(_ title: String, selected: Bool) -> some View {
+        if selected { Label(title, systemImage: "checkmark") } else { Text(title) }
+    }
+
+    private func refreshDevices() async {
+        devices = await Task.detached(priority: .userInitiated) { SimulatorHost.availableDevices() }.value
+    }
+
+    private func select(_ udid: String?) {
+        workspace.selectSimulatorDevice(tabID: tabID, udid: udid)
+        Task { await refreshDevices() }
+    }
+
+    private var headerBackground: Color {
+        if let repoColor { return repoColor.opacity(0.12) }
+        return Color.secondary.opacity(0.1)
+    }
+
+    private func toggleMarkup() {
+        guard let host else { return }
+        if host.markup.isMarkingUp { host.markup.cancel() } else { host.markup.begin() }
+    }
+
+    private func beginMoveDrag() -> TilingDragPayload {
+        let payload = TilingDragPayload(kind: .movePane(paneID: pane.id))
+        workspace.beginDrag(payload)
+        return payload
+    }
+}
+
+private struct SimulatorEmptyState: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "iphone")
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+            Text("Waiting for a booted simulator…")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text("Boot a device in Simulator.app or ask the agent to run one, and it will appear here.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 24)
+    }
+}
+
+// Forwards mouse and keyboard input over the live device frame: a click taps, a drag swipes
+// (scroll / page switch), and typing goes to the device once the view has key focus.
+private struct SimulatorInputView: NSViewRepresentable {
+    let host: SimulatorHost
+
+    func makeNSView(context: Context) -> InputNSView {
+        let view = InputNSView()
+        view.host = host
+        return view
+    }
+
+    func updateNSView(_ nsView: InputNSView, context: Context) { nsView.host = host }
+
+    final class InputNSView: NSView {
+        weak var host: SimulatorHost?
+        private var downPoint: NSPoint?
+
+        override var isFlipped: Bool { true }          // top-left origin, matching device coordinates
+        override var acceptsFirstResponder: Bool { true }
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        private func normalized(_ p: NSPoint) -> (Double, Double) {
+            (Double(p.x / max(bounds.width, 1)), Double(p.y / max(bounds.height, 1)))
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            window?.makeFirstResponder(self)
+            downPoint = convert(event.locationInWindow, from: nil)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            guard let start = downPoint else { return }
+            downPoint = nil
+            let end = convert(event.locationInWindow, from: nil)
+            let (sx, sy) = normalized(start)
+            let (ex, ey) = normalized(end)
+            if hypot(end.x - start.x, end.y - start.y) < bounds.width * 0.02 {
+                host?.sendTap(x: ex, y: ey)
+            } else {
+                host?.sendSwipe(x0: sx, y0: sy, x1: ex, y1: ey)
+            }
+        }
+
+        override func keyDown(with event: NSEvent) {
+            guard let text = event.characters, !text.isEmpty else { return super.keyDown(with: event) }
+            host?.sendText(text)
+        }
+    }
+}
+
 private struct MarkupSelectionOverlay: View {
-    let host: BrowserHost
+    let markup: Markup
     let agentAvailable: Bool
     let onSend: () -> Void
     let onCancel: () -> Void
@@ -628,11 +1023,11 @@ private struct MarkupSelectionOverlay: View {
                             }
                             .onEnded { value in
                                 let rect = normalizedRect(value.startLocation, value.location, geo.size)
-                                if rect.width > 0.004, rect.height > 0.004 { host.markupRects.append(rect) }
+                                if rect.width > 0.004, rect.height > 0.004 { markup.rects.append(rect) }
                                 current = nil
                             }
                     )
-                if host.markupRects.isEmpty, current == nil {
+                if markup.rects.isEmpty, current == nil {
                     Text("Drag to mark up an area")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
@@ -642,14 +1037,14 @@ private struct MarkupSelectionOverlay: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                         .allowsHitTesting(false)
                 }
-                ForEach(Array(host.markupRects.enumerated()), id: \.offset) { _, rect in
+                ForEach(Array(markup.rects.enumerated()), id: \.offset) { _, rect in
                     box(rect, in: geo.size)
                 }
                 if let current {
                     box(current, in: geo.size)
                 }
-                if let anchor = host.markupRects.last {
-                    MarkupCommentField(host: host, agentAvailable: agentAvailable, onSend: onSend, onCancel: onCancel)
+                if let anchor = markup.rects.last {
+                    MarkupCommentField(markup: markup, agentAvailable: agentAvailable, onSend: onSend, onCancel: onCancel)
                         .frame(width: fieldWidth)
                         .offset(commentOffset(anchor, in: geo.size))
                 }
@@ -687,7 +1082,7 @@ private struct MarkupSelectionOverlay: View {
 }
 
 private struct MarkupCommentField: View {
-    @Bindable var host: BrowserHost
+    @Bindable var markup: Markup
     let agentAvailable: Bool
     let onSend: () -> Void
     let onCancel: () -> Void
@@ -695,8 +1090,8 @@ private struct MarkupCommentField: View {
     var body: some View {
         HStack(spacing: 6) {
             MarkupNoteField(
-                text: $host.markupNote,
-                focusToken: host.markupRects.count,
+                text: $markup.note,
+                focusToken: markup.rects.count,
                 onSubmit: { if agentAvailable { onSend() } },
                 onCancel: onCancel
             )
@@ -948,7 +1343,15 @@ private struct TerminalPaneBody: View {
                         originTabID: tabID,
                         nearPaneID: pane.id
                     )
-                }
+                },
+                onSimulator: SimulatorHost.simulatorInstalled ? {
+                    workspace.openSimulator(
+                        repoID: repoID,
+                        worktreeID: worktreeID,
+                        originTabID: tabID,
+                        nearPaneID: pane.id
+                    )
+                } : nil
             )
             if isExpanded {
                 ExpandedPanePlaceholder()
@@ -1168,6 +1571,7 @@ private struct PaneHeader: View {
     let onExpand: () -> Void
     let onClose: () -> Void
     let onPreview: (() -> Void)?
+    let onSimulator: (() -> Void)?
     @State private var devScript: String?
     @Environment(PluriMonitor.self) private var monitor: PluriMonitor?
 
@@ -1205,23 +1609,8 @@ private struct PaneHeader: View {
                     .help(status.help)
             }
             Spacer()
-            if devScript != nil {
-                Button(action: { workspace.runDevScript(paneID: pane.id) }) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Run dev script in a new tab (⌘R)")
-            }
-            if let onPreview {
-                Button(action: onPreview) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Preview this worktree's local server in a built-in browser")
+            if devScript != nil || onPreview != nil || onSimulator != nil {
+                previewMenu
             }
             Button(action: onExpand) {
                 Image(systemName: isExpanded
@@ -1269,6 +1658,35 @@ private struct PaneHeader: View {
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
+    }
+
+    private var previewMenu: some View {
+        Menu {
+            if devScript != nil {
+                Button("Run dev server", systemImage: "play.fill") {
+                    workspace.runDevScript(paneID: pane.id)
+                }
+            }
+            if let onPreview {
+                Button("Web preview", systemImage: "globe", action: onPreview)
+            }
+            if let onSimulator {
+                Button("iOS Simulator", systemImage: "iphone", action: onSimulator)
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "play.circle")
+                Text("Preview")
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Run or preview this worktree")
     }
 
     private var headerBackground: Color {
@@ -1469,6 +1887,7 @@ private struct MinimizedPaneChip: View {
         case .tasks: "checklist"
         case .widget(let kind): kind.systemImage
         case .browser: "globe"
+        case .simulator: "iphone"
         }
     }
 
@@ -1481,6 +1900,7 @@ private struct MinimizedPaneChip: View {
         case .tasks(let listID): return workspace.taskListStore.list(id: listID)?.name ?? "Tasks"
         case .widget(let kind): return kind.label
         case .browser(_, let worktreeID, _): return worktreeID
+        case .simulator(_, let worktreeID, _): return worktreeID
         }
     }
 }
@@ -1552,6 +1972,14 @@ private struct ExpandedPaneCard: View {
                 url: url,
                 workspace: workspace
             )
+        case .simulator(let repoID, let worktreeID, _):
+            SimulatorExpandedContent(
+                pane: pane,
+                tabID: pane.activeTabID,
+                repoID: repoID,
+                worktreeID: worktreeID,
+                workspace: workspace
+            )
         case .tasks, .widget:
             EmptyView()
         }
@@ -1578,7 +2006,8 @@ private struct TerminalExpandedContent: View {
                 onActivate: { workspace.setFocus(paneID: pane.id) },
                 onExpand: { workspace.collapseExpandedPane() },
                 onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) },
-                onPreview: nil
+                onPreview: nil,
+                onSimulator: nil
             )
             if let targetID = workspace.stubTabs[tabID] {
                 SessionMovedBody(
