@@ -1587,32 +1587,8 @@ private struct PaneHeader: View {
                     .help(status.help)
             }
             Spacer()
-            if devScript != nil {
-                Button(action: { workspace.runDevScript(paneID: pane.id) }) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Run dev script in a new tab (⌘R)")
-            }
-            if let onPreview {
-                Button(action: onPreview) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Preview this worktree's local server in a built-in browser")
-            }
-            if let onSimulator {
-                Button(action: onSimulator) {
-                    Image(systemName: "iphone")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Preview the iOS Simulator for this worktree's agent")
+            if devScript != nil || onPreview != nil || onSimulator != nil {
+                previewMenu
             }
             Button(action: onExpand) {
                 Image(systemName: isExpanded
@@ -1660,6 +1636,35 @@ private struct PaneHeader: View {
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
+    }
+
+    private var previewMenu: some View {
+        Menu {
+            if devScript != nil {
+                Button("Run dev server", systemImage: "play.fill") {
+                    workspace.runDevScript(paneID: pane.id)
+                }
+            }
+            if let onPreview {
+                Button("Web preview", systemImage: "globe", action: onPreview)
+            }
+            if let onSimulator {
+                Button("iOS Simulator", systemImage: "iphone", action: onSimulator)
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "play.circle")
+                Text("Preview")
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Run or preview this worktree")
     }
 
     private var headerBackground: Color {
