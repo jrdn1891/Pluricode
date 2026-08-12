@@ -19,7 +19,6 @@ final class Workspace {
     var name: String
     let tiling: Tiling
     let repoStore: RepoStore
-    let taskListStore: TaskListStore
     let worktreePaths: WorktreePaths
     let worktreeStatusService: WorktreeStatusService
     var terminalHosts: [UUID: TerminalHost] = [:]
@@ -33,6 +32,7 @@ final class Workspace {
     var focusedPaneID: UUID?
     @ObservationIgnored var pendingFocusPaneID: UUID?
     var expandedPaneID: UUID?
+    var tasksPopoverPaneID: UUID?
     var commandKeyHeld: Bool = false
     var dragSession: DragSession?
     var resizeSession: ResizeSession?
@@ -65,7 +65,6 @@ final class Workspace {
         root: TileNode? = nil,
         minimizedPanes: [MinimizedPane] = [],
         repoStore: RepoStore,
-        taskListStore: TaskListStore,
         worktreePaths: WorktreePaths,
         worktreeStatusService: WorktreeStatusService
     ) {
@@ -74,7 +73,6 @@ final class Workspace {
         self.tiling = Tiling(root: root)
         self.minimizedPanes = minimizedPanes
         self.repoStore = repoStore
-        self.taskListStore = taskListStore
         self.worktreePaths = worktreePaths
         self.worktreeStatusService = worktreeStatusService
     }
@@ -177,6 +175,7 @@ final class Workspace {
         }
         if focusedPaneID == paneID { focusedPaneID = tiling.panes.first?.id }
         if expandedPaneID == paneID { expandedPaneID = nil }
+        if tasksPopoverPaneID == paneID { tasksPopoverPaneID = nil }
         scheduleSave()
     }
 
@@ -204,6 +203,7 @@ final class Workspace {
         tiling.remove(paneID: paneID)
         if focusedPaneID == paneID { focusedPaneID = tiling.panes.first?.id }
         if expandedPaneID == paneID { expandedPaneID = nil }
+        if tasksPopoverPaneID == paneID { tasksPopoverPaneID = nil }
         scheduleSave()
     }
 
@@ -450,6 +450,17 @@ final class Workspace {
         }
     }
 
+    func toggleTasksPopover() {
+        guard let id = focusedPaneID else { return }
+        tasksPopoverPaneID = tasksPopoverPaneID == id ? nil : id
+    }
+
+    var focusedPaneHasWorktree: Bool {
+        guard let id = focusedPaneID, let pane = pane(id: id) else { return false }
+        if case .terminal = pane.activeTab.content { return true }
+        return false
+    }
+
     func expandPane(paneID: UUID) {
         expandedPaneID = paneID
         focusedPaneID = paneID
@@ -502,13 +513,12 @@ final class Workspace {
         return devScript(paneID: id)
     }
 
-    func tabLabel(_ tab: Tab, fallback: String) -> String {
+    func tabLabel(_ tab: Tab) -> String {
         if let name = tab.name, !name.isEmpty { return name }
         switch tab.content {
         case .terminal(_, let worktreeID): return worktreeID
         case .shell(let cwd): return cwd.lastPathComponent
         case .widget(let kind): return kind.label
-        case .tasks: return fallback
         case .browser(_, let worktreeID, _): return worktreeID
         case .simulator(_, let worktreeID, _): return worktreeID
         }
@@ -550,7 +560,7 @@ final class Workspace {
         tiling.panes.filter {
             switch $0.activeTab.content {
             case .terminal, .shell: return true
-            case .tasks, .widget, .browser, .simulator: return false
+            case .widget, .browser, .simulator: return false
             }
         }
     }
@@ -666,10 +676,6 @@ final class Workspace {
                 let content: TabContent = .shell(cwd: cwd)
                 if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
                 else { addPane(content) }
-            case .newTaskPane(let listID):
-                let content: TabContent = .tasks(listID: listID)
-                if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
-                else { addPane(content) }
             case .newWidget(let kind):
                 let content: TabContent = .widget(kind)
                 if let targetID { splitPane(paneID: targetID, edge: edge, content: content) }
@@ -732,7 +738,6 @@ final class WorkspaceStore {
     var selectedWorkspaceID: UUID?
 
     private let repoStore: RepoStore
-    private let taskListStore: TaskListStore
     let worktreePaths: WorktreePaths
     let worktreeStatusService: WorktreeStatusService
     let localHostRegistry: LocalHostRegistry
@@ -741,9 +746,8 @@ final class WorkspaceStore {
 
     private static let selectedKey = "selectedWorkspaceID"
 
-    init(repoStore: RepoStore, taskListStore: TaskListStore) {
+    init(repoStore: RepoStore) {
         self.repoStore = repoStore
-        self.taskListStore = taskListStore
         self.worktreePaths = WorktreePaths()
         self.worktreeStatusService = WorktreeStatusService(repoStore: repoStore)
         self.localHostRegistry = LocalHostRegistry()
@@ -762,7 +766,6 @@ final class WorkspaceStore {
         let ws = Workspace(
             name: finalName,
             repoStore: repoStore,
-            taskListStore: taskListStore,
             worktreePaths: worktreePaths,
             worktreeStatusService: worktreeStatusService
         )
@@ -954,7 +957,6 @@ final class WorkspaceStore {
                 root: snap.root,
                 minimizedPanes: snap.minimizedPanes,
                 repoStore: repoStore,
-                taskListStore: taskListStore,
                 worktreePaths: worktreePaths,
                 worktreeStatusService: worktreeStatusService
             )
