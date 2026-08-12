@@ -28,15 +28,16 @@ final class WorktreeManager {
         if await isRegistered() { return path }
 
         if baseBranch.hasPrefix("origin/") {
-            _ = try? await run("git", args: ["-C", repoRoot.path, "fetch", "origin", "--quiet"])
+            let ref = String(baseBranch.dropFirst("origin/".count))
+            _ = try? await run("git", args: ["-C", repoRoot.path, "fetch", "origin", ref, "--no-tags", "--quiet"])
         }
 
         for attempt in 0..<2 {
             let added = try await run("git", args: ["-C", repoRoot.path, "worktree", "add", path.path, "-b", name, baseBranch])
             if added.status == 0 { return path }
+            if await isRegistered() { return path }
             let fallback = try await run("git", args: ["-C", repoRoot.path, "worktree", "add", path.path, baseBranch])
             if fallback.status == 0 { return path }
-
             if await isRegistered() { return path }
             guard attempt == 0 else { throw WorktreeError.createFailed(fallback.stderr) }
             try? FileManager.default.removeItem(at: path)
