@@ -35,6 +35,7 @@
 		52E38A0A2F1A5A340174EE81 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52683043549EE708AC508136 /* KeychainStore.swift */; };
 		56CB18171A578DECD2613656 /* TileNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67FC19651849CFB42A1D4A3A /* TileNode.swift */; };
 		585484B172F60EB3A21E8D7C /* PinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2701F83AE83DE7286C13ED90 /* PinStore.swift */; };
+		5911E5CC84FB90B1B37A1C79 /* TaskNudgeOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 005ED6F0057C96C86A270501 /* TaskNudgeOverlay.swift */; };
 		5A417EACA60EC596FDD22E8D /* Markup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D3ADD765174C116F2A8724A /* Markup.swift */; };
 		5B7EA870BAD5BD55A4926917 /* PluriSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 658E63739A71DF77F181FC44 /* PluriSettingsView.swift */; };
 		5BFF6AC69093B72FBE9F32BC /* TerminalSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 311D5BA84A083B24731CB565 /* TerminalSession.swift */; };
@@ -84,6 +85,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		005ED6F0057C96C86A270501 /* TaskNudgeOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskNudgeOverlay.swift; sourceTree = "<group>"; };
 		00BD77080A2D11D1A0C7F167 /* PluriChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriChatView.swift; sourceTree = "<group>"; };
 		04A3591F4D52D920EBF984E5 /* PermissionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsService.swift; sourceTree = "<group>"; };
 		065515018075EF79019CB7AA /* PluriPairing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluriPairing.swift; sourceTree = "<group>"; };
@@ -318,6 +320,7 @@
 				5D3ADD765174C116F2A8724A /* Markup.swift */,
 				CC0C09002543DB4038C8126D /* NewWorkspaceSheet.swift */,
 				29117C68DB5FDBD775405FD1 /* SimulatorHost.swift */,
+				005ED6F0057C96C86A270501 /* TaskNudgeOverlay.swift */,
 				895712BE0FDA4CCF28A4245E /* TasksPopover.swift */,
 				BDC77F2E641969738B4482B5 /* TerminalHost.swift */,
 				A3AB0523B2C998E6BDF6FDB3 /* TerminalPaneView.swift */,
@@ -519,6 +522,7 @@
 				280CCB430242DD94E60CD1A2 /* SidebarState.swift in Sources */,
 				2C6C75F6615AD7DB23DF8141 /* SimulatorHost.swift in Sources */,
 				19997BD2F3D31B49597027C8 /* SplitDivider.swift in Sources */,
+				5911E5CC84FB90B1B37A1C79 /* TaskNudgeOverlay.swift in Sources */,
 				EF3340BCAF3B77F3AB662B92 /* TasksPopover.swift in Sources */,
 				7C59C92DEE6916476A4B02AA /* TerminalHost.swift in Sources */,
 				E8973038D7B03AFD54029DEF /* TerminalPaneView.swift in Sources */,

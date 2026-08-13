@@ -1336,6 +1336,11 @@ private struct TerminalPaneBody: View {
                                 AttachmentChipsOverlay(session: session)
                             }
                         }
+                        .overlay {
+                            if let session = workspace.terminalHosts[tabID]?.session {
+                                TaskNudgeOverlay(worktreePath: path, session: session)
+                            }
+                        }
                         .onDrop(
                             of: [.plainText],
                             delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
@@ -1560,7 +1565,7 @@ private struct PaneHeader: View {
 
     private var workerStatus: WorkerStatus? {
         guard let monitor, let path = worktreePath else { return nil }
-        return monitor.statuses[URL(fileURLWithPath: path).standardizedFileURL.path]?.status
+        return monitor.state(atWorktree: path)?.status
     }
 
     var body: some View {
