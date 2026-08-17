@@ -11,12 +11,12 @@ Goal: observe and manage multiple terminals running in parallel, each scoped to 
 ## End state
 
 - **Sidebar**: two-level tree. Repos → Worktrees. Create/rename/delete worktrees here. Worktrees are drag sources.
-- **Detail**: a `WorkspaceView` rendering a recursive `TileNode`. Dividers resize freely. Panes hold either a terminal bound to a worktree, or a task list scoped to the repo.
+- **Detail**: a `WorkspaceView` rendering a recursive `TileNode`. Dividers resize freely. Panes hold a terminal bound to a worktree.
 - **Drop zones**: dropping a worktree on a pane's edge splits that pane; dropping on the center replaces the pane.
 - **Pure tiling**. No tabs. Same worktree may appear in multiple panes (two sessions in the same directory — that's fine).
 - **Agent profile** is a property of the worktree, not the pane. Opening it anywhere respawns the right agent.
 - **Startup script** auto-runs when a worktree opens in a pane.
-- **Task panes**: repo-scoped task lists for the user's own follow-ups, bugs, notes. Not wired into agents.
+- **Tasks**: one markdown checklist per worktree, opened as a popover from the pane header. The agent in that worktree reads and ticks the same file (M16).
 - **No edges**, no task cards on a canvas, no sections, no workflow engine, no minimap, no Metal rendering.
 
 ## Data model
@@ -37,7 +37,6 @@ TileNode
 
 PaneContent
   .terminal(worktreeID: String)          // branch name
-  .tasks                                 // repo-scoped task list, no state here
 
 Split
   direction: .horizontal | .vertical
@@ -47,14 +46,13 @@ Split
 Workspace                                // one per repo, persisted to .pluricode/workspace.json
   root: TileNode?                        // nil = empty canvas
 
-TaskItem                                 // repo-scoped, persisted to .pluricode/tasks.json
-  id: UUID
-  title: String
-  done: Bool
-  createdAt: Date
+TaskItem                                 // a line in {worktree}/.pluricode/TASKS.md
+  title: String                          // "- [ ] title"
+  done: Bool                             // "- [x]"
+                                         // id is parse-time only, never persisted
 ```
 
-**What we do NOT store**: paths, branches, heads (all derived from `git worktree list`). Worktree records are not persisted separately — the list is the filesystem. Display names are the branch suffix. Per-worktree config (agent profile, startup script) lives in `{worktree}/.pluricode/worktree.json`.
+**What we do NOT store**: paths, branches, heads (all derived from `git worktree list`). Worktree records are not persisted separately — the list is the filesystem. Display names are the branch suffix. Per-worktree config (agent profile, startup script) lives in `{worktree}/.pluricode/worktree.json`, and that worktree's tasks in `{worktree}/.pluricode/TASKS.md` — so a task list has no identity of its own, and git moves and deletes it with the worktree.
 
 ---
 
@@ -124,6 +122,8 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 **Goal**: a pane can be a task list instead of a terminal. Users jot down quick todos, bugs, follow-ups, and tick them off. Scoped per-repo. Not wired to agents.
 
+**Superseded by M16.** Shipped and used, then removed: tasks are no longer a pane kind, and no longer repo-scoped. Kept here as history — every item below describes code that has since been deleted.
+
 - [x] `Workspace/TaskStore.swift`: `TaskItem` (id, title, done, createdAt) + observable `TaskStore` persisting `.pluricode/tasks.json` debounced.
 - [x] `PaneContent.tasks` variant; `TilingDragPayload.Kind.newTaskPane` maps via `paneContent` helper.
 - [x] `Workspace.addPane`/`splitPane` generalized over `PaneContent` so both kinds flow through one path.
@@ -137,20 +137,22 @@ Each milestone has a checklist. Tick items as completed across sessions.
 
 - [x] `Tiling.movePane(sourceID:to:adjacentTo:)` and `Tiling.swapPanes(a:b:)`. Move preserves the Pane struct (id + content) so TerminalHost sessions keep running.
 - [x] `TilingDragPayload.Kind.movePane(paneID:)` and a single `Workspace.acceptDrop(payload:on:edge:)` dispatcher that handles all kinds. Center drop on another pane swaps.
-- [x] `PaneHeader` and `TaskPaneHeader` are draggable with `.movePane(...)` payloads; tap-to-activate and close button still work alongside the drag.
-- [x] All drop handlers (empty workspace, terminal pane, task pane) route through the dispatcher.
+- [x] `PaneHeader` is draggable with `.movePane(...)` payloads; tap-to-activate and close button still work alongside the drag. (`TaskPaneHeader` too, until M16 removed task panes.)
+- [x] All drop handlers (empty workspace, terminal pane) route through the dispatcher.
 
 ### M9 — Named task lists per repo
 
 **Goal**: users create multiple named task lists per repo (e.g. "Bugs", "Improvements") and open each in its own pane. Dragging a specific list from the sidebar creates a pane bound to that list.
 
-- [ ] `TaskList` struct (id, name, items). `TaskStore` holds `[TaskList]` per repo. Persists to `.pluricode/tasks.json` as a list-of-lists (old flat-array format becomes unreadable — acceptable per no-backwards-compat rule).
-- [ ] `TaskStoreRegistry` shared across sidebar and workspaces, keyed by repo path, so changes in the sidebar show up live in open panes.
-- [ ] `PaneContent.tasks(listID:)` and `TilingDragPayload.Kind.newTaskPane(listID:)` carry the list identity.
-- [ ] `TaskPaneView` renders and mutates a specific list by id; header shows the list's name + counts. Missing-list pane shows an error state with Remove Pane.
-- [ ] Sidebar: under each expanded repo, below the worktrees, show a Task Lists section with draggable rows + "New Task List" action. Context menu offers Rename and Delete (confirm when list has tasks).
-- [ ] Remove the old global "Task List" drag source from the sidebar top.
-- [ ] Verify: create two lists, drag each into the canvas, add tasks in each, rename a list (panes reflect), delete a list (pane shows missing state).
+**Superseded by M16.** These items were all built — the checkboxes were simply never ticked — and M16 then reversed the direction: a list has no name and no id, because it *is* its worktree. Kept here as history; nothing below is outstanding work.
+
+- [ ] ~~`TaskList` struct (id, name, items). `TaskStore` holds `[TaskList]` per repo. Persists to `.pluricode/tasks.json` as a list-of-lists (old flat-array format becomes unreadable — acceptable per no-backwards-compat rule).~~
+- [ ] ~~`TaskStoreRegistry` shared across sidebar and workspaces, keyed by repo path, so changes in the sidebar show up live in open panes.~~
+- [ ] ~~`PaneContent.tasks(listID:)` and `TilingDragPayload.Kind.newTaskPane(listID:)` carry the list identity.~~
+- [ ] ~~`TaskPaneView` renders and mutates a specific list by id; header shows the list's name + counts. Missing-list pane shows an error state with Remove Pane.~~
+- [ ] ~~Sidebar: under each expanded repo, below the worktrees, show a Task Lists section with draggable rows + "New Task List" action. Context menu offers Rename and Delete (confirm when list has tasks).~~
+- [ ] ~~Remove the old global "Task List" drag source from the sidebar top.~~
+- [ ] ~~Verify: create two lists, drag each into the canvas, add tasks in each, rename a list (panes reflect), delete a list (pane shows missing state).~~
 
 ### M7 — Polish
 
@@ -159,7 +161,7 @@ Each milestone has a checklist. Tick items as completed across sessions.
 - [x] Pane header shows worktree/task info + profile swatch + close. Clicking the header activates the pane (sets workspace focus).
 - [x] Workspace.focusedPaneID auto-updates on add/split/close. Focused pane has an accent-color border and tinted header.
 - [x] Keyboard shortcuts via a Pane menu: ⌘W closes the focused pane, ⌘D splits right, ⌘⇧D splits down. Uses FocusedSceneValue so commands target the active workspace.
-- [x] Empty workspace copy now mentions the Task List too.
+- [x] Empty workspace copy now mentions the Task List too. (Removed in M16 — nothing is dragged from the sidebar any more.)
 - [x] Broken-worktree panes show an error state with "Remove Pane" (done earlier in M3).
 - Divider hover widening + ⌘⌥ arrow focus navigation: deferred (nice-to-have, not blocking day-to-day use).
 
@@ -291,12 +293,27 @@ A central agent ("Pluri") the user talks to in natural language; it sets up work
 - [x] Live-run fix: dispatching typed `worker '<brief>'` as one PTY line, but the line lands before zsh leaves canonical mode, whose `MAX_CANON` (1024 bytes on macOS) silently mangles longer lines — briefs are 1–2KB, so claude never launched. The brief now goes to `{worktree}/.pluricode/brief.md` and the startup line stays short: `worker "$(cat '<brief path>')"`.
 - [ ] Verify (interactive): ask Pluri for a multi-task fan-out — card appears, Approve dispatches all workers and Pluri acknowledges; a task chip opens the thread, a reply lands in the worker's terminal and echoes in the timeline; Open Pane jumps to the pane; Re-dispatch revives a dead task. *(First run surfaced the brief-length bug above; re-run pending.)*
 
+### M16 — Worktree tasks in a header popover
+
+**Goal**: replace repo-scoped task *panes* with one markdown checklist per worktree, opened from the pane header, that the agent working in that worktree can read and tick off. Supersedes M6 and M9.
+
+- [x] `Workspace/WorktreeTasks.swift`: `TaskItem` (title, done) + `@MainActor WorktreeTaskStore` keyed by worktree path, backed by `{worktree}/.pluricode/TASKS.md`. Writes go straight to disk — every mutation is a discrete user action, so there is no debounce to lose on quit. The reload guard compares *rendered* text, so the store's own writes don't bounce back through the watcher as view churn.
+- [x] Identity is the worktree path, so git carries the file: `worktree move` survives a branch rename with no reference bookkeeping, `worktree remove` deletes the tasks with it. `TaskList` (id + name), the persisted UUID and `createdAt` are gone; order is file order.
+- [x] `TabContent.tasks` and `TilingDragPayload.Kind.newTaskPane` deleted, and with them the drop simulation, `TaskPaneBody`, the sidebar Task Lists section, both sheets, `TaskListStore`, and the missing-list error state — no longer representable, since a list cannot outlive its worktree.
+- [x] `TasksPopover` hangs off a badged `checklist` button in `PaneHeader`. ⌘L toggles it on the focused pane via `Workspace.tasksPopoverPaneID`; dismissing hands first responder back to SwiftTerm so the next keystrokes reach the agent.
+- [x] One `DirectoryWatcher` per worktree, so an agent ticking a box updates the header badge while the popover is closed.
+- [x] `WorkerHooks.install` adds a second `SessionStart` hook emitting the open items as context, so a fresh session starts knowing what is queued. Silent, exit 0, when the file is missing, empty, or fully checked.
+- [x] `TaskNudgeOverlay`: once a worktree has been `.done` (Stop hook) for 30s with an open item, a capsule offers to start the top one via `TerminalSession.submit`. The dwell arms the offer, a click sends it — the app never types on its own, and any status change re-arms so it cannot fire mid-conversation. Deliberately not `session.isIdle`, a 4s PTY-quiet timer that also trips on permission prompts and while reading.
+- [x] Snapshots holding a tasks pane no longer decode, and `WorkspaceStore.load` drops the whole workspace on a failed decode; two local snapshots were repaired by stripping the dead panes and collapsing splits the way `Tiling.remove` does.
+- [ ] Verify (interactive): ⌘L files an item and Escape returns focus to the agent; the badge updates when the agent edits `TASKS.md`; the capsule appears after 30s idle and its click lands the task as a prompt. *(Builds + launches clean; needs a live agent turn to drive end-to-end.)*
+- Not built: no open-count on the sidebar worktree rows, so a worktree's tasks are only visible while it sits in a pane. Repo-level backlogs have no home — the model is per-worktree only.
+
 ---
 
 ## Ordering
 
-M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last. M10 (browser) is independent of the task-list work; its three phases are sequential (each builds on the last). M11 → M12 → M13 → M14 → M15 are sequential: each Pluri milestone proves the previous before adding machinery.
+M1 → M2 → M3 → M4 are strictly sequential (each needs the previous). M5 and M6 are independent after M4 and can be done in either order. M7 last. M10 (browser) is independent of the task-list work; its three phases are sequential (each builds on the last). M11 → M12 → M13 → M14 → M15 are sequential: each Pluri milestone proves the previous before adding machinery. M16 replaces M6/M9 and depends on M14's hook events for its idle signal.
 
 ## Open decisions
 
-- Should task panes have multiple lists per repo (so separate "Now" / "Backlog" panes can show different slices), or a single shared list? Deferring — start with single shared list in M6; revisit if it feels cramped.
+- ~~Should task panes have multiple lists per repo, or a single shared list?~~ Resolved in M16: neither. Tasks are scoped to a worktree, not a repo, and a worktree has exactly one list — so there is nothing to name and nothing to pick between.
