@@ -29,6 +29,10 @@ final class PluriMonitor {
         drain()
     }
 
+    func state(atWorktree path: String) -> WorkerState? {
+        statuses[URL(fileURLWithPath: path).standardizedFileURL.path]
+    }
+
     private func drain() {
         let urls = ((try? FileManager.default.contentsOfDirectory(
             at: WorkerHooks.eventsDir,

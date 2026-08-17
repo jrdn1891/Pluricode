@@ -2,15 +2,12 @@ import SwiftUI
 
 struct RepoSidebarView: View {
     let repoStore: RepoStore
-    let taskListStore: TaskListStore
     let workspaceStore: WorkspaceStore
     let pinStore: PinStore
     let sidebarState: SidebarState
     @State private var newWorktreeRepo: RepoEntry?
     @State private var renameTarget: RenameTarget?
     @State private var configureRepo: RepoEntry?
-    @State private var creatingList = false
-    @State private var renameListTarget: TaskList?
     @State private var creatingWorkspace = false
     @State private var renameWorkspaceTarget: Workspace?
     @State private var pendingConfirmation: ConfirmationPrompt?
@@ -36,7 +33,7 @@ struct RepoSidebarView: View {
                             Button("Delete", role: .destructive) {
                                 pendingConfirmation = .destructive(
                                     title: "Delete workspace \(ws.name)?",
-                                    message: "Panes are removed from the canvas. Worktrees and task lists are untouched."
+                                    message: "Panes are removed from the canvas. Worktrees are untouched."
                                 ) {
                                     workspaceStore.removeWorkspace(id: ws.id)
                                 }
@@ -46,30 +43,6 @@ struct RepoSidebarView: View {
             } header: {
                 SidebarSectionHeader(title: "Workspaces") { creatingWorkspace = true }
             }
-
-            Section {
-                ForEach(taskListStore.lists) { list in
-                    TaskListRow(list: list, workspaceStore: workspaceStore)
-                        .contextMenu {
-                            Button("Rename...") { renameListTarget = list }
-                            Divider()
-                            Button("Delete", role: .destructive) {
-                                let count = list.items.count
-                                pendingConfirmation = .destructive(
-                                    title: "Delete list \(list.name)?",
-                                    message: count == 0
-                                        ? "The list is empty. This cannot be undone."
-                                        : "This will delete \(count) task\(count == 1 ? "" : "s")."
-                                ) {
-                                    taskListStore.removeList(id: list.id)
-                                }
-                            }
-                        }
-                }
-            } header: {
-                SidebarSectionHeader(title: "Task Lists") { creatingList = true }
-            }
-            .selectionDisabled()
 
             if !pinStore.pins.isEmpty {
                 Section("Pinned") {
@@ -159,12 +132,6 @@ struct RepoSidebarView: View {
         }
         .sheet(item: $configureRepo) { repo in
             ConfigureRepoSheet(repo: repo)
-        }
-        .sheet(isPresented: $creatingList) {
-            NewTaskListSheet(store: taskListStore)
-        }
-        .sheet(item: $renameListTarget) { list in
-            RenameTaskListSheet(store: taskListStore, list: list)
         }
         .confirmation($pendingConfirmation)
     }
@@ -713,45 +680,6 @@ struct WorktreeRow<MenuContent: View>: View {
     }
 }
 
-struct TaskListRow: View {
-    let list: TaskList
-    let workspaceStore: WorkspaceStore
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "checklist")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-            Text(list.name)
-                .font(.body)
-            Spacer()
-            if list.items.count > 0 {
-                Text("\(list.items.filter { !$0.done }.count)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .contentShape(Rectangle())
-        .padding(.vertical, 1)
-        .onDrag({
-            let payload = TilingDragPayload(kind: .newTaskPane(listID: list.id))
-            workspaceStore.selectedWorkspace?.beginDrag(payload)
-            let data = (try? JSONEncoder().encode(payload)) ?? Data()
-            let string = String(data: data, encoding: .utf8) ?? ""
-            return NSItemProvider(object: string as NSString)
-        }, preview: {
-            HStack(spacing: 6) {
-                Image(systemName: "checklist")
-                Text(list.name)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.accentColor.opacity(0.2))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-        })
-    }
-}
-
 private struct RenameWorkspaceSheet: View {
     let workspace: Workspace
     let workspaceStore: WorkspaceStore
@@ -989,70 +917,3 @@ private struct RenameWorktreeSheet: View {
     }
 }
 
-private struct NewTaskListSheet: View {
-    let store: TaskListStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var name: String = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("New Task List")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Name").font(.caption).foregroundStyle(.secondary)
-                TextField("Bugs", text: $name)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Create") {
-                    _ = store.addList(name: name)
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding(24)
-        .frame(width: 360)
-    }
-}
-
-private struct RenameTaskListSheet: View {
-    let store: TaskListStore
-    let list: TaskList
-    @Environment(\.dismiss) private var dismiss
-    @State private var name: String = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Rename Task List")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Name").font(.caption).foregroundStyle(.secondary)
-                TextField("Bugs", text: $name)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            HStack {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button("Rename") {
-                    store.renameList(id: list.id, name: name)
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .padding(24)
-        .frame(width: 360)
-        .onAppear { name = list.name }
-    }
-}

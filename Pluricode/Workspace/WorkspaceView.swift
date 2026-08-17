@@ -136,7 +136,7 @@ private struct GhostLayoutOverlay: View {
 
     var body: some View {
         TileView(node: root, tiling: tiling) { pane in
-            GhostPane(pane: pane, isHighlight: highlightedIDs.contains(pane.id), workspace: workspace)
+            GhostPane(pane: pane, isHighlight: highlightedIDs.contains(pane.id))
         }
     }
 }
@@ -144,7 +144,6 @@ private struct GhostLayoutOverlay: View {
 private struct GhostPane: View {
     let pane: Pane
     let isHighlight: Bool
-    let workspace: Workspace
 
     var body: some View {
         ZStack {
@@ -183,7 +182,6 @@ private struct GhostPane: View {
         switch pane.activeTab.content {
         case .terminal: return "arrow.triangle.branch"
         case .shell: return "folder"
-        case .tasks: return "checklist"
         case .widget(let kind): return kind.systemImage
         case .browser: return "globe"
         case .simulator: return "iphone"
@@ -196,8 +194,6 @@ private struct GhostPane: View {
             return worktreeID
         case .shell(let cwd):
             return cwd.lastPathComponent
-        case .tasks(let listID):
-            return workspace.taskListStore.lists.first { $0.id == listID }?.name ?? "Tasks"
         case .widget(let kind):
             return kind.label
         case .browser(_, let worktreeID, _):
@@ -220,11 +216,6 @@ private struct EmptyWorkspace: View {
             Text("Drag a worktree here")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-            Text("Or drag a Task List from the sidebar to jot down quick notes.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
@@ -278,8 +269,6 @@ private struct TabBody: View {
             )
         case .shell(let cwd):
             ShellPaneBody(pane: pane, tabID: tab.id, cwd: cwd, workspace: workspace)
-        case .tasks(let listID):
-            TaskPaneBody(pane: pane, tabID: tab.id, listID: listID, workspace: workspace)
         case .widget(.localHosts):
             WidgetPaneBody(pane: pane, tabID: tab.id, workspace: workspace)
         case .browser(let repoID, let worktreeID, let url):
@@ -1189,7 +1178,7 @@ private struct TabStrip: View {
         HStack(spacing: 2) {
             ForEach(pane.tabs) { tab in
                 TabCell(
-                    label: workspace.tabLabel(tab, fallback: "tab"),
+                    label: workspace.tabLabel(tab),
                     isActive: tab.id == pane.activeTabID,
                     onSelect: { workspace.setActiveTab(paneID: pane.id, tabID: tab.id) },
                     onClose: { workspace.closeTab(paneID: pane.id, tabID: tab.id) }
@@ -1284,34 +1273,6 @@ private struct PaneFrame<Content: View>: View {
     }
 }
 
-private struct TaskPaneBody: View {
-    let pane: Pane
-    let tabID: UUID
-    let listID: UUID
-    let workspace: Workspace
-
-    var body: some View {
-        GeometryReader { geo in
-            TaskPaneView(
-                paneID: pane.id,
-                listID: listID,
-                store: workspace.taskListStore,
-                workspace: workspace,
-                onActivate: { workspace.setFocus(paneID: pane.id) },
-                onMinimize: workspace.canMinimize(paneID: pane.id)
-                    ? { workspace.minimizePane(paneID: pane.id) }
-                    : nil,
-                onClose: { workspace.closeTab(paneID: pane.id, tabID: tabID) }
-            )
-            .frame(width: geo.size.width, height: geo.size.height)
-            .onDrop(
-                of: [.plainText],
-                delegate: PaneDropDelegate(paneID: pane.id, workspace: workspace, size: geo.size)
-            )
-        }
-    }
-}
-
 private struct TerminalPaneBody: View {
     let pane: Pane
     let tabID: UUID
@@ -1373,6 +1334,11 @@ private struct TerminalPaneBody: View {
                         .overlay {
                             if let session = workspace.terminalHosts[tabID]?.session {
                                 AttachmentChipsOverlay(session: session)
+                            }
+                        }
+                        .overlay {
+                            if let session = workspace.terminalHosts[tabID]?.session {
+                                TaskNudgeOverlay(worktreePath: path, session: session)
                             }
                         }
                         .onDrop(
@@ -1574,6 +1540,7 @@ private struct PaneHeader: View {
     let onSimulator: (() -> Void)?
     @State private var devScript: String?
     @Environment(PluriMonitor.self) private var monitor: PluriMonitor?
+    @Environment(WorktreeTaskStore.self) private var taskStore
 
     private var isMerged: Bool {
         guard let tab = pane.tabs.first(where: { $0.id == tabID }),
@@ -1581,9 +1548,24 @@ private struct PaneHeader: View {
         return workspace.worktreeStatusService.status(repoID: repoID, branch: worktreeID).isMerged
     }
 
+    private var worktreePath: String? {
+        workspace.worktreePath(tabID: tabID)
+    }
+
+    private var tasksPopover: Binding<Bool> {
+        Binding(
+            get: { workspace.tasksPopoverPaneID == pane.id },
+            set: { shown in
+                workspace.tasksPopoverPaneID = shown ? pane.id : nil
+                guard !shown else { return }
+                DispatchQueue.main.async { workspace.terminalHosts[tabID]?.focusInput() }
+            }
+        )
+    }
+
     private var workerStatus: WorkerStatus? {
-        guard let monitor, let path = workspace.worktreePath(tabID: tabID) else { return nil }
-        return monitor.statuses[URL(fileURLWithPath: path).standardizedFileURL.path]?.status
+        guard let monitor, let path = worktreePath else { return nil }
+        return monitor.state(atWorktree: path)?.status
     }
 
     var body: some View {
@@ -1609,6 +1591,9 @@ private struct PaneHeader: View {
                     .help(status.help)
             }
             Spacer()
+            if let worktreePath {
+                tasksButton(worktreePath: worktreePath)
+            }
             if devScript != nil || onPreview != nil || onSimulator != nil {
                 previewMenu
             }
@@ -1648,6 +1633,9 @@ private struct PaneHeader: View {
         .task(id: tabID) {
             devScript = workspace.devScript(paneID: pane.id)
         }
+        .task(id: worktreePath) {
+            if let worktreePath { taskStore.open(path: worktreePath) }
+        }
         .draggable(beginMoveDrag()) {
             HStack(spacing: 6) {
                 Image(systemName: isMerged ? "arrow.trianglehead.merge" : "arrow.triangle.branch")
@@ -1657,6 +1645,23 @@ private struct PaneHeader: View {
             .padding(.vertical, 6)
             .background(Color.accentColor.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    private func tasksButton(worktreePath: String) -> some View {
+        let open = taskStore.openCount(at: worktreePath)
+        return Button { workspace.tasksPopoverPaneID = pane.id } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "checklist")
+                if open > 0 { Text("\(open)") }
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(open > 0 ? Color.accentColor : .secondary)
+        }
+        .buttonStyle(.plain)
+        .help("Tasks for this worktree (⌘L)")
+        .popover(isPresented: tasksPopover, arrowEdge: .bottom) {
+            TasksPopover(worktreePath: worktreePath, store: taskStore)
         }
     }
 
@@ -1884,7 +1889,6 @@ private struct MinimizedPaneChip: View {
         switch item.pane.activeTab.content {
         case .terminal: "arrow.triangle.branch"
         case .shell: "folder"
-        case .tasks: "checklist"
         case .widget(let kind): kind.systemImage
         case .browser: "globe"
         case .simulator: "iphone"
@@ -1897,7 +1901,6 @@ private struct MinimizedPaneChip: View {
         switch tab.content {
         case .terminal(_, let worktreeID): return worktreeID
         case .shell(let cwd): return cwd.lastPathComponent
-        case .tasks(let listID): return workspace.taskListStore.list(id: listID)?.name ?? "Tasks"
         case .widget(let kind): return kind.label
         case .browser(_, let worktreeID, _): return worktreeID
         case .simulator(_, let worktreeID, _): return worktreeID
@@ -1980,7 +1983,7 @@ private struct ExpandedPaneCard: View {
                 worktreeID: worktreeID,
                 workspace: workspace
             )
-        case .tasks, .widget:
+        case .widget:
             EmptyView()
         }
     }

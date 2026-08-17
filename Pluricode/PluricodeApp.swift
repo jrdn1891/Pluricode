@@ -3,7 +3,7 @@ import AppKit
 
 struct PluricodeApp: App {
     @State private var repoStore = RepoStore()
-    @State private var taskListStore = TaskListStore()
+    @State private var taskStore = WorktreeTaskStore()
     @State private var workspaceStore: WorkspaceStore
     @State private var pinStore: PinStore
     @State private var sidebarState: SidebarState
@@ -20,12 +20,10 @@ struct PluricodeApp: App {
 
     init() {
         let repos = RepoStore()
-        let lists = TaskListStore()
         let sidebar = SidebarState()
-        let store = WorkspaceStore(repoStore: repos, taskListStore: lists)
+        let store = WorkspaceStore(repoStore: repos)
         let pins = PinStore()
         _repoStore = State(initialValue: repos)
-        _taskListStore = State(initialValue: lists)
         _sidebarState = State(initialValue: sidebar)
         _workspaceStore = State(initialValue: store)
         _pinStore = State(initialValue: pins)
@@ -53,7 +51,6 @@ struct PluricodeApp: App {
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 RepoSidebarView(
                     repoStore: repoStore,
-                    taskListStore: taskListStore,
                     workspaceStore: workspaceStore,
                     pinStore: pinStore,
                     sidebarState: sidebarState
@@ -117,6 +114,7 @@ struct PluricodeApp: App {
             }
             .confirmation($pendingConfirmation)
             .environment(pluriMonitor)
+            .environment(taskStore)
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
@@ -224,6 +222,12 @@ struct PaneCommands: View {
         .disabled(workspace?.focusedPaneID == nil)
 
         Divider()
+
+        Button("Tasks") {
+            workspace?.toggleTasksPopover()
+        }
+        .keyboardShortcut("l", modifiers: .command)
+        .disabled(workspace?.focusedPaneHasWorktree != true)
 
         Button("Run Dev") {
             workspace?.runDevScriptOnFocusedPane()
